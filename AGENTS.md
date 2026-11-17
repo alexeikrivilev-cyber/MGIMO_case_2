@@ -66,7 +66,7 @@ Single-context: корневой `GLOSSARY.md` и `docs/adr/`. See `docs/agents/
 
 ## Delegation hierarchy (critical — read before running any implementation task)
 
-- Code / implementation / refactor / test tasks: delegate through Hermes — . Hermes is the team lead: it analyzes the task, delegates execution to OpenCode (), reviews the result, and reports back. NEVER call  or  directly from the project agent — that skips review and breaks the quality loop.
-- Visual / design / UI tasks: , also routed via Hermes for non-trivial work.
+- Code / implementation / refactor / test tasks: delegate through Hermes — `hermes-lead --dir <project> "<prompt>"`. Hermes is the team lead: it analyzes the task, delegates execution to OpenCode (`opencode-worker`), reviews the result, and reports back. NEVER call `opencode-worker` or `opencode run` directly from the project agent — that skips review and breaks the quality loop.
+- Visual / design / UI tasks: `opendesign-worker --dir <project> "<prompt>"`, also routed via Hermes for non-trivial work.
 - Direct exec is only for small mechanical steps (a single command, a quick check, reading a file).
 - The thinking-* skills apply at every level: Hermes picks the decision framework, the project agent verifies the outcome.

@@ -1,0 +1,268 @@
+// Prisma 7: datasource БЕЗ url — строка подключения задаётся в prisma.config.ts
+// через process.env.DATABASE_URL и пробрасывается в адаптер PrismaPg.
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  STUDENT
+  STAFF
+  ADMIN
+}
+
+enum ScheduleType {
+  LECTURE
+  SEMINAR
+  LAB
+}
+
+enum ScheduleStatus {
+  SCHEDULED
+  MOVED
+  CANCELLED
+}
+
+enum GradeType {
+  EXAM
+  CREDIT
+  COURSEWORK
+}
+
+enum RequestType {
+  REFERENCE
+  APPLICATION
+}
+
+enum RequestStatus {
+  NEW
+  IN_PROGRESS
+  READY
+  REJECTED
+}
+
+enum AnnouncementAudience {
+  ALL
+  FACULTY
+  GROUP
+}
+
+enum NotificationType {
+  SCHEDULE_CHANGE
+  GRADE
+  REQUEST_STATUS
+  ANNOUNCEMENT
+  DEADLINE
+  SYSTEM
+}
+
+model User {
+  id           String   @id @default(uuid())
+  login        String   @unique
+  passwordHash String
+  role         Role
+  createdAt    DateTime @default(now())
+
+  student       Student?
+  teacher       Teacher?
+  sessions      Session[]
+  notifications Notification[]
+  announcements Announcement[]
+  auditEvents   AuditEvent[]
+
+  @@map("users")
+}
+
+model Student {
+  id               String  @id @default(uuid())
+  userId           String  @unique
+  lastName         String
+  firstName        String
+  middleName       String?
+  faculty          String
+  direction        String
+  course           Int
+  groupId          String
+  email            String  @unique
+  studentCardNumber String @unique
+  phone            String?
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Restrict)
+  group  Group  @relation(fields: [groupId], references: [id], onDelete: Restrict)
+  grades Grade[]
+  requests Request[]
+
+  @@index([faculty])
+  @@index([groupId])
+  @@map("students")
+}
+
+model Teacher {
+  id         String  @id @default(uuid())
+  userId     String  @unique
+  lastName   String
+  firstName  String
+  middleName String?
+  department String
+  position   String
+
+  user            User             @relation(fields: [userId], references: [id], onDelete: Restrict)
+  scheduleEntries ScheduleEntry[]
+
+  @@index([department])
+  @@map("teachers")
+}
+
+model Subject {
+  id   String @id @default(uuid())
+  name String
+  code String @unique
+
+  scheduleEntries ScheduleEntry[]
+  grades          Grade[]
+
+  @@map("subjects")
+}
+
+model Group {
+  id        String @id @default(uuid())
+  name      String @unique
+  faculty   String
+  course    Int
+  direction String
+
+  students      Student[]
+  scheduleEntries ScheduleEntry[]
+  announcements Announcement[]
+
+  @@index([faculty, course])
+  @@map("groups")
+}
+
+model ScheduleEntry {
+  id          String         @id @default(uuid())
+  groupId     String
+  subjectId   String
+  teacherId   String
+  date        DateTime       @db.Date
+  startTime   String
+  endTime     String
+  room        String
+  type        ScheduleType
+  status      ScheduleStatus @default(SCHEDULED)
+  note        String?
+  movedToDate DateTime?      @db.Date
+  movedToRoom String?
+
+  group   Group   @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  subject Subject @relation(fields: [subjectId], references: [id], onDelete: Restrict)
+  teacher Teacher @relation(fields: [teacherId], references: [id], onDelete: Restrict)
+
+  @@index([groupId, date])
+  @@index([teacherId, date])
+  @@map("schedule_entries")
+}
+
+model Grade {
+  id        String    @id @default(uuid())
+  studentId String
+  subjectId String
+  value     Int?
+  passed    Boolean?
+  type      GradeType
+  date      DateTime  @db.Date
+  semester  Int
+
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  subject Subject @relation(fields: [subjectId], references: [id], onDelete: Restrict)
+
+  @@unique([studentId, subjectId, semester, type])
+  @@index([studentId, semester])
+  @@map("grades")
+}
+
+model Request {
+  id           String        @id @default(uuid())
+  studentId    String
+  type         RequestType
+  formData     Json
+  status       RequestStatus @default(NEW)
+  staffComment String?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@index([studentId, createdAt])
+  @@index([status])
+  @@map("requests")
+}
+
+model Announcement {
+  id          String               @id @default(uuid())
+  title       String
+  body        String
+  audience    AnnouncementAudience
+  faculty     String?
+  groupId     String?
+  pinned      Boolean              @default(false)
+  authorId    String
+  publishedAt DateTime             @default(now())
+
+  author User   @relation(fields: [authorId], references: [id], onDelete: Restrict)
+  group  Group? @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@index([audience, publishedAt])
+  @@map("announcements")
+}
+
+model Notification {
+  id        String           @id @default(uuid())
+  userId    String
+  type      NotificationType
+  title     String
+  body      String
+  read      Boolean          @default(false)
+  link      String?
+  createdAt DateTime         @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, read])
+  @@map("notifications")
+}
+
+model Session {
+  id        String   @id @default(uuid())
+  userId    String
+  tokenHash String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  ip        String?
+  userAgent String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("sessions")
+}
+
+model AuditEvent {
+  id          String   @id @default(uuid())
+  actorUserId String
+  action      String
+  entity      String
+  entityId    String?
+  meta        Json?
+  createdAt   DateTime @default(now())
+
+  actor User @relation(fields: [actorUserId], references: [id], onDelete: Restrict)
+
+  @@index([entity, entityId])
+  @@index([createdAt])
+  @@map("audit_events")
+}

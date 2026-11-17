@@ -4,6 +4,9 @@ out/
 dist/
 *.tsbuildinfo
 next-env.d.ts
+coverage/
+.turbo/
+.vercel/
 
 .env
 .env.*
