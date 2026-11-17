@@ -1,0 +1,40 @@
+{
+  "name": "Цифровой деканат — УдГУ",
+  "short_name": "Деканат УдГУ",
+  "description": "Учебный концепт для конкурса: личный кабинет студента УдГУ — расписание, успеваемость, заявки и уведомления в одном месте. Не официальный сервис университета.",
+  "start_url": "/login",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0b0e14",
+  "theme_color": "#818cf8",
+  "lang": "ru",
+  "dir": "ltr",
+  "categories": ["education", "productivity"],
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

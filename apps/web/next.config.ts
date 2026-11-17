@@ -43,6 +43,22 @@ const nextConfig: NextConfig = {
   serverExternalPackages: ['argon2'],
   output: 'standalone',
   reactStrictMode: true,
+  async headers() {
+    return [
+      {
+        // Service-Worker-Allowed: / — без него браузер ограничивает scope
+        // service worker каталогом файла (/), и оболочка не перехватывала
+        // бы навигацию по всему кабинету.
+        source: '/sw.js',
+        headers: [
+          { key: 'Service-Worker-Allowed', value: '/' },
+          // Обновления воркера должны доходить до клиента сразу:
+          // закешированный sw.js иначе живёт в браузере часами.
+          { key: 'Cache-Control', value: 'no-cache, no-store, must-revalidate' },
+        ],
+      },
+    ];
+  },
 };
 
 export default nextConfig;

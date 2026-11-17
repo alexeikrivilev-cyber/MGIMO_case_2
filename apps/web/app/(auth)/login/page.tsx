@@ -40,6 +40,9 @@ const DEMO_ACCOUNTS: readonly string[] = [
 
 const NETWORK_ERROR = 'Не удалось связаться с сервером. Проверьте соединение и попробуйте снова.';
 
+/** Идентификатор текста ошибки: поля формы ссылаются на него через aria-describedby. */
+const LOGIN_ERROR_ID = 'login-form-error';
+
 /** Текст ошибки входа: для 429 — минуты ожидания из заголовка Retry-After. */
 function loginErrorMessage(error: unknown): string {
   if (error instanceof ApiClientError) {
@@ -119,6 +122,7 @@ export default function LoginPage(): React.JSX.Element {
           value={login}
           disabled={busy}
           aria-invalid={error !== null}
+          aria-describedby={error === null ? undefined : LOGIN_ERROR_ID}
           onChange={(event) => setLogin(event.target.value)}
         />
         <TextInput
@@ -130,12 +134,20 @@ export default function LoginPage(): React.JSX.Element {
           value={password}
           disabled={busy}
           aria-invalid={error !== null}
+          aria-describedby={error === null ? undefined : LOGIN_ERROR_ID}
           onChange={(event) => setPassword(event.target.value)}
         />
 
-        <div aria-live="polite" role="status">
+        {/* Ошибка входа — живая область role=alert (WCAG 4.1.3): скринридер
+            зачитывает сообщение сразу, без перехода к другому блоку. Через
+            aria-describedby ошибка связана с обоими полями формы. */}
+        <div role="alert">
           {error === null ? null : (
-            <p className="rounded-md bg-danger-soft px-3 py-2 text-sm font-medium text-danger" data-testid="login-error">
+            <p
+              className="rounded-md bg-danger-soft px-3 py-2 text-sm font-medium text-danger"
+              id={LOGIN_ERROR_ID}
+              data-testid="login-error"
+            >
               {error}
             </p>
           )}

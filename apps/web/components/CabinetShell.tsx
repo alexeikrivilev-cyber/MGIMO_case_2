@@ -79,6 +79,13 @@ export function CabinetShell({ children }: { children: ReactNode }): React.JSX.E
 
   return (
     <div className="flex min-h-screen flex-col overflow-x-hidden bg-bg">
+      {/* Skip-link — первый фокус-элемент страницы (WCAG 2.4.1):
+          с клавиатуры можно сразу перейти к содержимому, минуя шапку
+          и пять пунктов навигации. */}
+      <a href="#main-content" className="skip-link">
+        Перейти к содержимому
+      </a>
+
       {/* Шапка + баннер концепта: закреплены сверху, всегда на виду */}
       <div className="sticky top-0 z-20">
         <ConceptBanner />
@@ -102,10 +109,12 @@ export function CabinetShell({ children }: { children: ReactNode }): React.JSX.E
       </div>
 
       {/* Контент: pb-28 — место под зафиксированную нижнюю навигацию */}
-      <main className="mx-auto w-full max-w-2xl flex-1 px-4 py-4 pb-28">{children}</main>
+      <main id="main-content" className="mx-auto w-full max-w-2xl flex-1 px-4 py-4 pb-28">
+        {children}
+      </main>
 
       <nav
-        aria-label="Разделы кабинета"
+        aria-label="Основная навигация"
         className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-surface pb-[env(safe-area-inset-bottom)]"
       >
         <ul className="mx-auto flex w-full max-w-2xl">

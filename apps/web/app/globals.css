@@ -44,3 +44,50 @@
     @apply bg-bg text-text font-sans antialiased;
   }
 }
+
+/*
+ * Skip-link «Перейти к содержимому» (WCAG 2.4.1 Bypass Blocks).
+ * Первый фокус-элемент страницы: скрыт сдвигом, появляется по
+ * :focus-visible — доступен с клавиатуры, но не мешает мыши.
+ */
+@layer components {
+  .skip-link {
+    position: absolute;
+    left: 0.75rem;
+    top: 0.75rem;
+    z-index: var(--udgu-z-toast);
+    border-radius: var(--udgu-radius-md);
+    background-color: var(--udgu-color-primary);
+    color: var(--udgu-color-on-primary);
+    padding: 0.5rem 0.75rem;
+    font-size: var(--udgu-text-sm);
+    font-weight: var(--udgu-font-medium);
+    text-decoration: none;
+    transform: translateY(-250%);
+    transition: transform var(--udgu-transition-fast);
+  }
+
+  .skip-link:focus-visible {
+    transform: translateY(0);
+    outline: 2px solid var(--udgu-color-primary);
+    outline-offset: 2px;
+  }
+}
+
+/*
+ * prefers-reduced-motion (WCAG 2.3.3, 2.2.2): пользователь просил не
+ * двигать интерфейс — гасим ВСЕ анимации и переходы, включая
+ * animate-pulse (скелетоны) и animate-spin (спиннеры кнопок).
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-delay: 0ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    transition-delay: 0ms !important;
+    scroll-behavior: auto !important;
+  }
+}

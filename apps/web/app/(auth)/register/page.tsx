@@ -33,6 +33,9 @@ const OAUTH_PROVIDER_LABELS: Readonly<Record<OAuthProviderPath, string>> = {
 
 const NETWORK_ERROR = 'Не удалось связаться с сервером. Проверьте соединение и попробуйте снова.';
 
+/** Идентификатор общей ошибки формы: обязательные поля ссылаются на него. */
+const FORM_ERROR_ID = 'register-form-error';
+
 /** Минимальная длина state — как в oauthCallbackSchema (битая ссылка отсевается сразу). */
 const MIN_STATE_LENGTH = 8;
 
@@ -113,6 +116,8 @@ function RegisterForm(): React.JSX.Element {
           required
           disabled={pending}
           hint="Как в студенческом: фамилия, имя и отчество."
+          aria-invalid={error !== null}
+          aria-describedby={error === null ? undefined : FORM_ERROR_ID}
           value={fullName}
           onChange={(event) => setFullName(event.target.value)}
         />
@@ -124,6 +129,8 @@ function RegisterForm(): React.JSX.Element {
           required
           disabled={pending}
           hint="Название группы показывает староста в расписании группы (например, ПИ-31)."
+          aria-invalid={error !== null}
+          aria-describedby={error === null ? undefined : FORM_ERROR_ID}
           value={groupName}
           onChange={(event) => setGroupName(event.target.value)}
         />
@@ -140,9 +147,16 @@ function RegisterForm(): React.JSX.Element {
           onChange={(event) => setLogin(event.target.value)}
         />
 
-        <div aria-live="polite" role="status">
+        {/* Общая ошибка формы — role=alert (WCAG 4.1.3), связана с
+            обязательными полями через aria-describedby. */}
+        <div role="alert">
           {error === null ? null : (
-            <p className="rounded-md bg-danger-soft px-3 py-2 text-sm font-medium text-danger">{error}</p>
+            <p
+              className="rounded-md bg-danger-soft px-3 py-2 text-sm font-medium text-danger"
+              id={FORM_ERROR_ID}
+            >
+              {error}
+            </p>
           )}
         </div>
 

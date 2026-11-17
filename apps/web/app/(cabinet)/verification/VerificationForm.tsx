@@ -111,7 +111,9 @@ export function VerificationForm(): React.JSX.Element {
           )}
         </div>
 
-        <div aria-live="polite" role="status">
+        {/* Ошибка отправки — role=alert: живая область зачитывается
+            скринридером сразу (WCAG 4.1.3). */}
+        <div role="alert">
           {error === null ? null : (
             <p className="rounded-md bg-danger-soft px-3 py-2 text-sm font-medium text-danger">{error}</p>
           )}

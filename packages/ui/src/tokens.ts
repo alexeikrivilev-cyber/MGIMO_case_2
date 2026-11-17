@@ -65,8 +65,10 @@ export const tokens = {
     lg: '0 12px 32px rgb(16 24 40 / 0.12)',
   },
   font: {
-    sans: '"Inter", "Segoe UI", system-ui, -apple-system, sans-serif',
-    mono: '"JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace',
+    // Системный стек без сетевых загрузок: требование кейса про лицензии
+    // и скорость — ни одного запроса за шрифтом. Совпадает с tokens.css.
+    sans: 'system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+    mono: 'ui-monospace, "SF Mono", Menlo, Consolas, monospace',
   },
   text: {
     xs: '0.75rem',

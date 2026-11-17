@@ -24,6 +24,7 @@ import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { NextRequest } from 'next/server';
 import { AppRouterContext } from 'next/dist/shared/lib/app-router-context.shared-runtime';
+import { PathnameContext } from 'next/dist/shared/lib/hooks-client-context.shared-runtime';
 import { dateKey } from '@udgu/core';
 import { getPrisma } from '@udgu/db';
 import { createSession } from '@udgu/core';
@@ -59,6 +60,7 @@ const { SickLeaveView } = await import('../app/(cabinet)/sick-leave/sick-leave-s
 const { TeachersView } = await import('../app/(cabinet)/teachers/teachers-screen');
 const { TeacherCardView } = await import('../app/(cabinet)/teachers/[id]/teacher-card-screen');
 const { CabinetShell } = await import('../components/CabinetShell');
+const AuthLayout = (await import('../app/(auth)/layout')).default;
 const {
   loadAnnouncementsPageData,
   loadDashboardData,
@@ -90,6 +92,35 @@ function render(element: React.ReactElement): string {
   return renderToStaticMarkup(
     <AppRouterContext.Provider value={ROUTER_CONTEXT}>{element}</AppRouterContext.Provider>,
   );
+}
+
+/**
+ * Рендер оболочки с заданным путём: CabinetShell берёт путь из
+ * usePathname (PathnameContext) — без провайдера он null, и проверить
+ * aria-current активного раздела было бы нельзя.
+ */
+function renderShellAtPath(pathname: string, children: React.ReactNode): string {
+  return renderToStaticMarkup(
+    <AppRouterContext.Provider value={ROUTER_CONTEXT}>
+      <PathnameContext.Provider value={pathname}>
+        <CabinetShell>{children}</CabinetShell>
+      </PathnameContext.Provider>
+    </AppRouterContext.Provider>,
+  );
+}
+
+/**
+ * Тег <a …>, у которого есть все перечисленные атрибуты. Порядок атрибутов
+ * в разметке Next не гарантирован, поэтому ищем по вхождению, а не порядком.
+ */
+function anchorTag(html: string, ...attributes: readonly string[]): string | null {
+  for (const match of html.matchAll(/<a [^>]*>/g)) {
+    const tag = match[0];
+    if (attributes.every((attribute) => tag.includes(attribute))) {
+      return tag;
+    }
+  }
+  return null;
 }
 
 let verifiedCookie: string;
@@ -297,7 +328,7 @@ test('дашборд: приветствие, ближайшая пара, ра�
   if (!result.ok) return;
   const html = render(<DashboardView result={result} />);
 
-  assert.match(html, /Добрый день, Александр!/, 'приветствие по имени из профиля');
+  assert.match(html, /Добр(ый день|ое утро|ый вечер|ой ночи), Александр!/, 'приветствие по имени из профиля');
   assert.match(html, /Ближайшая пара/, 'карточка ближайшей пары');
   assert.match(html, /Тестирование интерфейсов/, 'предмет из расписания');
   assert.match(html, /Расписание на сегодня/, 'секция расписания на сегодня');
@@ -318,7 +349,7 @@ test('дашборд неверифицированного: заглушка у
 
   assert.match(html, /data-testid="verification-gate"/, 'карточка гейта верификации');
   assert.match(html, /Верифицировать студенческий билет/, 'призыв действовать');
-  assert.match(html, /Добрый день, Мария!/, 'профиль доступен и до верификации');
+  assert.match(html, /Добр(ый день|ое утро|ый вечер|ой ночи), Мария!/, 'профиль доступен и до верификации');
 });
 
 // ---------------------------------------------------------------------------
@@ -522,6 +553,23 @@ test('преподаватели: список и карточка с часам
 });
 
 // ---------------------------------------------------------------------------
+// Экран входа: skip-link и доступная разметка
+// ---------------------------------------------------------------------------
+
+test('вход: skip-link первым элементом, баннер концепта, главная область', async () => {
+  // Лэйаут (auth) — серверный компонент: вызываем его и рендерим
+  // полученное дерево, как это делает Next на /login.
+  const element = await AuthLayout({ children: <p>форма входа</p> });
+  const html = render(element);
+
+  const skipLinkIndex = html.indexOf('Перейти к содержимому');
+  assert.ok(skipLinkIndex >= 0, 'skip-link «Перейти к содержимому» на экране входа');
+  assert.ok(skipLinkIndex < html.indexOf('Учебный концепт'), 'skip-link идёт раньше баннера');
+  assert.match(html, /<main[^>]*id="main-content"/, '<main> с идентификатором для skip-link');
+  assert.match(html, /Учебный концепт для конкурса\. Не официальный сервис УдГУ\./, 'баннер кейса на виду');
+});
+
+// ---------------------------------------------------------------------------
 // Оболочка кабинета
 // ---------------------------------------------------------------------------
 
@@ -533,7 +581,7 @@ test('оболочка: баннер концепта, пять разделов
   );
 
   assert.match(html, /Учебный концепт для конкурса\. Не официальный сервис УдГУ\./, 'баннер кейса');
-  assert.match(html, /aria-label="Разделы кабинета"/, 'навигация с доступным именем');
+  assert.match(html, /aria-label="Основная навигация"/, 'навигация с доступным именем');
   for (const label of ['Сегодня', 'Расписание', 'Успеваемость', 'Заявки', 'Уведомления']) {
     assert.ok(html.includes(label), `раздел «${label}» в нижней навигации`);
   }
@@ -543,6 +591,42 @@ test('оболочка: баннер концепта, пять разделов
   // Touch-targets: min-h-11 (44 px) у пунктов навигации и кнопок шапки.
   assert.match(html, /min-h-14/, 'пункты навигации — 56 px (≥ 44)');
   assert.ok((html.match(/min-h-11/g) ?? []).length >= 2, 'кнопки шапки — 44 px');
+});
+
+test('оболочка: доступность — skip-link первым, aria-current, главная область', () => {
+  const html = renderShellAtPath('/grades', <p>контент страницы</p>);
+
+  // Skip-link (WCAG 2.4.1): первый интерактивный элемент документа и
+  // ведёт на <main>, который существует на экране.
+  const skipLinkIndex = html.indexOf('Перейти к содержимому');
+  const headerIndex = html.indexOf('<header');
+  assert.ok(skipLinkIndex >= 0, 'skip-link «Перейти к содержимому» присутствует');
+  assert.ok(skipLinkIndex < headerIndex, 'skip-link идёт раньше шапки — первый фокус-элемент');
+  assert.match(html, /href="#main-content"/, 'skip-link ведёт на основное содержимое');
+  assert.match(html, /<main[^>]*id="main-content"/, '<main> с идентификатором для skip-link');
+
+  // aria-current="page" — активный раздел обозначен не только цветом.
+  const activeLink = anchorTag(html, 'href="/grades"', 'aria-current="page"');
+  assert.ok(activeLink !== null, 'активный пункт навигации помечен aria-current="page"');
+  assert.equal((html.match(/aria-current="page"/g) ?? []).length, 1, 'aria-current ровно на одном пункте');
+  // Остальные пункты aria-current не получают.
+  assert.equal(anchorTag(html, 'href="/schedule"', 'aria-current'), null, 'неактивный пункт без aria-current');
+  assert.equal(anchorTag(html, 'href="/"', 'aria-current'), null, '«Сегодня» на /grades не активен');
+});
+
+test('оболочка: «Сегодня» активно только на корне', () => {
+  const root = renderShellAtPath('/', <p>контент</p>);
+  assert.ok(
+    anchorTag(root, 'href="/"', 'aria-current="page"') !== null,
+    'на корне активен «Сегодня»',
+  );
+
+  const schedule = renderShellAtPath('/schedule', <p>контент</p>);
+  assert.ok(
+    anchorTag(schedule, 'href="/schedule"', 'aria-current="page"') !== null,
+    'на /schedule активен «Расписание»',
+  );
+  assert.equal(anchorTag(schedule, 'href="/"', 'aria-current'), null, '«Сегодня» на /schedule не активен');
 });
 
 // ---------------------------------------------------------------------------
