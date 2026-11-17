@@ -6,12 +6,14 @@
  * Состав (требования P1.4b):
  * - шапка: знак концепта + название раздела + выход + переключатель
  *   темы + кнопка профиля; под ней — постоянно видимый баннер концепта;
- * - нижняя навигация: 5 разделов (Сегодня / Расписание / Успеваемость /
- *   Заявки / Уведомления), цели ≥ 44 px, активный раздел отмечен
- *   aria-current="page" (не только цветом), на «Уведомлениях» — бейдж
- *   непрочитанных (UnreadBadge, данные из /api/notifications);
+ * - нижняя навигация: 6 разделов (Сегодня / Расписание / Успеваемость /
+ *   Заявки / Уведомления / Ассистент), цели ≥ 44 px, активный раздел
+ *   отмечен aria-current="page" (не только цветом), на «Уведомлениях» —
+ *   бейдж непрочитанных (UnreadBadge, данные из /api/notifications);
  * - мобильный first: всё в flex-колонке с min-w-0, корневой
- *   overflow-x-hidden — на 360 px горизонтального скролла нет;
+ *   overflow-x-hidden — на 360 px горизонтального скролла нет. Подписи
+ *   шести пунктов на 360 px набираются в 9 px (до sm — 10 px): «Успеваемость»
+ *   и «Уведомления» не переносятся и не вылезают за экран;
  * - тема: тёмная по умолчанию (решение Council), переключение —
  *   ThemeToggle, выбор remembered в cookie.
  *
@@ -26,7 +28,7 @@ import { ConceptMark } from './ConceptMark';
 import { LogoutButton } from './LogoutButton';
 import { ThemeToggle } from './ThemeToggle';
 import { UnreadBadge } from './UnreadBadge';
-import { IconBell, IconCalendar, IconGrades, IconRequests, IconToday, IconProfile } from './icons';
+import { IconAssistant, IconBell, IconCalendar, IconGrades, IconRequests, IconToday, IconProfile } from './icons';
 
 /** Разделы нижней навигации: путь → подпись и иконка. */
 const NAV_ITEMS: readonly {
@@ -39,6 +41,7 @@ const NAV_ITEMS: readonly {
   { href: '/grades', label: 'Успеваемость', Icon: IconGrades },
   { href: '/requests', label: 'Заявки', Icon: IconRequests },
   { href: '/notifications', label: 'Уведомления', Icon: IconBell },
+  { href: '/assistant', label: 'Ассистент', Icon: IconAssistant },
 ];
 
 /** Название раздела для шапки по текущему пути. */
@@ -60,6 +63,7 @@ function sectionTitle(pathname: string | null): string {
   if (pathname === '/profile') return 'Профиль';
   if (pathname === '/verification') return 'Верификация';
   if (pathname === '/sick-leave') return 'Я болею';
+  if (pathname === '/assistant') return 'Ассистент';
   return 'Кабинет';
 }
 
@@ -135,10 +139,12 @@ export function CabinetShell({ children }: { children: ReactNode }): React.JSX.E
                     <Icon />
                     {badge}
                   </span>
-                  {/* whitespace-nowrap + tracking-tight: на 360 px пять пунктов
-                      дают ~64 px на подпись, и «Успеваемость»/«Уведомления»
+                  {/* whitespace-nowrap + tracking-tight: на 360 px шесть пунктов
+                      дают ~60 px на подпись, и «Успеваемость»/«Уведомления»
                       не должны переноситься пословно-внутри-слова. */}
-                  <span className="max-w-full whitespace-nowrap tracking-tight">{label}</span>
+                  <span className="max-w-full whitespace-nowrap text-[9px] leading-3 tracking-tight sm:text-[10px] sm:leading-4">
+                    {label}
+                  </span>
                 </Link>
               </li>
             );

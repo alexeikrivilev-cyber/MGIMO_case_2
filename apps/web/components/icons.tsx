@@ -143,6 +143,17 @@ export function IconMove({ className }: IconProps): React.JSX.Element {
   );
 }
 
+/** Ассистент студента: искры-подсказки (BRIEF v2 §5). */
+export function IconAssistant({ className }: IconProps): React.JSX.Element {
+  return (
+    <svg viewBox="0 0 24 24" className={className ?? BASE} fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M11 3.5l1.5 3.6 3.6 1.5-3.6 1.5L11 13.7 9.5 10.1 5.9 8.6l3.6-1.5L11 3.5Z" />
+      <path d="M17.5 14l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8.8-2Z" />
+      <path d="M6.5 14.5l.6 1.6 1.6.6-1.6.6-.6 1.6-.6-1.6-1.6-.6 1.6-.6.6-1.6Z" />
+    </svg>
+  );
+}
+
 /** Сообщение в переписке (облако с текстом). */
 export function IconChat({ className }: IconProps): React.JSX.Element {
   return (

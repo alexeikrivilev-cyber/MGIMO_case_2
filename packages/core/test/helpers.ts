@@ -1,3 +1,4 @@
+import { before } from 'node:test';
 /**
  * Общий помощник тестов packages/core.
  *
@@ -16,6 +17,7 @@
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { prisma } from '../src/db';
+import { ensureTestDatabase } from '@udgu/db';
 
 const coreDir = path.dirname(fileURLToPath(import.meta.url));
 
@@ -39,8 +41,35 @@ process.env.DATABASE_URL = TEST_DATABASE_URL;
 
 export { TEST_DATABASE_URL };
 
+/**
+ * Тестовая база готовится САМА (создание + миграции), поэтому `npm test`
+ * проходит на чистом клоне без ручных шагов — критерий приёмки PO.
+ * Хук корневого уровня node:test: выполняется один раз перед всеми
+ * тестами процесса.
+ */
+let testDatabaseReady = false;
+
+/**
+ * Гарантия «база существует и мигрирована» с мемоизацией: вызывается и из
+ * корневого хука, и из resetTestData — чтобы не зависеть от порядка хуков
+ * node:test (корневой `before` из хелпера может выполниться позже
+ * файлового). Идемпотентно: migrate deploy ничего не ломает.
+ */
+async function ensureTestDatabaseOnce(): Promise<void> {
+  if (testDatabaseReady) {
+    return;
+  }
+  await ensureTestDatabase(TEST_DATABASE_URL);
+  testDatabaseReady = true;
+}
+
+before(async () => {
+  await ensureTestDatabaseOnce();
+});
+
 /** Очищает все таблицы в порядке, безопасном для FK. */
 export async function resetTestData(): Promise<void> {
+  await ensureTestDatabaseOnce();
   await prisma().auditEvent.deleteMany();
   await prisma().notification.deleteMany();
   await prisma().session.deleteMany();
@@ -328,6 +357,30 @@ export async function createSickLeave(
     select: { id: true },
   });
   return leave.id;
+}
+
+/**
+ * Заявка на верификацию студбилета с конечным статусом — быстрый путь
+ * для тестов сервисов, закрытых гейтом (успеваемость, ассистент):
+ * без фото, мок-распознавания и решения сотрудника. Решение сотрудника
+ * проверяют тесты verification.ts через боевые submit/review.
+ */
+export async function createVerification(
+  studentId: string,
+  status: 'PENDING' | 'VERIFIED' | 'REJECTED',
+): Promise<void> {
+  await prisma().studentVerification.create({
+    data: {
+      studentId,
+      status,
+      idCardPhotoPath: `id-cards/${studentId}/fixture.jpg`,
+      recognizedLastName: 'Иванов',
+      recognizedFirstName: 'Александр',
+      recognizedGroupName: 'Группа-фикстура',
+      recognizedCardNumber: 'UDGU-TEST-0000',
+      matchScore: status === 'VERIFIED' ? 1 : null,
+    },
+  });
 }
 
 /** Сессия пользователя для тестов сервисов (создаётся боевым createSession). */

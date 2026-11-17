@@ -60,6 +60,7 @@ const { SickLeaveView } = await import('../app/(cabinet)/sick-leave/sick-leave-s
 const { TeachersView } = await import('../app/(cabinet)/teachers/teachers-screen');
 const { TeacherCardView } = await import('../app/(cabinet)/teachers/[id]/teacher-card-screen');
 const { CabinetShell } = await import('../components/CabinetShell');
+const { AssistantView } = await import('../app/(cabinet)/assistant/assistant-screen');
 const AuthLayout = (await import('../app/(auth)/layout')).default;
 const {
   loadAnnouncementsPageData,
@@ -73,6 +74,7 @@ const {
   loadTeacherCardData,
   loadTeachersPageData,
   loadVerificationPageData,
+  loadAssistantPageData,
 } = await import('../lib/page-data');
 
 /**
@@ -337,6 +339,8 @@ test('дашборд: приветствие, ближайшая пара, ра�
   assert.match(html, /Изменение в расписании/, 'непрочитанное уведомление');
   assert.match(html, /Стипендиальный конкурс/, 'свежее объявление');
   assert.match(html, /В деканате/, 'метка «чей ход» на заявке');
+  // Карточка-ссылка в ассистент (BRIEF v2 §5): раздел находится без подсказок.
+  assert.match(html, /href="\/assistant"/, 'карточка-ссылка в ассистент');
   // Верифицированный студент не видит заглушку гейта.
   assert.equal(html.includes('data-testid="verification-gate"'), false);
 });
@@ -573,7 +577,7 @@ test('вход: skip-link первым элементом, баннер конц
 // Оболочка кабинета
 // ---------------------------------------------------------------------------
 
-test('оболочка: баннер концепта, пять разделов, цели ≥ 44px', () => {
+test('оболочка: баннер концепта, шесть разделов, цели ≥ 44px', () => {
   const html = render(
     <CabinetShell>
       <p>контент страницы</p>
@@ -582,7 +586,7 @@ test('оболочка: баннер концепта, пять разделов
 
   assert.match(html, /Учебный концепт для конкурса\. Не официальный сервис УдГУ\./, 'баннер кейса');
   assert.match(html, /aria-label="Основная навигация"/, 'навигация с доступным именем');
-  for (const label of ['Сегодня', 'Расписание', 'Успеваемость', 'Заявки', 'Уведомления']) {
+  for (const label of ['Сегодня', 'Расписание', 'Успеваемость', 'Заявки', 'Уведомления', 'Ассистент']) {
     assert.ok(html.includes(label), `раздел «${label}» в нижней навигации`);
   }
   assert.match(html, /href="\/"/, '«Сегодня» ведёт на корень');
@@ -673,6 +677,9 @@ async function collectAllScreens(): Promise<readonly string[]> {
   const card = await loadTeacherCardData(verifiedCookie, teacherId);
   if (card.ok) screens.push(render(<TeacherCardView result={card} />));
 
+  const assistant = await loadAssistantPageData(verifiedCookie);
+  if (assistant.ok) screens.push(render(<AssistantView result={assistant} />));
+
   screens.push(
     render(
       <CabinetShell>
@@ -686,7 +693,7 @@ async function collectAllScreens(): Promise<readonly string[]> {
 
 test('мобильный вид: нет фиксированных ширин больше 360 px', async () => {
   const screens = await collectAllScreens();
-  assert.ok(screens.length >= 13, `проверяем все экраны кабинета (${screens.length})`);
+  assert.ok(screens.length >= 14, `проверяем все экраны кабинета (${screens.length})`);
 
   // Фиксированные ширины в пикселях — единственный источник горизонтального
   // скролла на 360 px: классы w-[Npx], min-w-[Npx] и инлайн style="width: Npx".
