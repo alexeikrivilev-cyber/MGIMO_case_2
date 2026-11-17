@@ -1,7 +1,7 @@
 /**
  * ТЕСТЫ РЕГИСТРАЦИИ ЧЕРЕЗ OAUTH-ЭМУЛЯЦИЮ (VK ID / MAX / Telegram).
  *
- * - start: одноразовый state на 10 минут, consentUrl → /register?state=…;
+ * - start: одноразовый state на 10 минут, consentUrl → /register?state=…&provider=…;
  *   неизвестный провайдер → 404;
  * - callback: создаёт User(STUDENT) + Student + OAuthAccount, сессию,
  *   аудит; отсутствие группы/неверная группа → 400; повторное
@@ -56,7 +56,9 @@ test('start: состояние согласия создаётся, consentUrl 
   assert.equal(response.status(), 200);
 
   const body = await response.json<{ consentUrl: string; state: string; expiresInSeconds: number }>();
-  assert.match(body.consentUrl, /^\/register\?state=[0-9a-f-]{36}$/);
+  // Провайдер в ссылке согласия: страница /register показывает того же
+  // провайдера, через которого нажали «Войти» (BRIEF v2).
+  assert.match(body.consentUrl, /^\/register\?state=[0-9a-f-]{36}&provider=vk_id$/);
   assert.equal(body.expiresInSeconds, 600);
 
   const intent = await getPrisma().oAuthIntent.findUnique({ where: { state: body.state } });

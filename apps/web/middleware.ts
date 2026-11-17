@@ -160,7 +160,9 @@ export default async function middleware(request: NextRequest): Promise<NextResp
   }
 
   // ---- Страницы кабинета студента ----
-  if (startsWithAny(pathname, CABINET_PAGES)) {
+  // Корень «/» — экран «Сегодня» (route group (cabinet)/page.tsx), поэтому
+  // проверяем точным совпадением: startsWith('/') захватил бы все пути.
+  if (pathname === '/' || startsWithAny(pathname, CABINET_PAGES)) {
     if (session === null) {
       return applySecurityHeaders(NextResponse.redirect(new URL('/login', request.url)));
     }

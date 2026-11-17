@@ -39,19 +39,29 @@ import type {
 /**
  * Ошибка клиентского слоя: машинный код и сообщение приходят от сервера
  * в едином формате (lib/http.ts), details — сообщения уровня формы
- * («поле: причина») для полей ввода.
+ * («поле: причина») для полей ввода. retryAfterSeconds заполняется из
+ * заголовка Retry-After ответа (rate-limit входа: 429) — чтобы форма
+ * входа могла сказать «попробуйте через N минут».
  */
 export class ApiClientError extends Error {
   readonly status: number;
   readonly code: string;
   readonly details: readonly string[];
+  readonly retryAfterSeconds: number | null;
 
-  constructor(status: number, code: string, message: string, details: readonly string[] = []) {
+  constructor(
+    status: number,
+    code: string,
+    message: string,
+    details: readonly string[] = [],
+    retryAfterSeconds: number | null = null,
+  ) {
     super(message);
     this.name = 'ApiClientError';
     this.status = status;
     this.code = code;
     this.details = details;
+    this.retryAfterSeconds = retryAfterSeconds;
   }
 }
 
@@ -60,6 +70,22 @@ const CSRF_HEADER = 'x-csrf-token';
 
 /** Изменяющие методы — требуют CSRF-токен (как в middleware). */
 const MUTATING_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
+
+/** Retry-After: секунды (числом) или дата HTTP-date → секунды ожидания. */
+function parseRetryAfter(value: string | null): number | null {
+  if (value === null || value.trim() === '') {
+    return null;
+  }
+  const seconds = Number.parseInt(value.trim(), 10);
+  if (Number.isFinite(seconds)) {
+    return Math.max(0, seconds);
+  }
+  const date = Date.parse(value);
+  if (Number.isNaN(date)) {
+    return null;
+  }
+  return Math.max(0, Math.round((date - Date.now()) / 1000));
+}
 
 /** Лимит фото студбилета, байт (MAX_ID_CARD_SIZE_BYTES в packages/core). */
 const MAX_ID_CARD_PHOTO_BYTES = 5 * 1024 * 1024;
@@ -130,6 +156,75 @@ export interface ProfilePayload {
   readonly profile: MyProfile;
 }
 
+// ---------------------------------------------------------------------------
+// Контракты данных кабинета (wire-форма: даты приходят строками ISO)
+// ---------------------------------------------------------------------------
+
+/** Уведомление в ленте (GET /api/notifications). */
+export interface NotificationItem {
+  readonly id: string;
+  readonly type: string;
+  readonly title: string;
+  readonly body: string;
+  readonly read: boolean;
+  readonly link: string | null;
+  readonly createdAt: string;
+}
+
+export interface NotificationsPayload {
+  readonly notifications: readonly NotificationItem[];
+  readonly unreadCount: number;
+}
+
+/** Заявка/справка в списке (GET /api/requests). */
+export interface RequestItem {
+  readonly id: string;
+  readonly type: 'REFERENCE' | 'APPLICATION';
+  readonly typeLabel: string;
+  readonly status: 'NEW' | 'IN_PROGRESS' | 'READY' | 'REJECTED';
+  readonly statusLabel: string;
+  readonly formData: Record<string, string>;
+  readonly staffComment: string | null;
+  readonly createdAt: string;
+}
+
+/** Тело создания заявки (POST /api/requests). */
+export interface CreateRequestInput {
+  readonly type: 'REFERENCE' | 'APPLICATION';
+  readonly formData: Record<string, string>;
+}
+
+/**
+ * Результат «левериджа» (POST /api/grades/leverage) — расчёт
+ * packages/core calculateLeverage, сериализованный для браузера.
+ */
+export interface LeverageResultPayload {
+  readonly targetGpa: number;
+  readonly gradedCount: number;
+  readonly pendingCount: number;
+  readonly currentAverage: number | null;
+  readonly neededSumOnPending: number | null;
+  readonly neededAverageOnPending: number | null;
+  readonly maxPossibleAverage: number | null;
+  readonly achievable: boolean;
+  readonly alreadyAchieved: boolean;
+}
+
+/** Отметка «болею» (GET/POST /api/sick-leave). */
+export interface SickLeaveItem {
+  readonly id: string;
+  readonly dateFrom: string;
+  readonly dateTo: string;
+  readonly reason: string | null;
+  readonly hasAttachment: boolean;
+  readonly createdAt: string;
+}
+
+export interface SickLeavePayload {
+  readonly items: readonly SickLeaveItem[];
+  readonly sickNow: boolean;
+}
+
 export interface ApiClient {
   /** POST /api/auth/login — вход по логину/паролю университетской УЗ. */
   login(input: LoginInput): Promise<LoginResult>;
@@ -150,6 +245,20 @@ export interface ApiClient {
   submitVerification(cardNumber: string, photo: File): Promise<{ verification: MyVerification }>;
   /** GET /api/profile — профиль студента сессии. */
   getProfile(): Promise<ProfilePayload>;
+  /** GET /api/notifications — лента уведомлений + счётчик непрочитанных. */
+  getNotifications(): Promise<NotificationsPayload>;
+  /** POST /api/notifications/read-all — отметить все уведомления прочитанными. */
+  markAllNotificationsRead(): Promise<{ ok: boolean; updated: number }>;
+  /** GET /api/requests — свои заявки и справки. */
+  getRequests(): Promise<{ requests: readonly RequestItem[] }>;
+  /** POST /api/requests — подать заявку (справка/заявление). */
+  createRequest(input: CreateRequestInput): Promise<{ request: RequestItem }>;
+  /** POST /api/requests/[id]/cancel — отменить свою заявку в статусе NEW. */
+  cancelRequest(id: string): Promise<{ request: RequestItem }>;
+  /** POST /api/grades/leverage — расчёт баллов до целевого среднего (ядро). */
+  getLeverage(targetGpa: number): Promise<{ result: LeverageResultPayload }>;
+  /** POST /api/sick-leave — отметить «болею» (multipart: период + необязательное фото справки). */
+  createSickLeave(form: FormData): Promise<{ sickLeave: SickLeaveItem }>;
 }
 
 // ---------------------------------------------------------------------------
@@ -220,7 +329,7 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
     }
   }
 
-  function toApiClientError(status: number, payload: unknown): ApiClientError {
+  function toApiClientError(status: number, payload: unknown, retryAfterSeconds: number | null): ApiClientError {
     const body = payload as { error?: unknown } | null;
     const error = body?.error as
       | { code?: unknown; message?: unknown; details?: unknown }
@@ -234,9 +343,9 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
       const details = Array.isArray(error.details)
         ? error.details.filter((item): item is string => typeof item === 'string')
         : [];
-      return new ApiClientError(status, code, message, details);
+      return new ApiClientError(status, code, message, details, retryAfterSeconds);
     }
-    return new ApiClientError(status, 'INTERNAL', `Сервер вернул ошибку ${status}. Попробуйте позже.`);
+    return new ApiClientError(status, 'INTERNAL', `Сервер вернул ошибку ${status}. Попробуйте позже.`, [], retryAfterSeconds);
   }
 
   async function request<T>(path: string, options: RequestOptions, allowCsrfRetry = true): Promise<T> {
@@ -269,7 +378,7 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
     const payload = (await response.json().catch(() => null)) as unknown;
 
     if (!response.ok) {
-      const error = toApiClientError(response.status, payload);
+      const error = toApiClientError(response.status, payload, parseRetryAfter(response.headers.get('retry-after')));
 
       // Сервер ротирует CSRF-cookie (вход/выход) или токен устарел:
       // один повтор со свежим токеном. Повтор запрещён для самого
@@ -365,6 +474,49 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
 
     async getProfile(): Promise<ProfilePayload> {
       return request<ProfilePayload>('/api/profile', { method: 'GET' });
+    },
+
+    async getNotifications(): Promise<NotificationsPayload> {
+      return request<NotificationsPayload>('/api/notifications', { method: 'GET' });
+    },
+
+    async markAllNotificationsRead(): Promise<{ ok: boolean; updated: number }> {
+      return request<{ ok: boolean; updated: number }>('/api/notifications/read-all', {
+        method: 'POST',
+        json: {},
+      });
+    },
+
+    async getRequests(): Promise<{ requests: readonly RequestItem[] }> {
+      return request<{ requests: readonly RequestItem[] }>('/api/requests', { method: 'GET' });
+    },
+
+    async createRequest(input: CreateRequestInput): Promise<{ request: RequestItem }> {
+      return request<{ request: RequestItem }>('/api/requests', {
+        method: 'POST',
+        json: { type: input.type, formData: input.formData },
+      });
+    },
+
+    async cancelRequest(id: string): Promise<{ request: RequestItem }> {
+      return request<{ request: RequestItem }>(`/api/requests/${encodeURIComponent(id)}/cancel`, {
+        method: 'POST',
+        json: {},
+      });
+    },
+
+    async getLeverage(targetGpa: number): Promise<{ result: LeverageResultPayload }> {
+      return request<{ result: LeverageResultPayload }>('/api/grades/leverage', {
+        method: 'POST',
+        json: { targetGpa },
+      });
+    },
+
+    async createSickLeave(form: FormData): Promise<{ sickLeave: SickLeaveItem }> {
+      return request<{ sickLeave: SickLeaveItem }>('/api/sick-leave', {
+        method: 'POST',
+        form,
+      });
     },
   };
 }
