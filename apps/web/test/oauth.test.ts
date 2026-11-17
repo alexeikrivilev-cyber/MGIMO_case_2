@@ -230,3 +230,56 @@ test('callback: логин занят → 409 (без подтверждения
   });
   assert.equal(accounts.length, 0, 'к служебной УЗ провайдер не привязан');
 });
+
+/**
+ * РЕГРЕССИЯ (найдена QA-гейтом Hermes прогоном HTTP): схема callback
+ * требовала login, из-за чего регистрация через провайдера без логина
+ * падала с 400 INVALID_INPUT. BRIEF v2 делает обязательными только ФИО
+ * и группу — логин студент не придумывает, он вошёл через провайдера.
+ */
+test('callback: логин НЕ обязателен — выводится из аккаунта провайдера', async () => {
+  const startResponse = await start('max');
+  const { state } = await startResponse.json<{ state: string }>();
+
+  const response = await callback('max', {
+    state,
+    fullName: 'Орлова Мария Андреевна',
+    groupName: 'ЮР-22',
+  });
+  assert.equal(response.status(), 200, 'регистрация без логина должна проходить');
+
+  // Cookie сессии читаем так же, как в соседнем тесте регистрации.
+  const sessionCookie = (
+    response as unknown as { cookie(name: string): string | undefined }
+  ).cookie('udgu_session');
+  assert.ok(sessionCookie !== undefined, 'выдана cookie сессии');
+  const sessionResponse = await callRoute(
+    sessionRoute,
+    apiRequest('/api/auth/session', { cookies: { udgu_session: sessionCookie } }),
+  );
+  assert.equal(sessionResponse.status(), 200, 'сессия создана');
+  const sessionBody = await sessionResponse.json<{
+    user: { login: string; role: string; studentId: string | null };
+    verificationGate: { verified: boolean };
+  }>();
+  assert.equal(sessionBody.user.role, 'STUDENT');
+  assert.match(sessionBody.user.login, /^max_/, 'логин выведен из провайдера');
+  assert.ok(sessionBody.user.studentId !== null, 'студенческая запись создана');
+
+  // Студент realmente существует в БД с заявленным ФИО.
+  const created = await getPrisma().student.findUnique({
+    where: { userId: (await getPrisma().user.findFirst({ where: { login: sessionBody.user.login } }))!.id },
+  });
+  assert.equal(created?.lastName, 'Орлова');
+  assert.equal(sessionBody.verificationGate.verified, false, 'новый студент не верифицирован');
+
+  // Уникальность: вторая такая регистрация не конфликтует по логину.
+  const start2 = await start('max');
+  const { state: state2 } = await start2.json<{ state: string }>();
+  const response2 = await callback('max', {
+    state: state2,
+    fullName: 'Крылов Пётр Сергеевич',
+    groupName: 'ЮР-22',
+  });
+  assert.equal(response2.status(), 200, 'второй студент без логина регистрируется независимо');
+});
