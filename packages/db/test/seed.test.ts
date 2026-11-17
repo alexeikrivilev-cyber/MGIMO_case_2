@@ -7,6 +7,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { verify } from 'argon2';
+import { DEMO_ACCOUNTS } from '@udgu/ui';
 import {
   buildSeedData,
   TEST_PASSWORD,
@@ -104,6 +105,19 @@ test('пароли тестовых аккаунтов — argon2id-хеш от 
   const first = data.users[0];
   assert.ok(first);
   assert.equal(await verify(first.passwordHash, 'wrong-password'), false);
+});
+
+test('демо-доступы подсказки на входе существуют в сидере с заявленными ролями', () => {
+  // Подсказка «Демо-доступ» на странице входа берёт аккаунты из
+  // @udgu/ui: сидер обязан создавать каждого из них с той же ролью,
+  // иначе кнопка подстановки приведёт к неудачному входу.
+  const byLogin = new Map(data.users.map((user) => [user.login, user]));
+  for (const account of DEMO_ACCOUNTS) {
+    const user = byLogin.get(account.login);
+    assert.ok(user, `демо-аккаунт ${account.login} должен создаваться сидером`);
+    assert.equal(user.role, account.role, `роль ${account.login} совпадает с подсказкой на входе`);
+  }
+  assert.ok(DEMO_ACCOUNTS.length >= 4, 'в подсказке есть студенты, преподаватель, сотрудник и админ');
 });
 
 test('студенты уникальны и ссылаются на существующие группы', () => {

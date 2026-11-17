@@ -13,11 +13,13 @@
  *   (boundary ставит браузер).
  *
  * fetch подменяется через createApiClient({ fetch }) — сети и БД тесту
- * не нужны, он проверяет только клиентский слой.
+ * не нужны, он проверяет только клиентский слой. Демо-пароль берётся из
+ * @udgu/ui (единый источник с сидером и формой входа).
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createApiClient, ApiClientError, type FetchLike } from '../lib/api-client';
+import { DEMO_PASSWORD } from '@udgu/ui';
 
 interface RecordedRequest {
   readonly path: string;
@@ -85,7 +87,7 @@ test('CSRF: заголовок x-csrf-token есть на POST и отсутст
   });
   const client = createApiClient({ fetch: network.fetch });
 
-  const login = await client.login({ login: 'student1', password: 'password123' });
+  const login = await client.login({ login: 'student1', password: DEMO_PASSWORD });
   assert.equal(login.redirectTo, '/dashboard');
 
   await client.getSession();
@@ -157,7 +159,7 @@ test('CSRF_INVALID → один повтор со свежим токеном', 
   });
   const client = createApiClient({ fetch: network.fetch });
 
-  const result = await client.login({ login: 'student1', password: 'password123' });
+  const result = await client.login({ login: 'student1', password: DEMO_PASSWORD });
 
   assert.equal(result.ok, true);
   assert.equal(loginAttempts, 2, 'запрос повторён один раз');
