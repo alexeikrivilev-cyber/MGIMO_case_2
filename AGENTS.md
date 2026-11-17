@@ -32,7 +32,7 @@
 
 - NEVER start `opencode serve`, `hermes`, `openclaw gateway` or any harness daemon by hand (no `&`, no nohup, no direct binary).
 - The OpenCode server is owned by systemd (`opencode-server.service`, port 4096). If it looks down, run `systemctl status opencode-server` — the watchdog restarts it; do NOT start your own instance (a manual `opencode serve` steals port 4096 and the state DB, and the real service then crash-loops).
-- To run code work: `opencode-worker --dir <project> "<prompt>"` (standalone, no server needed) or `opencode run --dir <project> --auto "<prompt>"`.
+- Never spawn harness daemons manually; code work goes through Hermes (`hermes-lead`), which delegates to OpenCode — see the Delegation hierarchy section.
 - To restart a service properly: `sudo systemctl restart <unit>` (or ask the owner).
 
 ## When to message the owner (strict)
@@ -63,3 +63,10 @@ Single-context: корневой `GLOSSARY.md` и `docs/adr/`. See `docs/agents/
 - When you face a problem, decision, or trade-off — ESPECIALLY one affecting quality and the final outcome — you MUST read and apply the relevant `thinking-*` SKILL.md before deciding. Start with `thinking-model-router` if unsure which framework fits.
 - Decide autonomously in favor of quality and the final result, WITHOUT operator intervention. Escalate to the owner only for genuine blockers, irreversible risk, or decisions that are explicitly theirs.
 - Record which framework you used and the resulting decision in the project LOG/STATE so the reasoning is auditable.
+
+## Delegation hierarchy (critical — read before running any implementation task)
+
+- Code / implementation / refactor / test tasks: delegate through Hermes — . Hermes is the team lead: it analyzes the task, delegates execution to OpenCode (), reviews the result, and reports back. NEVER call  or  directly from the project agent — that skips review and breaks the quality loop.
+- Visual / design / UI tasks: , also routed via Hermes for non-trivial work.
+- Direct exec is only for small mechanical steps (a single command, a quick check, reading a file).
+- The thinking-* skills apply at every level: Hermes picks the decision framework, the project agent verifies the outcome.
