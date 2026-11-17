@@ -4,6 +4,7 @@ import { useState, type FormEvent } from 'react';
 
 interface LoginResponse {
   error?: string;
+  redirectTo?: string;
 }
 
 export default function LoginPage(): React.JSX.Element {
@@ -31,8 +32,9 @@ export default function LoginPage(): React.JSX.Element {
         return;
       }
 
-      // Успешный вход обработается на шаге P1.3 (сессия + редирект в кабинет).
-      window.location.assign('/');
+      // Сервер отвечает целью редиректа по роли: студент — в кабинет,
+      // сотрудник деканата — в /staff.
+      window.location.assign(payload?.redirectTo ?? '/dashboard');
     } catch {
       setError('Не удалось связаться с сервером. Проверьте соединение и попробуйте снова.');
     } finally {

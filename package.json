@@ -19,7 +19,7 @@
     "db:deploy": "npm run db:deploy -w @udgu/db",
     "db:seed": "npm run db:seed -w @udgu/db",
     "db:reset": "npm run db:reset -w @udgu/db",
-    "test": "npm test -w @udgu/db && npm test -w @udgu/core",
+    "test": "npm test -w @udgu/db && npm test -w @udgu/core && npm test -w @udgu/web",
     "typecheck": "npm run typecheck --workspaces --if-present"
   },
   "devDependencies": {
