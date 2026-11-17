@@ -133,3 +133,95 @@ _(далее — по мере исполнения)_
 - Институты УдГУ взяты из открытой структуры вуза (udsu.ru); все люди, оценки, зачётки,
   фото — синтетические.
 
+### Этап 2 (завершён). P1.2 «Пивот на УдГУ + расширение схемы» — QA-гейт
+
+- Ветка `feat/udgu-pivot-schema`, исполнитель — OpenCode.
+- **QA-гейт Hermes (всё прогнано лично):** `npm run typecheck` (4 воркспейса) зелёно;
+  `npm run db:seed` → users 22, subjects 80, teachers 16, scheduleEntries 443 (3 MOVED /
+  4 CANCELLED), grades 57, requests 9, announcements 6, notifications 27, auditEvents 9,
+  identityRegistry 6, studentVerifications 4, oauthAccounts 2, oauthIntents 2,
+  sickLeaves 2, officeHours 13; `npm test` → **36/36**; `npm run build` зелёно;
+  сканер секретов чист; `storage/` в .gitignore кроме `.gitkeep`.
+- **Ручной ревью кода:** `packages/core/src/storage.ts` — приватное хранилище вне webroot,
+  валидация MIME и размера (≤5 МБ), защита от path traversal (абсолютные пути, `..`,
+  закодированные обходы) — 14 dedicated-тестов. Схема Prisma: `IdentityRegistry`,
+  `StudentVerification`, `OAuthAccount`, `OAuthIntent`, `SickLeave`, `OfficeHour`
+  с осмысленными `onDelete` и индексами.
+- **Выход воркера за мандат (принято явно):** правил `docs/ARCHITECTURE.md`,
+  `docs/PLAN.md`, `AGENTS.md`, `README.md`, `.env.example`, `docker-compose.yml`.
+  Правки верные и согласованы с BRIEF v2 — оставлены, не откачены.
+- Коммит `a85aa94`, запушен в origin.
+- **Второе нарушение процесса (зафиксировано):** в момент коммита P1.2 HEAD оказался на
+  `master`, а ветка `feat/udgu-pivot-schema` — удалена; внешний актор переключал ветку
+  под живой сессией (reflog: `checkout: moving from master to master`). Фактическое
+  содержимое коммита сверено с ожидаемым (`git diff master a85aa94` — пусто), ущерба нет,
+  но процесс нарушен. Для P1.3 ветку создал заново и смёржил `--no-ff`, чтобы структура
+  `feat/*` сохранилась в истории.
+
+### Этап 3 (завершён). P1.3 «Домен и безопасность» — QA-гейт
+
+- Ветка `feat/core-domain`, исполнитель — OpenCode. Смерж в `master` через
+  `--no-ff` (`654601f`), запушен.
+- **QA-гейт Hermes (всё прогнано лично):** `npm run typecheck` зелёно;
+  `npm test` → **126/126**; `npm run build` зелёно; `npm run db:seed` проходит;
+  grep по `not implemented|TODO|FIXME` в `packages/core/src`, `packages/db/src`,
+  `apps/web` — пусто.
+- **Архитектурное правило, проверенное тестами (главное в этапе):** ни один сервис
+  `packages/core/services` не принимает `studentId` извне — `requireOwnStudent` это
+  единственная точка сравнения, ошибки обобщены («не существует» неотличимо от «не твоё»).
+  IDOR-набор (`packages/core/test/idor.test.ts`): student2 не видит оценки, заявки,
+  уведомления, отметки о болезни, верификацию и расписание student1; чужая заявка по
+  идентификатору → `OwnershipError`; проверки ролей для staff-only операций.
+- Модули: `password.ts` (argon2id, OWASP-параметры, fail-closed verify),
+  `session.ts` (32-байтный токен, в БД только sha256, TTL из env, отзыв,
+  httpOnly/sameSite/secure-cookie, CSRF двойная отправка + timingSafeEqual),
+  `ratelimit.ts` (5 неуспешных / 15 мин на логин+IP, инъекция часов),
+  `ownership.ts`, `services/*` (profile, schedule + свободные окна + расписание и часы
+  приёма преподавателей, grades с GPA/долгами/трендом/«что подтянуть»/левериджем,
+  requests, notifications, announcements, sickleave с уведомлением деканату,
+  verification с гейтом доступа, audit), `mockOcr.ts` — честный мок без выдумывания
+  данных, точка интеграции реального OCR названа в коде.
+
+### Этап 4. P1.4 «API-слой» — приёмка in-flight работы воркера
+
+- **Контекст:** воркер (OpenCode) оставил в рабочем дереве незакоммиченный in-flight
+  P1.4 — API-роуты `apps/web/app/api/*` + `lib/` + `middleware.ts` + тесты.
+  Принято по полному QA-гейту, не на слово.
+- **QA-гейт Hermes (прогнано лично):** `npm run typecheck` — 4/4 воркспейса зелёно;
+  `npm test` → **200/200** (db 22 + core 126 + web 52); `npm run build` → зелёный
+  (23 роут: страницы + 21 API); `npm run db:seed` проходит; скан секретов чист;
+  grep по `not implemented|TODO|FIXME` — только честные комментарии (мок-OCR).
+- **Ошибка воркера, найденная и исправленная на приёмке:** первая сборка падала
+  `Invariant: no direct app page entry found for /_not-found` — причина НЕ в коде:
+  в `apps/web/.next` остался кеш прерванной сборки предыдущей сессии. После
+  `rm -rf .next` сборка проходит стабильно (проверено дважды). В `.gitignore`
+  кеш не попадает; на деплое собираем образ всегда с чистым кешем.
+- **Ручное ревью кода (ключевые решения воркера, приняты):**
+  - middleware: security-заголовки на каждый ответ (CSP, HSTS только в проде,
+    X-Frame-Options DENY, nosniff, Referrer-Policy, Permissions-Policy camera
+    'self' — под съёмку студбилета); гейтинг: аноним на /api/* → 401, страницы
+    кабинета → редирект на /login, студент на /staff|/admin → **404, не 403**
+    (требование ACCEPTANCE); CSRF двойная отправка на все мутирующие /api/*
+    (исключения — точки входа login/oauth, там SameSite=Lax + одноразовый state).
+  - `lib/session.ts`: единая таблица маппинга ошибок ядра → HTTP. Владение
+    (NOT_OWNER/STAFF_ONLY) → **404 с обобщённым сообщением**, а не 403 — иначе
+    API становился бы оракулом существования чужих ID. VERIFICATION_REQUIRED
+    → 403 (честный ответ про закрытый раздел). 500 — без деталей в ответе.
+  - `lib/http.ts`: единый формат ошибок `{error:{code,message,details}}`, IP из
+    первого адреса X-Forwarded-For, zod-валидация тела/query на границе.
+  - Логин: rate-limit ДО argon2; при неизвестном логине пароль всё равно
+    проверяется против фиктивного хеша (выравнивание тайминга — нет оракула
+    перебора логинов); одна обобщённая ошибка 401.
+  - OAuth-эмуляция (start/callback): одноразовый state 10 мин, повторное
+    использование исключено `updateMany consumedAt=null` (защита от гонки);
+    занятый логин НЕ приводится к привязке провайдера (иначе вход в чужой
+    кабинет по знакомому логину) — честный 409; новая УЗ = случайный пароль,
+    хеш argon2id.
+  - Верификация: multipart, быстрый отсев формата/размера на границе, дальше
+    всё в packages/core (приватное хранилище, мок-OCR, сверка с реестром).
+  - Правка ядра, принятая: `verification.ts` — регулярка номера билета
+    расширена до `\p{L}\p{N}` (коды направлений УдГУ с кириллицей, «ПИ-2023-0138»);
+    новый сервис `services/teachers.ts` (список + карточка преподавателя с
+    расписанием и часами приёма), экспорт из `index.ts`.
+- Ветка `feat/api-layer`, коммит и мёрж `--no-ff` в master — ниже по логу.
+

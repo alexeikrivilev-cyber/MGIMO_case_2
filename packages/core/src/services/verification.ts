@@ -34,7 +34,9 @@ export const verificationSubmitSchema = z.object({
     .trim()
     .min(4, 'Номер студенческого билета слишком короткий')
     .max(32, 'Номер студенческого билета слишком длинный')
-    .regex(/^[A-Za-z0-9-]+$/, 'Номер может содержать только буквы, цифры и дефис'),
+    // \p{L}/\p{N}: номера УдГУ содержат кириллические коды направлений
+    // (например, «ПИ-2023-0138»), — латиница тут была бы ошибкой.
+    .regex(/^[\p{L}\p{N}-]+$/u, 'Номер может содержать только буквы, цифры и дефис'),
   photoBuffer: z.instanceof(Buffer),
   mime: z.enum(Object.keys(ID_CARD_ALLOWED_MIME) as [string, ...string[]], {
     message: `Допустимые форматы: ${Object.keys(ID_CARD_ALLOWED_MIME).join(', ')}`,

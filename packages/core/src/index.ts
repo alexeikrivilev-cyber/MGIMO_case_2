@@ -31,6 +31,8 @@ export type {
   ValidationErrorCode,
 } from './errors';
 
+export { firstIssues } from './validation';
+
 export {
   hashPassword,
   verifyPassword,
@@ -179,6 +181,9 @@ export {
   ANNOUNCEMENT_AUDIENCE_LABELS,
 } from './services/announcements';
 export type { AnnouncementItem } from './services/announcements';
+
+export { listTeachers, getTeacherCard } from './services/teachers';
+export type { TeacherCard, TeacherListItem } from './services/teachers';
 
 export {
   createMySickLeave,
