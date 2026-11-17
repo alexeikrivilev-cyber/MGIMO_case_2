@@ -56,6 +56,27 @@ export function requireStudent(session: AuthSession): { user: SessionUser; stude
 }
 
 /**
+ * Проверяет, что сессия принадлежит преподавателю, и возвращает его
+ * teacherId.
+ *
+ * Преподаватель в этой системе — учётная запись с привязанным профилем
+ * Teacher (в сидере роль STAFF + teacherId). Студент, сотрудник деканата
+ * и админ БЕЗ профиля преподавателя не проходят: их инструменты живут в
+ * своих разделах (кабинет студента, кабинет деканата), а раздел
+ * преподавателя (учебные планы, RAG-ассистент) закрыт для них.
+ *
+ * Как и остальные функции пакета, не принимает идентификатор извне:
+ * teacherId берётся только из сессии.
+ */
+export function requireTeacher(session: AuthSession): { user: SessionUser; teacherId: string } {
+  const user = requireUser(session);
+  if (typeof user.teacherId !== 'string' || user.teacherId === '') {
+    throw new OwnershipError('NOT_A_TEACHER', 'Операция доступна только преподавателю.');
+  }
+  return { user, teacherId: user.teacherId };
+}
+
+/**
  * Проверяет, что запрошенный studentId принадлежит сессии.
  *
  * Это ЕДИНСТВЕННАЯ функция пакета, которая сравнивает приходящий извне

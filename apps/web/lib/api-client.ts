@@ -366,6 +366,43 @@ export interface StaffAnnouncementInput {
 }
 
 // ---------------------------------------------------------------------------
+// Контракты ассистента преподавателя (/api/teacher/*, BRIEF v2 §5)
+// ---------------------------------------------------------------------------
+
+/**
+ * Учебный план в списке преподавателя (GET /api/teacher/study-plans).
+ * storagePath намеренно отсутствует: файл плана лежит в приватном
+ * хранилище, публичных ссылок на него нет.
+ */
+export interface TeacherStudyPlanItem {
+  readonly id: string;
+  readonly title: string;
+  readonly fileName: string;
+  readonly mime: string;
+  readonly sizeBytes: number;
+  readonly uploadedAt: string;
+}
+
+/** Цитата-подсказка из плана: раздел и оценка релевантности. */
+export interface TeacherAssistantCitation {
+  readonly section: string;
+  readonly score: number;
+}
+
+/**
+ * Ответ ассистента преподавателя (POST /api/teacher/assistant).
+ * mode: deterministic — ответ движка по разделам плана; llm — ответ
+ * модели по тем же разделам (ключ только в env сервера).
+ */
+export interface TeacherAssistantPayload {
+  readonly answer: string;
+  readonly mode: 'deterministic' | 'llm';
+  readonly citations: readonly TeacherAssistantCitation[];
+  readonly suggestions: readonly string[];
+  readonly plan: { readonly id: string; readonly title: string } | null;
+}
+
+// ---------------------------------------------------------------------------
 // Контракты переписки (/api/conversations/*)
 // ---------------------------------------------------------------------------
 
@@ -446,6 +483,15 @@ export interface ApiClient {
   askAssistant(question: string): Promise<AssistantPayload>;
   /** POST /api/sick-leave — отметить «болею» (multipart: период + необязательное фото справки). */
   createSickLeave(form: FormData): Promise<{ sickLeave: SickLeaveItem }>;
+  // ---- Ассистент преподавателя ----
+  /** GET /api/teacher/study-plans — свои учебные планы (без путей хранилища). */
+  getTeacherStudyPlans(): Promise<{ plans: readonly TeacherStudyPlanItem[] }>;
+  /** POST /api/teacher/study-plans — загрузить план (multipart: title + файл .md/.txt). */
+  uploadTeacherStudyPlan(title: string, file: File): Promise<{ plan: TeacherStudyPlanItem }>;
+  /** DELETE /api/teacher/study-plans/[id] — удалить свой план (чужой → 404). */
+  deleteTeacherStudyPlan(id: string): Promise<{ ok: boolean }>;
+  /** POST /api/teacher/assistant — вопрос по учебному плану (RAG, ответ с цитатами). */
+  askTeacherAssistant(question: string, planId?: string): Promise<TeacherAssistantPayload>;
   // ---- Кабинет сотрудника деканата ----
   /** GET /api/staff/dashboard — счётчики очередей института сотрудника. */
   getStaffDashboard(): Promise<{ dashboard: StaffDashboardPayload }>;
@@ -754,6 +800,37 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
       });
     },
 
+    // ---- Ассистент преподавателя ----
+
+    async getTeacherStudyPlans(): Promise<{ plans: readonly TeacherStudyPlanItem[] }> {
+      return request<{ plans: readonly TeacherStudyPlanItem[] }>('/api/teacher/study-plans', {
+        method: 'GET',
+      });
+    },
+
+    async uploadTeacherStudyPlan(title: string, file: File): Promise<{ plan: TeacherStudyPlanItem }> {
+      const form = new FormData();
+      form.set('title', title.trim());
+      form.set('file', file);
+      return request<{ plan: TeacherStudyPlanItem }>('/api/teacher/study-plans', {
+        method: 'POST',
+        form,
+      });
+    },
+
+    async deleteTeacherStudyPlan(id: string): Promise<{ ok: boolean }> {
+      return request<{ ok: boolean }>(`/api/teacher/study-plans/${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+      });
+    },
+
+    async askTeacherAssistant(question: string, planId?: string): Promise<TeacherAssistantPayload> {
+      return request<TeacherAssistantPayload>('/api/teacher/assistant', {
+        method: 'POST',
+        json: { question, ...(planId === undefined ? {} : { planId }) },
+      });
+    },
+
     // ---- Кабинет сотрудника деканата ----
 
     async getStaffDashboard(): Promise<{ dashboard: StaffDashboardPayload }> {
@@ -892,6 +969,26 @@ export const MAX_MESSAGE_LENGTH = MAX_MESSAGE_LENGTH_CLIENT;
 
 /** Допустимые MIME фото студбилета (дублирует ID_CARD_ALLOWED_MIME core для клиента). */
 export const ID_CARD_PHOTO_ALLOWED_MIME: readonly string[] = ID_CARD_PHOTO_MIME;
+
+/** Лимит размера учебного плана, байт (MAX_STUDY_PLAN_SIZE_BYTES в packages/core). */
+export const STUDY_PLAN_MAX_BYTES = 1024 * 1024;
+
+/** Допустимые MIME учебного плана (STUDY_PLAN_ALLOWED_MIME в packages/core). */
+export const STUDY_PLAN_ALLOWED_MIME: readonly string[] = ['text/markdown', 'text/plain'];
+
+/** Проверка файла учебного плана на клиенте: понятная ошибка до отправки. */
+export function validateStudyPlanFile(file: File): string | null {
+  const extension = file.name.toLowerCase().split('.').pop();
+  const looksLikePlan =
+    STUDY_PLAN_ALLOWED_MIME.includes(file.type) || extension === 'md' || extension === 'txt';
+  if (!looksLikePlan) {
+    return 'План — текстовый файл .md или .txt.';
+  }
+  if (file.size > STUDY_PLAN_MAX_BYTES) {
+    return 'Размер плана не должен превышать 1 МБ.';
+  }
+  return null;
+}
 
 /** Проверка файла фото на клиенте: понятная ошибка до отправки на сервер. */
 export function validateIdCardPhoto(file: File): string | null {

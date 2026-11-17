@@ -62,6 +62,18 @@ export async function getSessionFromRequest(request: NextRequest): Promise<AuthS
 }
 
 /**
+ * Преподаватель ли пользователь сессии: профиль Teacher + роль не STUDENT.
+ *
+ * Единая проверка признака «преподаватель» для гейта кабинета
+ * преподавателя, подсказок на /staff и навигации переписки: источник —
+ * только сессия (teacherId приходит из БД при validateSession), никогда
+ * тело или query запроса.
+ */
+export function isTeacherUser(user: SessionUser): boolean {
+  return user.role !== 'STUDENT' && typeof user.teacherId === 'string' && user.teacherId !== '';
+}
+
+/**
  * Сессия для маршрута данных: бросает OwnershipError UNAUTHENTICATED
  * (→ 401), если пользователь не вошёл. Каждый маршрут данных вызывает
  * эту функцию — ни один не принимает studentId из query/body.
@@ -176,7 +188,9 @@ interface MappedError {
  *
  * UNAUTHENTICATED → 401; NOT_OWNER/STAFF_ONLY/FORBIDDEN_ROLE → 404
  * (не 403: не раскрываем существование чужих объектов); NOT_A_STUDENT
- * → 403; VERIFICATION_REQUIRED → 403 (гейт верификации — честный
+ * → 403; NOT_A_TEACHER → 403 (раздел преподавателя — честный отказ по
+ * роли, а не «не существует»: студент видит заглушку на странице);
+ * VERIFICATION_REQUIRED → 403 (гейт верификации — честный
  * ответ про закрытый раздел, а не про чужую запись); INVALID_INPUT
  * → 400; CONFLICT → 409; NOT_FOUND → 404; прочее → 500.
  *
@@ -200,6 +214,8 @@ function mapCoreError(error: CoreError): MappedError {
       return { status: 404, code: 'NOT_FOUND', message: 'Запрошенные данные не найдены.' };
     case 'NOT_A_STUDENT':
       return { status: 403, code: 'FORBIDDEN', message: 'Раздел доступен только студенту.' };
+    case 'NOT_A_TEACHER':
+      return { status: 403, code: 'FORBIDDEN', message: 'Раздел доступен только преподавателю.' };
     case 'VERIFICATION_REQUIRED':
       return {
         status: 403,

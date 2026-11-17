@@ -9,6 +9,11 @@
  * справочник преподавателей; преподаватель — к своему расписанию
  * (/teachers/<свой id>) и обратно в переписку.
  *
+ * У преподавателя в навигации есть и разделы ЕГО кабинета
+ * (/teacher/plans, /teacher/assistant): из переписки он должен находить
+ * путь обратно к планам и ассистенту (discoverability, BRIEF v4) —
+ * иначе кабинет преподавателя ненаходим из общего раздела.
+ *
  * Требования те же, что у остальных экранов: баннер концепта, цели
  * ≥ 44 px, aria-current="page" у активного раздела, мобильный 360 px
  * без горизонтального скролла, тёмная тема по умолчанию (токены @udgu/ui).
@@ -21,7 +26,7 @@ import { ConceptMark } from './ConceptMark';
 import { LogoutButton } from './LogoutButton';
 import { ThemeToggle } from './ThemeToggle';
 import { FOCUS_RING } from '../lib/ui';
-import { IconChat, IconToday, IconCalendar } from './icons';
+import { IconAssistant, IconCalendar, IconChat, IconRequests, IconToday } from './icons';
 
 interface NavItem {
   readonly href: string;
@@ -37,10 +42,12 @@ const STUDENT_NAV: readonly NavItem[] = [
   { href: '/messages', label: 'Переписка', fullLabel: 'Переписка с преподавателями', Icon: IconChat },
 ];
 
-/** Пункты навигации преподавателя: своё расписание и переписка. */
+/** Пункты навигации преподавателя: своё расписание, кабинет и переписка. */
 function teacherNav(teacherId: string): readonly NavItem[] {
   return [
     { href: `/teachers/${teacherId}`, label: 'Моё расписание', fullLabel: 'Моё расписание и часы приёма', Icon: IconCalendar },
+    { href: '/teacher/plans', label: 'Планы', fullLabel: 'Мои учебные планы', Icon: IconRequests },
+    { href: '/teacher/assistant', label: 'Ассистент', fullLabel: 'Ассистент по учебному плану', Icon: IconAssistant },
     { href: '/messages', label: 'Переписка', fullLabel: 'Переписка со студентами', Icon: IconChat },
   ];
 }

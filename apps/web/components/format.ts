@@ -92,3 +92,15 @@ export function formatDelta(value: number | null): string {
   if (value < 0) return `−${fixed}`;
   return fixed;
 }
+
+/** Размер файла: «820 Б», «12 КБ», «1,4 МБ» (списки планов и фото). */
+export function formatFileSize(bytes: number): string {
+  if (bytes < 1024) {
+    return `${bytes} Б`;
+  }
+  const kilobytes = bytes / 1024;
+  if (kilobytes < 1024) {
+    return `${Math.round(kilobytes)} КБ`;
+  }
+  return `${(kilobytes / 1024).toFixed(1).replace('.', ',')} МБ`;
+}

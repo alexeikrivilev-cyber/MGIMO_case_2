@@ -13,7 +13,12 @@
  *   не выдавало существование пользователя по таймингу;
  * - сессия создаётся в packages/core (в БД только sha256 токена), токен
  *   уходит в httpOnly-cookie; вместе с ним выдаётся CSRF-cookie;
- * - аудит: LOGIN_SUCCESS / LOGIN_FAILED (для существующего пользователя).
+ * - аудит: LOGIN_SUCCESS / LOGIN_FAILED (для существующего пользователя);
+ * - redirectTo по роли: студент → /dashboard, преподаватель (профиль
+ *   Teacher) → /teacher/plans, сотрудник деканата и админ → /staff —
+ *   каждая роль после входа попадает в свой раздел (discoverability,
+ *   BRIEF v4). Признак преподавателя берётся из профиля в БД, не из тела
+ *   запроса.
  */
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
@@ -33,6 +38,22 @@ import { coreErrorResponse, issueCsrfCookie, setSessionCookie } from '@/lib/sess
 
 /** Кеш фиктивного хеша для выравнивания тайминга (см. комментарий файла). */
 let dummyPasswordHash: string | null = null;
+
+/**
+ * Куда вход ведёт пользователя: каждая роль — в свой раздел (роль решает
+ * не тело запроса, а учётная запись). Студент → кабинет студента;
+ * преподаватель (пользователь с профилем Teacher) → кабинет преподавателя;
+ * сотрудник деканата и админ → кабинет деканата.
+ */
+function redirectTargetFor(role: string, teacherId: string | null): string {
+  if (role === 'STUDENT') {
+    return '/dashboard';
+  }
+  if (teacherId !== null) {
+    return '/teacher/plans';
+  }
+  return '/staff';
+}
 
 async function burnArgon2Time(password: string): Promise<void> {
   dummyPasswordHash ??= await hashPassword(randomBytes(24).toString('base64url'));
@@ -60,9 +81,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     }
 
     // 2. Пользователь (регистр логина не важен — УЗ вуза в нижнем регистре).
+    // Профиль преподавателя (teacher.id) читаем здесь же: он решает,
+    // какой кабинет открыть после входа.
     const user = await getPrisma().user.findFirst({
       where: { login: { equals: login, mode: 'insensitive' } },
-      select: { id: true, role: true, passwordHash: true },
+      select: { id: true, role: true, passwordHash: true, teacher: { select: { id: true } } },
     });
 
     const passwordMatches =
@@ -97,7 +120,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       meta: { ip },
     });
 
-    const redirectTo = user.role === 'STUDENT' ? '/dashboard' : '/staff';
+    const redirectTo = redirectTargetFor(user.role, user.teacher?.id ?? null);
     const response = NextResponse.json({ ok: true, redirectTo });
     setSessionCookie(response, token);
     issueCsrfCookie(response);

@@ -20,8 +20,11 @@
  *      токен до входа, паттерн «двойная отправка» требует публичной выдачи);
  *    - страницы кабинета закрыты: аноним → редирект на /login;
  *    - /staff и /admin: роль STUDENT → 404 (не 403! требование
- *      ACCEPTANCE: студент не должен даже узнавать, что раздел есть).
- *
+ *      ACCEPTANCE: студент не должен даже узнавать, что раздел есть);
+ *    - /teacher/* (кабинет преподавателя, BRIEF v2 §5): закрыты для
+ *      анонимов, роль решает лэйаут route group (teacher) — преподаватель
+ *      проходит, остальные видят честную заглушку «раздел для
+ *      преподавателей» (не 404: раздел существует, он просто не theirs); *
  * 3. CSRF — все изменяющие запросы (POST/PUT/PATCH/DELETE) к /api/*
  *    требуют заголовок X-CSRF-Token, равный cookie udgu_csrf
  *    (сравнение timingSafeEqual в packages/core). Исключения — точки
@@ -71,6 +74,15 @@ const CABINET_PAGES = [
 
 /** Страницы сотрудника деканата (роль STUDENT получает 404). */
 const STAFF_PAGES = ['/staff', '/admin'] as const;
+
+/**
+ * Страницы кабинета преподавателя (/teacher/*, BRIEF v2 §5): закрыты
+ * для анонимов. Роль решает не middleware, а лэйаут route group
+ * (teacher): преподаватель видит раздел, студент и сотрудник деканата
+ * — честную заглушку «раздел для преподавателей» (не 404: раздел
+ * существует, он просто не theirs).
+ */
+const TEACHER_PAGES = ['/teacher'] as const;
 
 /**
  * Публичные точки API: сессия не требуется.
@@ -170,7 +182,11 @@ export default async function middleware(request: NextRequest): Promise<NextResp
   // ---- Страницы кабинета студента ----
   // Корень «/» — экран «Сегодня» (route group (cabinet)/page.tsx), поэтому
   // проверяем точным совпадением: startsWith('/') захватил бы все пути.
-  if (pathname === '/' || startsWithAny(pathname, CABINET_PAGES)) {
+  if (
+    pathname === '/' ||
+    startsWithAny(pathname, CABINET_PAGES) ||
+    startsWithAny(pathname, TEACHER_PAGES)
+  ) {
     if (session === null) {
       return applySecurityHeaders(NextResponse.redirect(new URL('/login', request.url)));
     }

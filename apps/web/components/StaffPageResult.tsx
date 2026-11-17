@@ -9,9 +9,10 @@ import type { LoadResult, PageError } from '../lib/page-data';
  * дальше»: у студента это главный экран кабинета, у сотрудника — сводка
  * /staff, а преподаватель (STAFF без факультета в учётной записи) в
  * очереди деканата не попадает вовсе (requireStaffScope → STAFF_ONLY):
- * ему показываем объяснение и ведём в его раздел — переписку. Иначе
- * ссылка «на главный экран» вернула бы его на /staff, и получался бы
- * замкнутый круг.
+ * ему показываем объяснение и ведём в его раздел — переписку и кабинет
+ * преподавателя (путь из сессии, error.teacherCabinet). Иначе ссылка
+ * «на главный экран» вернула бы его на /staff, и получался бы замкнутый
+ * круг.
  */
 function StaffErrorView({ error }: { error: PageError }): React.JSX.Element {
   switch (error.kind) {
@@ -36,7 +37,12 @@ function StaffErrorView({ error }: { error: PageError }): React.JSX.Element {
             Кабинет деканата доступен сотрудникам деканата и администратору.
           </p>
           <div className="mt-4 flex flex-wrap gap-2">
-            <LinkButton href="/messages" variant="primary">
+            {error.teacherCabinet === true ? (
+              <LinkButton href="/teacher/plans" variant="primary">
+                Кабинет преподавателя
+              </LinkButton>
+            ) : null}
+            <LinkButton href="/messages" variant={error.teacherCabinet === true ? 'secondary' : 'primary'}>
               Переписка со студентами
             </LinkButton>
             <LinkButton href="/" variant="secondary">

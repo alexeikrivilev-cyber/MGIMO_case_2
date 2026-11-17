@@ -3,19 +3,25 @@
  * - верные креды → 200 + httpOnly-cookie сессии;
  * - неверный пароль → 401 с ОБЩЕЙ ошибкой (текст не различает «нет такого
  *   логина» и «неверный пароль»);
- * - 6-я попытка подряд → 429 с Retry-After (5/15 мин на логин+IP).
+ * - 6-я попытка подряд → 429 с Retry-After (5/15 мин на логин+IP);
+ * - redirectTo по роли: студент → /dashboard, преподаватель →
+ *   /teacher/plans, сотрудник деканата → /staff.
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { resetLoginRateLimit } from '@udgu/core';
+import { getPrisma } from '@udgu/db';
 import { POST as loginRoute } from '../app/api/auth/login/route';
 import { GET as sessionRoute } from '../app/api/auth/session/route';
 import {
   closeWebTestDb,
   createGroup,
   createStudent,
+  createTeacher,
+  createUser,
   resetWebTestData,
   TEST_PASSWORD,
+  FACULTY_A,
 } from './helpers';
 import { apiRequest, callRoute, sessionCookiesFrom } from './http';
 
@@ -23,6 +29,11 @@ test.before(async () => {
   await resetWebTestData();
   await createGroup('ПИ-31');
   await createStudent('student1', (await getGroupId('ПИ-31')));
+  // Преподаватель (STAFF + профиль Teacher) и сотрудник деканата
+  // (STAFF + факультет): у них свой раздел после входа.
+  await createTeacher('teacher1');
+  const staff = await createUser('staff1', 'STAFF');
+  await getPrisma().user.update({ where: { id: staff.id }, data: { faculty: FACULTY_A } });
 });
 
 test.after(async () => {
@@ -37,7 +48,6 @@ test.beforeEach(() => {
 });
 
 async function getGroupId(name: string): Promise<string> {
-  const { getPrisma } = await import('@udgu/db');
   const group = await getPrisma().group.findUnique({ where: { name }, select: { id: true } });
   if (group === null) {
     throw new Error(`Фикстура: группа ${name} не найдена`);
@@ -79,6 +89,29 @@ test('верные креды → 200, ok, httpOnly-cookie сессии', async 
   const sessionBody = await sessionResponse.json<{ user: { login: string; role: string } }>();
   assert.equal(sessionBody.user.login, 'student1');
   assert.equal(sessionBody.user.role, 'STUDENT');
+});
+
+test('редирект после входа: студент → /dashboard, преподаватель → /teacher/plans, сотрудник → /staff', async () => {
+  const cases: readonly { login: string; redirectTo: string; ip: string }[] = [
+    { login: 'student1', redirectTo: '/dashboard', ip: '10.20.0.1' },
+    { login: 'teacher1', redirectTo: '/teacher/plans', ip: '10.20.0.2' },
+    { login: 'staff1', redirectTo: '/staff', ip: '10.20.0.3' },
+  ];
+
+  for (const { login, redirectTo, ip } of cases) {
+    const response = await callRoute(
+      loginRoute,
+      apiRequest('/api/auth/login', {
+        method: 'POST',
+        ip,
+        body: { login, password: TEST_PASSWORD },
+      }),
+    );
+    assert.equal(response.status(), 200, `${login} входит успешно`);
+    const body = await response.json<{ ok?: boolean; redirectTo?: string }>();
+    assert.equal(body.ok, true);
+    assert.equal(body.redirectTo, redirectTo, `${login} → ${redirectTo}`);
+  }
 });
 
 test('неверный пароль → 401 с общей ошибкой (без намёка на существование логина)', async () => {

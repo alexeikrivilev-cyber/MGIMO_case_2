@@ -16,7 +16,7 @@
  * - в модель уходит ТОЛЬКО вычисленная сводка по владельцу сессии
  *   (никогда чужие данные и никогда сырые таблицы БД).
  */
-import { ASSISTANT_SYSTEM_PROMPT } from './assistantPrompt';
+import { ASSISTANT_SYSTEM_PROMPT, TEACHER_ASSISTANT_SYSTEM_PROMPT } from './assistantPrompt';
 
 /** Таймаут запроса к LLM, мс (дольше ждать ответа нельзя). */
 export const ASSISTANT_LLM_TIMEOUT_MS = 10_000;
@@ -46,7 +46,7 @@ export interface LlmClient {
  * Системный промпт ассистента (единственный источник — модуль
  * assistantPrompt.ts, чтобы его можно было проверить тестом).
  */
-export { ASSISTANT_SYSTEM_PROMPT };
+export { ASSISTANT_SYSTEM_PROMPT, TEACHER_ASSISTANT_SYSTEM_PROMPT };
 
 /**
  * Конфигурация из окружения. Любой из обязательных параметров отсутствует
