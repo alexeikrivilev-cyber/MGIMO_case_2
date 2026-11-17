@@ -87,7 +87,26 @@ export function csrfCookieName(): string {
  * Secure-флаг включается только в продакшне: на http://localhost (dev)
  * cookie с Secure браузер отвергает, и разрабочик не сможет войти.
  */
+/**
+ * Нужен ли флаг `Secure` у cookie сессии.
+ *
+ * `Secure` означает «отправлять cookie только по HTTPS». Это правильно для
+ * продакшена за HTTPS-терминацией, но ЛОМАЕТ вход, если приложение отдаётся
+ * по plain HTTP (например, проверка доступности по IP:порт до подключения
+ * домена): браузер и curl просто не отправят cookie назад, и каждый запрос
+ * выглядит анонимным. Именно на это напоролась первая выкладка на Helsinki.
+ *
+ * Поэтому: в продакшене флаг включён по умолчанию (безопасное значение), но
+ * может быть явно выключен переменной SESSION_COOKIE_SECURE=false — когда
+ * сервис временно работает по HTTP. Явный opt-out вместо тихой деградации.
+ */
 export function isSecureCookie(): boolean {
+  if (process.env.SESSION_COOKIE_SECURE === 'false') {
+    return false;
+  }
+  if (process.env.SESSION_COOKIE_SECURE === 'true') {
+    return true;
+  }
   return process.env.NODE_ENV === 'production';
 }
 

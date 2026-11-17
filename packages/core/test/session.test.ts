@@ -207,6 +207,44 @@ test('cookie сессии: httpOnly, sameSite lax, path /, secure по NODE_ENV'
   }
 });
 
+/**
+ * РЕГРЕССИЯ (найдена при выкладке на Helsinki VPS): приложение отдавалось по
+ * plain HTTP (до подключения домена и до открытия портов 80/443 в ufw), а
+ * cookie сессии имела флаг Secure, потому что NODE_ENV=production. Браузер и
+ * curl НЕ отправляют Secure-cookie по HTTP — поэтому каждый запрос выглядел
+ * анонимным: /staff отдавал 307 вместо 404, /api/grades — 401 вместо данных.
+ *
+ * Окружение production != окружение HTTPS. Флаг Secure должен управляться
+ * явно: SESSION_COOKIE_SECURE=true/false, и только затем NODE_ENV.
+ */
+test('Secure-cookie: явный opt-out через SESSION_COOKIE_SECURE=false', () => {
+  const previousEnv = process.env.NODE_ENV;
+  const previousFlag = process.env.SESSION_COOKIE_SECURE;
+  process.env.NODE_ENV = 'production';
+  try {
+    // По умолчанию в продакшене Secure включён (безопасное значение).
+    delete process.env.SESSION_COOKIE_SECURE;
+    assert.equal(isSecureCookie(), true, 'в продакшене Secure включён по умолчанию');
+
+    // Явный opt-out — когда сервис временно работает по HTTP.
+    process.env.SESSION_COOKIE_SECURE = 'false';
+    assert.equal(isSecureCookie(), false);
+    assert.doesNotMatch(buildSessionCookie('t'), /Secure/, 'по HTTP Secure выключен');
+
+    // Явный opt-in перебивает и development.
+    process.env.SESSION_COOKIE_SECURE = 'true';
+    assert.equal(isSecureCookie(), true);
+    assert.match(buildSessionCookie('t'), /Secure/);
+  } finally {
+    process.env.NODE_ENV = previousEnv;
+    if (previousFlag === undefined) {
+      delete process.env.SESSION_COOKIE_SECURE;
+    } else {
+      process.env.SESSION_COOKIE_SECURE = previousFlag;
+    }
+  }
+});
+
 test('имена cookie и удаление сессии', () => {
   assert.equal(sessionCookieName(), DEFAULT_SESSION_COOKIE_NAME);
   assert.equal(csrfCookieName(), DEFAULT_CSRF_COOKIE_NAME);
