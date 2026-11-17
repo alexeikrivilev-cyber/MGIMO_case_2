@@ -709,6 +709,44 @@ test('мобильный вид: нет фиксированных ширин б
   assert.match(shell, /overflow-x-hidden/, 'оболочка скрывает горизонтальный скролл');
 });
 
+test('доступность: у каждого интерактивного элемента есть видимый фокус', async () => {
+  const screens = await collectAllScreens();
+  const interactive = /<(a|button|input|select|textarea)\s([^>]*)>/g;
+  const missing: string[] = [];
+
+  for (const [index, html] of screens.entries()) {
+    for (const [, tag, attributes] of html.matchAll(interactive)) {
+      // skip-link оформлен в globals.css через :focus-visible — там нет
+      // Tailwind-класса, но кольцо фокуса есть.
+      if (attributes.includes('skip-link')) {
+        continue;
+      }
+      if (!attributes.includes('focus-visible')) {
+        missing.push(`экран ${index}: <${tag} ${attributes.slice(0, 80)}…>`);
+      }
+    }
+  }
+
+  assert.deepEqual(missing, [], 'интерактивные элементы без видимого focus-visible (WCAG 2.4.7)');
+});
+
+test('доступность: декоративные SVG скрыты от скринридера, иконочные кнопки названы', async () => {
+  const screens = await collectAllScreens();
+  const unnamedIcons: string[] = [];
+
+  for (const [index, html] of screens.entries()) {
+    for (const [, attributes] of html.matchAll(/<svg\s([^>]*)>/g)) {
+      // Декоративный SVG — aria-hidden; смысловой (знак концепта) —
+      // role="img" + aria-label. Третьего варианта нет.
+      if (!attributes.includes('aria-hidden') && !attributes.includes('role="img"')) {
+        unnamedIcons.push(`экран ${index}: <svg ${attributes.slice(0, 80)}…>`);
+      }
+    }
+  }
+
+  assert.deepEqual(unnamedIcons, [], 'SVG без aria-hidden и без role="img"');
+});
+
 test('/staff и /admin недоступны студенту (404, не 403)', async () => {
   for (const path of ['/staff', '/admin', '/staff/requests', '/admin/users']) {
     const response = await middleware(

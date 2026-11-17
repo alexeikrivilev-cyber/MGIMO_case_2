@@ -1,6 +1,5 @@
-import Link from 'next/link';
 import { ConceptMark } from '../../components/ConceptMark';
-import { Button, Card } from '../../components/ui';
+import { Card, LinkButton } from '../../components/ui';
 
 /**
  * 404 внутри кабинета: например, преподаватель по неизвестному
@@ -17,9 +16,9 @@ export default function CabinetNotFound(): React.JSX.Element {
         любой раздел кабинета.
       </p>
       <div className="mt-4 flex justify-center">
-        <Link href="/">
-          <Button variant="primary">На главный экран</Button>
-        </Link>
+        <LinkButton href="/" variant="primary">
+          На главный экран
+        </LinkButton>
       </div>
     </Card>
   );

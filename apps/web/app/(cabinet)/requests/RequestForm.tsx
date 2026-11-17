@@ -14,10 +14,9 @@
  * живёт в адресе, а не в клиентском стейте.
  */
 import { useState, type FormEvent } from 'react';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ApiClientError, api } from '../../../lib/api-client';
-import { Button, Card, Select, TextInput, Textarea } from '../../../components/ui';
+import { Button, Card, LinkButton, Select, TextInput, Textarea } from '../../../components/ui';
 import { SEMESTER_OPTIONS } from '../../../components/labels';
 
 type RequestType = 'REFERENCE' | 'APPLICATION';
@@ -144,11 +143,9 @@ export function RequestForm(): React.JSX.Element {
           <Button type="submit" loading={pending} loadingLabel="Отправляем…" disabled={!valid}>
             Отправить заявку
           </Button>
-          <Link href="/requests">
-            <Button variant="secondary" disabled={pending}>
-              Отмена
-            </Button>
-          </Link>
+          <LinkButton href="/requests" variant="secondary" disabled={pending}>
+            Отмена
+          </LinkButton>
         </div>
       </form>
     </Card>

@@ -9,8 +9,7 @@
  * Мутации идут только через /api/* (lib/api-client).
  */
 import { cookies } from 'next/headers';
-import Link from 'next/link';
-import { Button, Card, EmptyState, StatusBadge } from '../../../components/ui';
+import { Card, EmptyState, LinkButton, StatusBadge } from '../../../components/ui';
 import { PageHeader } from '../../../components/PageHeader';
 import { PageResult } from '../../../components/PageStates';
 import { formatMoment } from '../../../components/format';
@@ -34,9 +33,9 @@ export function RequestsView({
             title="Заявки"
             subtitle="Справки и заявления в деканат"
             action={
-              <Link href={formOpen ? '/requests' : '/requests?new=1'}>
-                <Button>{formOpen ? 'Закрыть форму' : 'Новая заявка'}</Button>
-              </Link>
+              <LinkButton href={formOpen ? '/requests' : '/requests?new=1'}>
+                {formOpen ? 'Закрыть форму' : 'Новая заявка'}
+              </LinkButton>
             }
           />
 
@@ -51,9 +50,9 @@ export function RequestsView({
               title="Заявок пока нет"
               description="Здесь появятся справки и заявления, отправленные в деканат: со статусом, комментарием сотрудника и отметкой, чей сейчас ход."
               action={
-                <Link href="/requests?new=1">
-                  <Button>Оформить первую заявку</Button>
-                </Link>
+                <LinkButton href="/requests?new=1">
+                  Оформить первую заявку
+                </LinkButton>
               }
             />
           ) : (

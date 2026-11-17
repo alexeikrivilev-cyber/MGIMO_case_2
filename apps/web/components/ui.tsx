@@ -109,6 +109,56 @@ export function Button({
 }
 
 // ---------------------------------------------------------------------------
+// Ссылка, оформленная как кнопка
+// ---------------------------------------------------------------------------
+
+export interface LinkButtonProps {
+  readonly href: string;
+  readonly variant?: ButtonVariant;
+  /** Неактивная ссылка: aria-disabled + убрана из таб-порядка. */
+  readonly disabled?: boolean;
+  readonly fullWidth?: boolean;
+  readonly className?: string;
+  readonly children: ReactNode;
+}
+
+/**
+ * Навигация, выглядетьящая как кнопка.
+ *
+ * Почему отдельный компонент, а не `<Link><Button/></Link>`: интерактивный
+ * элемент внутри <a> — невалидный HTML, и такой <a> получает фокус БЕЗ
+ * видимого кольца (WCAG 2.4.7), потому что кольцо нарисовано у внутренней
+ * кнопки. Здесь кольцо на самом ссылочном элементе — том, что фокусируется.
+ * Оформление и высота (h-11, 44 px) — те же токены, что у Button.
+ */
+export function LinkButton({
+  href,
+  variant = 'primary',
+  disabled = false,
+  fullWidth = false,
+  className,
+  children,
+}: LinkButtonProps): React.JSX.Element {
+  return (
+    <Link
+      href={href}
+      aria-disabled={disabled || undefined}
+      tabIndex={disabled ? -1 : undefined}
+      className={cn(
+        'inline-flex min-h-11 items-center justify-center gap-2 rounded-md px-4 text-sm font-medium transition-colors',
+        FOCUS_RING,
+        BUTTON_VARIANTS[variant],
+        fullWidth && 'w-full',
+        disabled && 'cursor-not-allowed opacity-60',
+        className,
+      )}
+    >
+      {children}
+    </Link>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Поля ввода
 // ---------------------------------------------------------------------------
 

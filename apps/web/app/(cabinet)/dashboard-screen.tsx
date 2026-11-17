@@ -12,7 +12,7 @@
  */
 import { cookies } from 'next/headers';
 import Link from 'next/link';
-import { Avatar, Button, Card, EmptyState, StatusBadge } from '../../components/ui';
+import { Avatar, Card, EmptyState, LinkButton, StatusBadge } from '../../components/ui';
 import { PageHeader } from '../../components/PageHeader';
 import { PageResult, SectionTitle, VerificationGateCard } from '../../components/PageStates';
 import { LessonRow } from '../../components/LessonRow';
@@ -79,11 +79,9 @@ export function DashboardView({ result }: { result: LoadResult<DashboardData> })
                         ? 'Заявка на верификацию ждёт решения сотрудника деканата.'
                         : 'Верификация отклонена — проверьте причину и подайте заявку снова.'}
                   </p>
-                  <Link href="/verification">
-                    <Button variant="secondary">
-                      {profile.verificationStatus === 'REJECTED' ? 'Подать снова' : 'Верифицировать'}
-                    </Button>
-                  </Link>
+                  <LinkButton href="/verification" variant="secondary">
+                    {profile.verificationStatus === 'REJECTED' ? 'Подать снова' : 'Верифицировать'}
+                  </LinkButton>
                 </div>
               </Card>
             )}
@@ -181,9 +179,9 @@ export function DashboardView({ result }: { result: LoadResult<DashboardData> })
                     title="Активных заявок нет"
                     description="Нужна справка или заявление? Оформите заявку онлайн — она появится здесь со статусом."
                     action={
-                      <Link href="/requests">
-                        <Button variant="secondary">Перейти к заявкам</Button>
-                      </Link>
+                      <LinkButton href="/requests" variant="secondary">
+                        Перейти к заявкам
+                      </LinkButton>
                     }
                   />
                 ) : (

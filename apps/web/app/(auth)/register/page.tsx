@@ -20,10 +20,9 @@
  * логина, форма остаётся редактируемой.
  */
 import { Suspense, useState, type FormEvent } from 'react';
-import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { ApiClientError, api, type OAuthProviderPath } from '../../../lib/api-client';
-import { Button, Card, ErrorState, Skeleton, TextInput } from '../../../components/ui';
+import { Button, Card, ErrorState, LinkButton, Skeleton, TextInput } from '../../../components/ui';
 
 const OAUTH_PROVIDER_LABELS: Readonly<Record<OAuthProviderPath, string>> = {
   vk_id: 'VK ID',
@@ -172,11 +171,9 @@ function RegisterForm(): React.JSX.Element {
       </form>
 
       <div className="mt-4">
-        <Link href="/login">
-          <Button variant="secondary" fullWidth disabled={pending}>
-            Назад
-          </Button>
-        </Link>
+        <LinkButton href="/login" variant="secondary" fullWidth disabled={pending}>
+          Назад
+        </LinkButton>
       </div>
 
       <p className="mt-4 text-xs text-text-muted">

@@ -8,8 +8,7 @@
  * студбилет — успеваемость до сверки закрыта (BRIEF v2).
  */
 import type { ReactNode } from 'react';
-import Link from 'next/link';
-import { Button, Card, ErrorState } from './ui';
+import { Card, ErrorState, LinkButton } from './ui';
 import type { LoadResult, PageError } from '../lib/page-data';
 
 /** Иконка-замок для закрытого раздела (декоративная, текст рядом). */
@@ -42,9 +41,9 @@ export function VerificationGateCard(): React.JSX.Element {
             решение принимает сотрудник деканата.
           </p>
           <div className="mt-4">
-            <Link href="/verification">
-              <Button variant="primary">Верифицировать студенческий билет</Button>
-            </Link>
+            <LinkButton href="/verification" variant="primary">
+              Верифицировать студенческий билет
+            </LinkButton>
           </div>
         </div>
       </div>
@@ -60,9 +59,9 @@ function PageErrorView({ error }: { error: PageError }): React.JSX.Element {
           <h2 className="text-base font-semibold text-text">Сессия истекла</h2>
           <p className="mt-1 text-sm text-text-muted">{error.message}</p>
           <div className="mt-4">
-            <Link href="/login">
-              <Button variant="primary">Войти в кабинет</Button>
-            </Link>
+            <LinkButton href="/login" variant="primary">
+              Войти в кабинет
+            </LinkButton>
           </div>
         </Card>
       );
@@ -76,9 +75,9 @@ function PageErrorView({ error }: { error: PageError }): React.JSX.Element {
           <h2 className="text-base font-semibold text-text">Раздел недоступен</h2>
           <p className="mt-1 text-sm text-text-muted">{error.message}</p>
           <div className="mt-4">
-            <Link href="/">
-              <Button variant="secondary">На главный экран</Button>
-            </Link>
+            <LinkButton href="/" variant="secondary">
+              На главный экран
+            </LinkButton>
           </div>
         </Card>
       );
@@ -89,9 +88,9 @@ function PageErrorView({ error }: { error: PageError }): React.JSX.Element {
           <h2 className="text-base font-semibold text-text">Не найдено</h2>
           <p className="mt-1 text-sm text-text-muted">{error.message}</p>
           <div className="mt-4">
-            <Link href="/">
-              <Button variant="secondary">На главный экран</Button>
-            </Link>
+            <LinkButton href="/" variant="secondary">
+              На главный экран
+            </LinkButton>
           </div>
         </Card>
       );
@@ -100,9 +99,9 @@ function PageErrorView({ error }: { error: PageError }): React.JSX.Element {
       return (
         <div className="space-y-4">
           <ErrorState message={error.message} />
-          <Link href="/">
-            <Button variant="secondary">На главный экран</Button>
-          </Link>
+          <LinkButton href="/" variant="secondary">
+            На главный экран
+          </LinkButton>
         </div>
       );
   }
