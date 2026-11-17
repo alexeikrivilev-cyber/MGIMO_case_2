@@ -341,6 +341,15 @@ export interface UserSeed {
   readonly login: string;
   readonly passwordHash: string;
   readonly role: Role;
+  /**
+   * Факультет сотрудника деканата (users.faculty). Заполнен ТОЛЬКО у
+   * сотрудника деканата (staff1): его очереди ограничены этим институтом
+   * (ARCHITECTURE §4). У админа, преподавателей и студентов — null:
+   * ADMIN видит все факультеты, преподаватель в кабинет деканата не
+   * попадает (fail-closed), студенту faculty не нужен (его факультет
+   * живёт в Student.faculty).
+   */
+  readonly faculty: string | null;
 }
 
 export interface GroupSeed {
@@ -763,14 +772,27 @@ export async function buildSeedData(options: BuildSeedDataOptions = {}): Promise
     };
   });
 
-  const staffUser: UserSeed = { login: 'staff1', passwordHash, role: 'STAFF' };
-  const adminUser: UserSeed = { login: 'admin1', passwordHash, role: 'ADMIN' };
+  // Сотрудник деканата привязан к институту с большинством студентов
+  // (индекс 0 — Институт математики, информационных технологий и физики):
+  // его очереди заявок, верификаций и болезней ограничены этим факультетом.
+  const staffFaculty = INSTITUTES[0]?.name ?? '';
+  const staffUser: UserSeed = { login: 'staff1', passwordHash, role: 'STAFF', faculty: staffFaculty };
+  // ADMIN: faculty = null — видит все факультеты (ARCHITECTURE §4).
+  const adminUser: UserSeed = { login: 'admin1', passwordHash, role: 'ADMIN', faculty: null };
+  // Преподаватели: faculty = null — кабинет деканата им недоступен,
+  // их кабинет преподавателя — отдельная фича (fail-closed).
   const teacherUsers: UserSeed[] = teachers.map((teacher) => ({
     login: teacher.login,
     passwordHash,
     role: 'STAFF',
+    faculty: null,
   }));
-  const studentUsers: UserSeed[] = students.map((student) => ({ login: student.login, passwordHash, role: 'STUDENT' }));
+  const studentUsers: UserSeed[] = students.map((student) => ({
+    login: student.login,
+    passwordHash,
+    role: 'STUDENT',
+    faculty: null,
+  }));
 
   const allUsers: UserSeed[] = [...studentUsers, ...teacherUsers, staffUser, adminUser];
 

@@ -67,6 +67,7 @@ async function main(): Promise<void> {
       login: user.login,
       passwordHash: user.passwordHash,
       role: user.role,
+      faculty: user.faculty,
     })),
   });
 

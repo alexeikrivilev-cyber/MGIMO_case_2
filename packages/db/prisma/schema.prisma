@@ -89,6 +89,16 @@ model User {
   passwordHash String
   role         Role
   createdAt    DateTime @default(now())
+  /// Факультет (институт) сотрудника деканата: очередь заявок, верификаций,
+  /// болезней и расписание сотрудника ограничены этим факультетом
+  /// (ARCHITECTURE §4: «сотрудник деканата — свой факультет; админ — всё»).
+  ///
+  /// ЗАПОЛНЯЕТСЯ ТОЛЬКО У СОТРУДНИКОВ ДЕКАНАТА (role=STAFF):
+  /// - у ADMIN null — админ видит все факультеты (allFaculties);
+  /// - у преподавателя (STAFF + профиль Teacher) null — его кабинет
+  ///   отдельная фича, в деканат он не попадает (fail-closed);
+  /// - у студента null — студенту факультет не нужен, он берётся из Student.
+  faculty      String?
 
   student       Student?
   teacher       Teacher?
@@ -98,9 +108,9 @@ model User {
   auditEvents   AuditEvent[]
   oauthAccounts OAuthAccount[]
   reviewedVerifications StudentVerification[] @relation("VerificationReviewer")
-  staffProfile  StaffProfile?
   messages      Message[]
 
+  @@index([faculty])
   @@map("users")
 }
 
@@ -419,28 +429,6 @@ model OfficeHour {
 
   @@index([teacherId, weekday])
   @@map("office_hours")
-}
-
-/// Привязка сотрудника деканата (роль STAFF) к факультету: очереди заявок,
-/// верификаций и болезней сотрудника ограничены его факультетом (ARCHITECTURE
-/// §4: «сотрудник деканата — свой факультет; админ — всё»).
-///
-/// ПОЧЕМУ ОТДЕЛЬНАЯ МОДЕЛЬ, А НЕ ПОЛЕ В Teacher: сотрудник деканата — не
-/// преподаватель (учётная запись staff1 не имеет записи Teacher), а faculty
-/// нужен именно учётной записи сотрудника. Поле в Teacher заставило бы
-/// заводить преподавателя для каждого сотрудника деканата — это искажает
-/// смысл обеих сущностей. Отдельная модель — минимальное решение: один
-/// ряд на сотрудника, и её отсутствие означает «факультет не привязан»
-/// (fail-closed: такой сотрудник не видит чужих данных вообще).
-model StaffProfile {
-  id      String @id @default(uuid())
-  userId  String @unique
-  faculty String
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([faculty])
-  @@map("staff_profiles")
 }
 
 /// Диалог студента с преподавателем (BRIEF v2 §4). Один диалог на пару
