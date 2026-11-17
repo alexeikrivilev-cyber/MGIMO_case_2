@@ -57,7 +57,7 @@ export function ConversationReadMarker({
   return (
     <p role="status" aria-live="polite" className="text-xs text-text-muted">
       {state === 'failed'
-        ? 'Не удалось отметить диалог прочитанным. Откройте диалог снова — счётчик непрочитанных обновится.'
+        ? 'Не удалось отметить прочитанным. Откройте диалог снова.'
         : `Отмечаем прочитанным: ${unreadCount}`}
     </p>
   );

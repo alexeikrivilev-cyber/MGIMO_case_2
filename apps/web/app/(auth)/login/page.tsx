@@ -16,12 +16,17 @@
  * - неверный пароль даёт ОДНУ обобщённую ошибку «Неверный логин или
  *   пароль» (сервер не различает «нет такого логина» и «неверный пароль»).
  *
- * Демо-доступы вымышленные: пароль одинаковый, данные синтетические.
+ * Демо-доступ (BRIEF v4): каждая строка — кнопка, которая подставляет
+ * логин и демо-пароль в форму, чтобы жюри не набирало пароль руками.
+ * Демо-пароль публичный by design: он опубликован в README и в этой
+ * подсказке, случайный (16 символов) — не помечается браузером как
+ * «утёкший». Данные всех аккаунтов синтетические.
  */
 import { useState, type FormEvent } from 'react';
 import { ApiClientError, api, type OAuthProviderPath } from '../../../lib/api-client';
 import { Button, Card, TextInput } from '../../../components/ui';
 import { ConceptMark } from '../../../components/ConceptMark';
+import { DEMO_ACCOUNTS, DEMO_PASSWORD, type DemoAccount } from '@udgu/ui';
 
 /** Провайдеры OAuth-эмуляции: сегмент пути роута → подпись кнопки. */
 const OAUTH_PROVIDERS: readonly { readonly path: OAuthProviderPath; readonly label: string }[] = [
@@ -30,15 +35,7 @@ const OAUTH_PROVIDERS: readonly { readonly path: OAuthProviderPath; readonly lab
   { path: 'telegram', label: 'Telegram' },
 ];
 
-/** Демо-аккаунты прототипа (вымышленные данные, пароль общий). */
-const DEMO_ACCOUNTS: readonly string[] = [
-  'student1 … student4 — студенты',
-  'teacher1 … teacher3 — преподаватели',
-  'staff1 — сотрудник деканата',
-  'admin1 — администратор',
-];
-
-const NETWORK_ERROR = 'Не удалось связаться с сервером. Проверьте соединение и попробуйте снова.';
+const NETWORK_ERROR = 'Нет связи с сервером. Попробуйте снова.';
 
 /** Идентификатор текста ошибки: поля формы ссылаются на него через aria-describedby. */
 const LOGIN_ERROR_ID = 'login-form-error';
@@ -100,6 +97,13 @@ export default function LoginPage(): React.JSX.Element {
       setError(oauthError instanceof ApiClientError ? oauthError.message : NETWORK_ERROR);
       setOauthPending(null);
     }
+  }
+
+  /** Подставить демо-доступ в форму: логин + пароль кнопкой (BRIEF v4). */
+  function fillDemo(account: DemoAccount): void {
+    setLogin(account.login);
+    setPassword(DEMO_PASSWORD);
+    setError(null);
   }
 
   return (
@@ -165,7 +169,7 @@ export default function LoginPage(): React.JSX.Element {
       </form>
 
       <div className="mt-6 space-y-2">
-        <p className="text-xs font-medium text-text-muted">Или через провайдера (эмуляция согласия)</p>
+        <p className="text-xs font-medium text-text-muted">Или войдите через</p>
         {OAUTH_PROVIDERS.map((provider) => (
           <Button
             key={provider.path}
@@ -181,15 +185,32 @@ export default function LoginPage(): React.JSX.Element {
         ))}
       </div>
 
-      <div className="mt-6 rounded-md bg-surface-2 p-3 text-xs text-text-muted">
-        <p className="font-medium text-text">Демо-доступы (вымышленные данные)</p>
-        <ul className="mt-1 space-y-0.5">
+      <div className="mt-6 rounded-md bg-surface-2 p-3">
+        <p className="text-xs font-medium text-text">Демо-доступ</p>
+        <div
+          className="mt-2 grid gap-2"
+          role="group"
+          aria-label="Демо-доступ: подставить логин и пароль в форму"
+        >
           {DEMO_ACCOUNTS.map((account) => (
-            <li key={account}>{account}</li>
+            <Button
+              key={account.login}
+              variant="secondary"
+              fullWidth
+              disabled={busy}
+              data-testid={`demo-login-${account.login}`}
+              onClick={() => fillDemo(account)}
+            >
+              {`${account.login} — ${account.label}`}
+            </Button>
           ))}
-        </ul>
-        <p className="mt-1.5">Пароль для всех: password123</p>
-        <p className="mt-1.5">Все данные в прототипе синтетические, реальных персональных данных нет.</p>
+        </div>
+        <p className="mt-2 text-xs text-text-muted">
+          Пароль для всех:{' '}
+          <span className="font-mono text-text" data-testid="demo-password">
+            {DEMO_PASSWORD}
+          </span>
+        </p>
       </div>
     </Card>
   );

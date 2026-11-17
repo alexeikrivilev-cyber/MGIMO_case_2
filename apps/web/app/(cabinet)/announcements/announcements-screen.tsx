@@ -18,10 +18,7 @@ export function AnnouncementsView({ result }: { result: LoadResult<Announcements
           <PageHeader title="Объявления" subtitle="Новости деканата для вас" />
 
           {data.announcements.length === 0 ? (
-            <EmptyState
-              title="Объявлений пока нет"
-              description="Деканат публикует здесь объявления для всего университета, для вашего института и для вашей группы."
-            />
+            <EmptyState title="Объявлений нет" />
           ) : (
             <ul className="space-y-3">
               {data.announcements.map((announcement) => (

@@ -47,11 +47,10 @@ export function RequestsView({
 
           {data.requests.length === 0 ? (
             <EmptyState
-              title="Заявок пока нет"
-              description="Здесь появятся справки и заявления, отправленные в деканат: со статусом, комментарием сотрудника и отметкой, чей сейчас ход."
+              title="Заявок нет"
               action={
                 <LinkButton href="/requests?new=1">
-                  Оформить первую заявку
+                  Подать заявку
                 </LinkButton>
               }
             />

@@ -74,10 +74,10 @@ export function DashboardView({ result }: { result: LoadResult<DashboardData> })
                   </StatusBadge>
                   <p className="min-w-0 flex-1 text-sm text-text-muted">
                     {profile.verificationStatus === 'NO_APPLICATION'
-                      ? 'Верифицируйте студенческий билет, чтобы открылись оценки и переписка.'
+                      ? 'Оценки и переписка откроются после верификации студбилета.'
                       : profile.verificationStatus === 'PENDING'
-                        ? 'Заявка на верификацию ждёт решения сотрудника деканата.'
-                        : 'Верификация отклонена — проверьте причину и подайте заявку снова.'}
+                        ? 'Заявка на верификацию ждёт решения.'
+                        : 'Верификация отклонена. Подайте заявку снова.'}
                   </p>
                   <LinkButton href="/verification" variant="secondary">
                     {profile.verificationStatus === 'REJECTED' ? 'Подать снова' : 'Верифицировать'}
@@ -90,10 +90,7 @@ export function DashboardView({ result }: { result: LoadResult<DashboardData> })
             <Card className="mb-4">
               <SectionTitle>Ближайшая пара</SectionTitle>
               {data.nextLesson === null ? (
-                <EmptyState
-                  title="Ближайших пар не найдено"
-                  description="На горизонте двух недель занятий нет. Проверьте расписание на неделю или расписание преподавателей."
-                />
+                <EmptyState title="Ближайших пар нет" />
               ) : (
                 <div>
                   <p className="text-lg font-semibold text-text">{data.nextLesson.subjectName}</p>
@@ -124,10 +121,7 @@ export function DashboardView({ result }: { result: LoadResult<DashboardData> })
               </SectionTitle>
               <Card>
                 {data.todayLessons.length === 0 ? (
-                  <EmptyState
-                    title="Сегодня пар нет"
-                    description="Сегодня занятий нет — можно спокойно подготовиться к завтрашнему дню или посмотреть расписание на неделю."
-                  />
+                  <EmptyState title="Сегодня пар нет" />
                 ) : (
                   <ul>
                     {data.todayLessons.map((lesson) => (
@@ -144,10 +138,7 @@ export function DashboardView({ result }: { result: LoadResult<DashboardData> })
                 <SectionTitle>
                   <span id="free-gaps">Свободные окна</span>
                 </SectionTitle>
-                <Card>
-                  <p className="mb-2 text-xs text-text-muted">
-                    Время между парами — «освоенное время»: его можно потратить на подготовку к следующей паре.
-                  </p>
+                  <Card>
                   <ul className="space-y-1.5">
                     {data.freeGaps.map((gap) => (
                       <li key={`${gap.startTime}-${gap.endTime}`} className="flex items-center justify-between text-sm">
@@ -177,10 +168,9 @@ export function DashboardView({ result }: { result: LoadResult<DashboardData> })
                 {data.activeRequests.length === 0 ? (
                   <EmptyState
                     title="Активных заявок нет"
-                    description="Нужна справка или заявление? Оформите заявку онлайн — она появится здесь со статусом."
                     action={
-                      <LinkButton href="/requests" variant="secondary">
-                        Перейти к заявкам
+                      <LinkButton href="/requests?new=1" variant="secondary">
+                        Подать заявку
                       </LinkButton>
                     }
                   />
@@ -209,10 +199,7 @@ export function DashboardView({ result }: { result: LoadResult<DashboardData> })
               </SectionTitle>
               <Card>
                 {data.unreadNotifications.length === 0 ? (
-                  <EmptyState
-                    title="Все уведомления прочитаны"
-                    description="Новых сообщений от деканата нет. Изменения расписания и статусы заявок появятся здесь."
-                  />
+                  <EmptyState title="Непрочитанных нет" />
                 ) : (
                   <ul>
                     {data.unreadNotifications.map((notification) => (
@@ -243,10 +230,7 @@ export function DashboardView({ result }: { result: LoadResult<DashboardData> })
               </SectionTitle>
               <Card>
                 {data.announcements.length === 0 ? (
-                  <EmptyState
-                    title="Объявлений пока нет"
-                    description="Деканат публикует объявления для института и группы — они появятся в этом разделе."
-                  />
+                  <EmptyState title="Объявлений нет" />
                 ) : (
                   <ul>
                     {data.announcements.map((announcement) => (

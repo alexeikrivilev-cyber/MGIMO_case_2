@@ -35,7 +35,7 @@ export function VerificationDecisionForm({
   if (disabled) {
     return (
       <p className="mt-3 text-xs text-text-muted">
-        Решение по заявке уже принято: повторно верификацию не изменить — студент получил уведомление.
+        Решение принято: студент получил уведомление.
       </p>
     );
   }
@@ -44,7 +44,7 @@ export function VerificationDecisionForm({
     setError(null);
     setDone(null);
     if (status === 'REJECTED' && comment.trim() === '') {
-      setError('Для отказа укажите причину — студент увидит её в заявке на верификацию.');
+      setError('Для отказа укажите причину — студент увидит её в заявке.');
       return;
     }
     setPending(true);
@@ -56,8 +56,8 @@ export function VerificationDecisionForm({
       });
       setDone(
         status === 'VERIFIED'
-          ? `Верификация одобрена: ${studentName} получил(а) доступ к успеваемости и переписке.`
-          : `Верификация отклонена. ${studentName} получил(а) уведомление с причиной.`,
+          ? `Одобрено: ${studentName} получил(а) доступ к оценкам и переписке.`
+          : `Отклонено. ${studentName} получил(а) причину.`,
       );
       setComment('');
       router.refresh();
@@ -65,7 +65,7 @@ export function VerificationDecisionForm({
       setError(
         submitError instanceof ApiClientError
           ? submitError.message
-          : 'Не удалось сохранить решение. Проверьте соединение и попробуйте снова.',
+          : 'Не удалось сохранить решение. Попробуйте снова.',
       );
       setPending(false);
     }
@@ -80,13 +80,12 @@ export function VerificationDecisionForm({
     <Card className="mt-3">
       <h3 className="text-sm font-semibold text-text">Решение по верификации</h3>
       <p className="mt-1 text-xs text-text-muted">
-        Сверьте фото с данными студента и с распознанными полями. Одобрение открывает студенту успеваемость и
-        переписку с преподавателями.
+        Одобрение открывает студенту успеваемость и переписку.
       </p>
       <form className="mt-3 space-y-3" onSubmit={handleSubmit} noValidate>
         <Textarea
           label="Комментарий"
-          hint="Необязательно при одобрении и обязательно при отказе: до 1000 символов."
+          hint="Обязательно при отказе. До 1000 символов."
           value={comment}
           maxLength={1000}
           disabled={pending}

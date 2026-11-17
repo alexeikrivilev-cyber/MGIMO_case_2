@@ -48,10 +48,7 @@ export function NotificationsView({ result }: { result: LoadResult<Notifications
           </div>
 
           {data.notifications.length === 0 ? (
-            <EmptyState
-              title="Уведомлений пока нет"
-              description="Деканат присылает сюда объявления, изменения расписания и статусы заявок. После первого события уведомление появится в этой ленте."
-            />
+            <EmptyState title="Уведомлений нет" />
           ) : (
             <ul className="space-y-3">
               {data.notifications.map((notification) => (

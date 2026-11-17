@@ -64,7 +64,7 @@ export function VerificationForm(): React.JSX.Element {
       setError(
         submitError instanceof ApiClientError
           ? submitError.message
-          : 'Не удалось отправить заявку. Проверьте соединение и попробуйте снова.',
+          : 'Не удалось отправить заявку. Попробуйте снова.',
       );
       setPending(false);
     }
@@ -76,7 +76,7 @@ export function VerificationForm(): React.JSX.Element {
       <form className="mt-4 space-y-4" onSubmit={handleSubmit} noValidate>
         <TextInput
           label="Номер студенческого билета"
-          hint="Номер с самой карточки: буквы, цифры и дефис. Например, ПИ-2023-0138."
+          hint="С самой карточки. Например, ПИ-2023-0138."
           value={cardNumber}
           disabled={pending}
           onChange={(event) => setCardNumber(event.target.value)}
@@ -88,8 +88,7 @@ export function VerificationForm(): React.JSX.Element {
             Фото студенческого билета
           </label>
           <p className="text-xs text-text-muted">
-            Снимок самой карточки: JPEG, PNG или WebP, до 5 МБ. Фото хранится в приватном хранилище —
-            по прямой ссылке его открыть нельзя, доступ есть только у вас и у сотрудника деканата.
+            Снимок карточки: JPEG, PNG или WebP, до 5 МБ. Хранится в приватном хранилище.
           </p>
           <input
             id={fileInputId}

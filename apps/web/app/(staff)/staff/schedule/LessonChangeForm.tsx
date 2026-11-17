@@ -45,7 +45,7 @@ export function LessonChangeForm({
     setDone(null);
 
     if (action === 'cancel' && reason.trim() === '') {
-      setError('Укажите причину отмены — студенты должны понять, почему занятия не будет.');
+      setError('Укажите причину отмены — её увидят студенты.');
       return;
     }
     if (action === 'move' && !/^\d{4}-\d{2}-\d{2}$/.test(newDate)) {
@@ -73,7 +73,7 @@ export function LessonChangeForm({
       setError(
         submitError instanceof ApiClientError
           ? submitError.message
-          : 'Не удалось сохранить изменение. Проверьте соединение и попробуйте снова.',
+          : 'Не удалось сохранить изменение. Попробуйте снова.',
       );
       setPending(false);
     }
@@ -100,14 +100,14 @@ export function LessonChangeForm({
             <TextInput
               label="Новая дата"
               type="date"
-              hint="Дата в формате ГГГГ-ММ-ДД. Исходный слот останется в сетке с отметкой «перенесена»."
+              hint="Исходный слот останется с отметкой «перенесена»."
               value={newDate}
               disabled={pending}
               onChange={(event) => setNewDate(event.target.value)}
             />
             <TextInput
               label="Новая аудитория"
-              hint="Необязательно: если оставить пустым, аудитория останется прежней."
+              hint="Если пусто — аудитория прежняя."
               value={newRoom}
               maxLength={50}
               disabled={pending}
@@ -115,7 +115,7 @@ export function LessonChangeForm({
             />
             <Textarea
               label="Примечание"
-              hint="Необязательно. Например: «перенос согласован с кафедрой»."
+              hint="Например: «перенос согласован с кафедрой»."
               value={note}
               maxLength={500}
               disabled={pending}
@@ -125,7 +125,7 @@ export function LessonChangeForm({
         ) : (
           <Textarea
             label="Причина отмены"
-            hint="Обязательно. Например: «преподаватель на конференции» — причина видна студентам."
+            hint="Обязательно. Причину увидят студенты."
             value={reason}
             maxLength={500}
             disabled={pending}

@@ -21,14 +21,11 @@ export function TeachersView({ result }: { result: LoadResult<TeachersPageData> 
         <>
           <PageHeader
             title="Преподаватели"
-            subtitle="Расписание пар, консультации и часы приёма"
+            subtitle="Пары, консультации, часы приёма"
           />
 
           {data.teachers.length === 0 ? (
-            <EmptyState
-              title="Список преподавателей пуст"
-              description="В справочнике пока нет преподавателей. Обратитесь в деканат, если раздел нужен для учёбы."
-            />
+            <EmptyState title="Преподавателей нет" />
           ) : (
             <ul className="space-y-2">
               {data.teachers.map((teacher) => (

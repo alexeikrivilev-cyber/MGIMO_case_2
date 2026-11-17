@@ -21,6 +21,7 @@ import os from 'node:os';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { getPrisma } from '@udgu/db';
 import { hashPassword } from '@udgu/core';
+import { DEMO_PASSWORD } from '@udgu/ui';
 
 const webDir = path.dirname(fileURLToPath(import.meta.url));
 
@@ -44,8 +45,11 @@ process.env.DATABASE_URL =
 const testStorageDir = mkdtempSync(path.join(os.tmpdir(), 'udgu-web-storage-'));
 process.env.STORAGE_DIR = testStorageDir;
 
-/** Пароль тестовых аккаунтов (как в сидере прототипа). */
-export const TEST_PASSWORD = 'password123';
+/**
+ * Пароль тестовых аккаунтов — DEMO_PASSWORD из @udgu/ui: сидер и
+ * подсказка на форме входа используют то же значение, хардкода нет.
+ */
+export const TEST_PASSWORD = DEMO_PASSWORD;
 
 /** Очищает все таблицы в порядке, безопасном для FK. */
 export async function resetWebTestData(): Promise<void> {

@@ -553,13 +553,13 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
       const message =
         typeof error.message === 'string' && error.message !== ''
           ? error.message
-          : `Сервер вернул ошибку ${status}. Попробуйте позже.`;
+          : 'Что-то пошло не так. Попробуйте позже.';
       const details = Array.isArray(error.details)
         ? error.details.filter((item): item is string => typeof item === 'string')
         : [];
       return new ApiClientError(status, code, message, details, retryAfterSeconds);
     }
-    return new ApiClientError(status, 'INTERNAL', `Сервер вернул ошибку ${status}. Попробуйте позже.`, [], retryAfterSeconds);
+    return new ApiClientError(status, 'INTERNAL', 'Что-то пошло не так. Попробуйте позже.', [], retryAfterSeconds);
   }
 
   async function request<T>(path: string, options: RequestOptions, allowCsrfRetry = true): Promise<T> {

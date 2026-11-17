@@ -19,9 +19,9 @@ import { Button, Card, Select, Textarea, TextInput } from '../../../../component
 
 /** Аудитории объявления: подписи как в справочнике студентов. */
 const AUDIENCES: readonly { value: 'ALL' | 'FACULTY' | 'GROUP'; label: string; hint: string }[] = [
-  { value: 'ALL', label: 'Весь университет', hint: 'Все студенты всех институтов. Такие объявления публикует администратор.' },
-  { value: 'FACULTY', label: 'Институт', hint: 'Студенты вашего института — самый частый случай для сотрудника деканата.' },
-  { value: 'GROUP', label: 'Группа', hint: 'Одна группа вашего института: например, сдача курсовых или перенос занятия.' },
+  { value: 'ALL', label: 'Весь университет', hint: 'Все студенты всех институтов.' },
+  { value: 'FACULTY', label: 'Институт', hint: 'Студенты вашего института.' },
+  { value: 'GROUP', label: 'Группа', hint: 'Одна группа вашего института.' },
 ];
 
 export function AnnouncementForm({
@@ -69,7 +69,7 @@ export function AnnouncementForm({
       return;
     }
     if (allFaculties && audience === 'FACULTY' && adminFaculty.trim() === '') {
-      setError('Администратору нужно указать институт для объявления аудитории «Институт».');
+      setError('Укажите институт.');
       return;
     }
     setPending(true);
@@ -102,7 +102,7 @@ export function AnnouncementForm({
       setError(
         submitError instanceof ApiClientError
           ? `${submitError.message}${details}`
-          : 'Не удалось опубликовать объявление. Проверьте соединение и попробуйте снова.',
+          : 'Не удалось опубликовать. Попробуйте снова.',
       );
       setPending(false);
     }
@@ -112,14 +112,13 @@ export function AnnouncementForm({
     <Card>
       <h2 className="text-base font-semibold text-text">Новое объявление</h2>
       <p className="mt-1 text-sm text-text-muted">
-        Текст уйдёт студентам выбранной аудитории уведомлением и появится в их разделе «Объявления».
-        Закреплённое объявление показывается первым.
+        Студенты аудитории получат уведомление.
       </p>
 
       <form className="mt-4 space-y-4" onSubmit={handleSubmit} noValidate>
         <TextInput
           label="Заголовок"
-          hint="Коротко и по делу: до 200 символов."
+          hint="До 200 символов."
           value={title}
           maxLength={200}
           disabled={pending}
@@ -127,7 +126,7 @@ export function AnnouncementForm({
         />
         <Textarea
           label="Текст объявления"
-          hint="Что нужно студентам сделать, до какого числа и куда обращаться. До 4000 символов."
+          hint="До 4000 символов."
           value={body}
           maxLength={4000}
           disabled={pending}
@@ -151,7 +150,7 @@ export function AnnouncementForm({
         {audience === 'GROUP' ? (
           <Select
             label="Группа"
-            hint="Только группы вашего института: сотрудник не публикует в чужие группы."
+            hint="Только группы вашего института."
             value={groupId}
             disabled={pending || groups.length === 0}
             onChange={(event) => setGroupId(event.target.value)}
@@ -168,7 +167,7 @@ export function AnnouncementForm({
         {allFaculties && audience === 'FACULTY' ? (
           <TextInput
             label="Институт"
-            hint="Администратор публикует в любой институт — укажите его название."
+            hint="Укажите институт."
             value={adminFaculty}
             maxLength={200}
             disabled={pending}
@@ -177,10 +176,7 @@ export function AnnouncementForm({
         ) : null}
 
         {audience === 'FACULTY' && !allFaculties ? (
-          <p className="text-xs text-text-muted">
-            Объявление института публикуется в ваш институт: {faculty ?? 'не указан'}. Указать другой факультет
-            нельзя — аудитория берётся из учётной записи.
-          </p>
+          <p className="text-xs text-text-muted">Аудитория — ваш институт: {faculty ?? 'не указан'}.</p>
         ) : null}
 
         <div className="flex items-start gap-2">
@@ -195,7 +191,7 @@ export function AnnouncementForm({
           <label htmlFor="announcement-pinned" className="text-sm text-text">
             Закрепить сверху
             <span className="block text-xs text-text-muted">
-              Закреплённое объявление студенты увидят первым, даже если вышли более свежие.
+              Будет первым в списке.
             </span>
           </label>
         </div>
@@ -212,7 +208,7 @@ export function AnnouncementForm({
         </div>
 
         <Button type="submit" loading={pending} loadingLabel="Публикуем…">
-          Опубликовать объявление
+          Опубликовать
         </Button>
       </form>
     </Card>

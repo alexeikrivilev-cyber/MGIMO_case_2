@@ -35,11 +35,17 @@ export function VerificationView({ result }: { result: LoadResult<VerificationPa
             <Card className="mb-4">
               <h2 className="text-base font-semibold text-text">Зачем это нужно</h2>
               <p className="mt-1 text-sm text-text-muted">
-                Кабинет защищает ваши оценки и переписку от чужого доступа: сотрудник деканата сверяет
-                фото вашего студенческого билета с реестром университета, и только после этого
-                открываются успеваемость и переписка с преподавателями. Фото видите только вы и
-                проверяющий сотрудник — оно лежит в приватном хранилище, без публичных ссылок.
+                Сотрудник сверяет фото студбилета с реестром — после этого откроются оценки и переписка.
               </p>
+              <details className="mt-2 rounded-md border border-border bg-surface-2/40 px-3 py-2">
+                <summary className="min-h-11 cursor-pointer py-2 text-sm font-medium text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
+                  Где хранится фото
+                </summary>
+                <p className="pb-1 text-sm text-text-muted">
+                  В приватном хранилище: фото видите только вы и проверяющий сотрудник, публичных ссылок
+                  нет.
+                </p>
+              </details>
             </Card>
 
             {/* Статус заявки */}
@@ -53,8 +59,7 @@ export function VerificationView({ result }: { result: LoadResult<VerificationPa
 
               {verification === null ? (
                 <p className="mt-2 text-sm text-text-muted">
-                  Заявка ещё не подана. Загрузите фото студенческого билета и укажите его номер —
-                  заявка попадёт в очередь на проверку.
+                  Заявка не подана: загрузите фото студбилета и укажите его номер.
                 </p>
               ) : (
                 <>
@@ -78,8 +83,7 @@ export function VerificationView({ result }: { result: LoadResult<VerificationPa
 
                   {status === 'PENDING' ? (
                     <p className="mt-3 text-sm text-text-muted">
-                      Заявка ждёт решения сотрудника деканата — обычно это занимает до трёх рабочих
-                      дней. Мы пришлём уведомление, когда решение будет принято.
+                      Заявка ждёт решения сотрудника. Пришлём уведомление.
                     </p>
                   ) : null}
 
@@ -92,10 +96,9 @@ export function VerificationView({ result }: { result: LoadResult<VerificationPa
 
                   {status === 'VERIFIED' ? (
                     <p className="mt-3 text-sm text-success">
-                      Студенческий билет подтверждён. Открыты успеваемость и переписка с
-                      преподавателями.{' '}
+                      Билет подтверждён. Открыты успеваемость и переписка.{' '}
                       <Link href="/grades" className={TEXT_LINK_CLASS}>
-                        Перейти к успеваемости
+                        К успеваемости
                       </Link>
                     </p>
                   ) : null}

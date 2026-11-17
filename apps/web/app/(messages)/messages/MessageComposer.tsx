@@ -39,14 +39,14 @@ export function MessageComposer({
 
     try {
       await api.sendConversationMessage(conversationId, body.trim());
-      setDone(`Сообщение отправлено: ${peerName} получит уведомление.`);
+      setDone(`Отправлено. ${peerName} получит уведомление.`);
       setBody('');
       router.refresh();
     } catch (submitError) {
       setError(
         submitError instanceof ApiClientError
           ? submitError.message
-          : 'Не удалось отправить сообщение. Проверьте соединение и попробуйте снова.',
+          : 'Не удалось отправить. Попробуйте снова.',
       );
       setPending(false);
     }
@@ -56,7 +56,7 @@ export function MessageComposer({
     <form className="mt-3 space-y-3" onSubmit={handleSubmit} noValidate>
       <Textarea
         label="Сообщение"
-        hint={`До ${MAX_MESSAGE_LENGTH} символов. Переписка доступна только верифицированным студентам — преподаватель видит ваши ФИО и группу.`}
+        hint={`До ${MAX_MESSAGE_LENGTH} символов.`}
         value={body}
         maxLength={MAX_MESSAGE_LENGTH}
         disabled={pending}
@@ -75,7 +75,7 @@ export function MessageComposer({
       </div>
 
       <Button type="submit" loading={pending} loadingLabel="Отправляем…">
-        Отправить сообщение
+        Отправить
       </Button>
     </form>
   );

@@ -68,7 +68,7 @@ function SummaryCard({ data }: { data: GradesPageData }): React.JSX.Element {
         ? `на ${formatDelta(trend.delta)} ниже прошлого семестра`
         : trend.direction === 'STABLE'
           ? 'на уровне прошлого семестра'
-          : 'недостаточно данных: нужны оценки минимум за два семестра';
+          : 'недостаточно данных';
 
   const TrendIcon =
     trend.direction === 'UP' ? IconArrowUp : trend.direction === 'DOWN' ? IconArrowDown : IconMinus;
@@ -85,7 +85,7 @@ function SummaryCard({ data }: { data: GradesPageData }): React.JSX.Element {
           <p className="mt-1 text-2xl font-semibold tabular-nums text-text" data-testid="average-score">
             {formatScore(summary.averageScore)}
           </p>
-          <p className="mt-0.5 text-xs text-text-muted">по {summary.gradedCount} оцененным работам</p>
+          <p className="mt-0.5 text-xs text-text-muted">по {summary.gradedCount} работам</p>
         </div>
         <div className="rounded-md bg-surface-2 p-3">
           <p className="text-xs text-text-muted">Тренд</p>
@@ -179,10 +179,7 @@ export function GradesView({ result }: { result: LoadResult<GradesPageData> }): 
               </SectionTitle>
 
               {data.grades.semesters.length === 0 ? (
-                <EmptyState
-                  title="Оценок пока нет"
-                  description="За этот семестр оценок и зачётов нет. Они появятся здесь после первых экзаменов и зачётов."
-                />
+                <EmptyState title="Оценок пока нет" />
               ) : (
                 <div className="space-y-4">
                   {data.grades.semesters.map((semesterGroup) => (
@@ -204,8 +201,8 @@ export function GradesView({ result }: { result: LoadResult<GradesPageData> }): 
             <Card className="mt-4">
               <p className="text-sm text-text-muted">
                 Нужна справка об успеваемости?{' '}
-                <Link href="/requests" className={TEXT_LINK_CLASS}>
-                  Оформить заявку
+                <Link href="/requests?new=1" className={TEXT_LINK_CLASS}>
+                  Оформить
                 </Link>
               </p>
             </Card>

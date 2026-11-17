@@ -37,10 +37,7 @@ function TeacherCardView({ result }: { result: LoadResult<TeacherCard> }): React
               <span id="teacher-schedule">Расписание на две недели</span>
             </SectionTitle>
             {teacher.lessons.length === 0 ? (
-              <EmptyState
-                title="На ближайшие две недели пар нет"
-                description="В расписании преподавателя занятий не найдено. Часы приёма ниже действуют по расписанию."
-              />
+              <EmptyState title="На две недели пар нет" />
             ) : (
               <Card>
                 <ul>
@@ -62,10 +59,7 @@ function TeacherCardView({ result }: { result: LoadResult<TeacherCard> }): React
               <span id="office-hours">Часы приёма и консультации</span>
             </SectionTitle>
             {teacher.officeHours.length === 0 ? (
-              <EmptyState
-                title="Часов приёма не указано"
-                description="У преподавателя не назначено время приёма. Свяжитесь через деканат или спросите после пары."
-              />
+              <EmptyState title="Часов приёма нет" />
             ) : (
               <ul className="space-y-2">
                 {teacher.officeHours.map((hour) => (
@@ -88,10 +82,7 @@ function TeacherCardView({ result }: { result: LoadResult<TeacherCard> }): React
             )}
           </section>
 
-          <p className="mt-4 text-xs text-text-muted">
-            Расписание показывает занятия на ближайшие две недели; часы приёма — регулярное недельное
-            расписание преподавателя.
-          </p>
+          <p className="mt-4 text-xs text-text-muted">Часы приёма — регулярное недельное расписание.</p>
         </>
       )}
     </PageResult>

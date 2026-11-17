@@ -43,10 +43,10 @@ function statusExplanation(lesson: StaffLessonItem): string {
   if (lesson.status === 'MOVED') {
     const to = lesson.movedToDate === null ? '' : formatDate(lesson.movedToDate);
     const room = lesson.movedToRoom === null || lesson.movedToRoom === '' ? '' : `, аудитория ${lesson.movedToRoom}`;
-    return `Перенесена на ${to}${room}. Исходный слот остаётся в сетке с этой отметкой — так же его видит студент.`;
+    return `Перенесена на ${to}${room}.`;
   }
   if (lesson.status === 'CANCELLED') {
-    return `Отменена${lesson.note === null ? '' : `: ${lesson.note}`}. Вернуть пару в расписание нельзя.`;
+    return `Отменена${lesson.note === null ? '' : `: ${lesson.note}`}.`;
   }
   return 'Пара идёт по расписанию.';
 }
@@ -158,7 +158,6 @@ export function StaffScheduleView({
           {data.days.length === 0 ? (
             <EmptyState
               title="На этот период пар нет"
-              description="В выбранных двух неделях у групп института нет занятий — возможно, каникулы. Переключитесь на другой период или проверьте расписание студентов в кабинете."
               action={
                 <LinkButton href="/staff/schedule" variant="secondary">
                   Текущие две недели
@@ -174,7 +173,7 @@ export function StaffScheduleView({
           )}
 
           <p className="mt-6 text-xs text-text-muted">
-            Изменения видны студентам сразу: перенос и отмена приходят уведомлением и отмечаются в их расписании.{' '}
+            Студенты видят изменения сразу и получают уведомление.{' '}
             <Link href="/staff/requests" className="font-medium text-primary underline decoration-dotted py-1 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
               Очередь заявок
             </Link>
