@@ -105,6 +105,87 @@ export {
   requireStaffAccess,
 } from './ownership';
 
+export {
+  requireStaffScope,
+  facultyStudentFilter,
+  assertFacultyInScope,
+} from './services/staff-scope';
+export type { StaffScope } from './services/staff-scope';
+
+export { getStaffDashboard } from './services/staffDashboard';
+export type { StaffDashboard } from './services/staffDashboard';
+
+export {
+  listStaffRequests,
+  decideStaffRequest,
+  staffRequestsFilterSchema,
+  staffRequestDecisionSchema,
+} from './services/staffRequests';
+export type {
+  StaffRequestsFilter,
+  StaffRequestDecision,
+  StaffRequestItem,
+} from './services/staffRequests';
+
+export {
+  listStaffAnnouncements,
+  createStaffAnnouncement,
+  listStaffGroups,
+  staffAnnouncementSchema,
+} from './services/staffAnnouncements';
+export type { StaffAnnouncementInput, StaffAnnouncementItem } from './services/staffAnnouncements';
+
+export {
+  listStaffSchedule,
+  moveStaffLesson,
+  cancelStaffLesson,
+  staffScheduleRangeSchema,
+  staffLessonMoveSchema,
+  staffLessonCancelSchema,
+} from './services/staffSchedule';
+export type {
+  StaffScheduleRange,
+  StaffLessonMoveInput,
+  StaffLessonCancelInput,
+  StaffLessonItem,
+} from './services/staffSchedule';
+
+export {
+  listStaffSickLeaves,
+  staffSickLeavesFilterSchema,
+} from './services/staffSickLeaves';
+export type { StaffSickLeavesFilter, StaffSickLeaveItem } from './services/staffSickLeaves';
+
+export {
+  listStaffVerifications,
+  getStaffVerificationPhoto,
+  decideStaffVerification,
+  mimeForPhotoPath,
+  staffVerificationsFilterSchema,
+} from './services/staffVerifications';
+export type { StaffVerificationsFilter, StaffVerificationItem } from './services/staffVerifications';
+
+export {
+  listMyConversations,
+  getConversation,
+  startConversationWithTeacher,
+  sendMessage,
+  markConversationRead,
+  messagingRole,
+  messageBodySchema,
+  conversationStartSchema,
+  MAX_MESSAGE_LENGTH,
+} from './services/messaging';
+export type {
+  ConversationDetail,
+  ConversationListItem,
+  ConversationMessageItem,
+  ConversationPeer,
+  ConversationStartInput,
+  MessageInput,
+  MessagingRole,
+} from './services/messaging';
+
 export { writeAuditEvent, getAuditTrail } from './audit';
 export type { AuditMetaValue, WriteAuditEventInput } from './audit';
 

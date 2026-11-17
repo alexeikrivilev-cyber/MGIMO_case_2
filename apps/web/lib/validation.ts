@@ -185,5 +185,67 @@ export const leverageBodySchema = z.object({
     .max(5, 'Целевой средний балл должен быть в диапазоне 2-5.'),
 });
 
+// ---------------------------------------------------------------------------
+// Кабинет сотрудника деканата (/api/staff/*)
+// ---------------------------------------------------------------------------
+
+/**
+ * Решение сотрудника по заявке (POST /api/staff/requests/[id]/decide).
+ * Каноническая схема — в packages/core (staffRequestDecisionSchema):
+ * REJECTED требует непустой комментарий, допустимые статусы
+ * IN_PROGRESS/READY/REJECTED. Здесь — реэкспорт, чтобы маршруты имели
+ * одну точку импорта (как requestCreateSchema/verificationReviewSchema).
+ */
+export {
+  staffRequestDecisionSchema,
+  staffAnnouncementSchema,
+  staffScheduleRangeSchema,
+  staffLessonMoveSchema,
+  staffLessonCancelSchema,
+  staffSickLeavesFilterSchema,
+  staffVerificationsFilterSchema,
+} from '@udgu/core';
+
+/**
+ * Фильтр очереди заявок (GET /api/staff/requests?status=): статус
+ * необязателен, пустая строка = все статусы (схема core преобразит).
+ */
+export const staffRequestsQuerySchema = z.object({
+  status: z.enum(['NEW', 'IN_PROGRESS', 'READY', 'REJECTED']).optional(),
+});
+
+/** Фильтр очереди верификаций (GET /api/staff/verifications?status=). */
+export const staffVerificationsQuerySchema = z.object({
+  status: z.enum(['PENDING', 'VERIFIED', 'REJECTED']).optional(),
+});
+
+/**
+ * Расписание сотрудника (GET /api/staff/schedule?from&to): период
+ * обязателен (иначе выборка «всех пар факультета» раздувает ответ).
+ */
+export const staffScheduleQuerySchema = z.object({
+  from: z.string().regex(DATE_KEY, 'Дата начала в формате YYYY-MM-DD'),
+  to: z.string().regex(DATE_KEY, 'Дата окончания в формате YYYY-MM-DD'),
+});
+
+/** Список болезней (GET /api/staff/sick-leaves?onlyActive&from&to). */
+export const staffSickLeavesQuerySchema = z.object({
+  onlyActive: z.enum(['true', 'false']).default('false'),
+  from: z.string().regex(DATE_KEY, 'Дата начала в формате YYYY-MM-DD').optional(),
+  to: z.string().regex(DATE_KEY, 'Дата окончания в формате YYYY-MM-DD').optional(),
+});
+
 /** Идентификатор сущности в пути (заявка, уведомление). */
 export const idParamSchema = z.string().trim().min(1, 'Идентификатор не указан.').max(64, 'Некорректный идентификатор.');
+
+// ---------------------------------------------------------------------------
+// Переписка студент ↔ преподаватель (/api/conversations/*)
+// ---------------------------------------------------------------------------
+
+/**
+ * Начало диалога (POST /api/conversations): идентификатор преподавателя
+ * из справочника. Каноническая схема — в packages/core
+ * (conversationStartSchema): диалог создаёт только верифицированный
+ * студент, проверка живёт в сервисе, здесь — точка импорта для роута.
+ */
+export { conversationStartSchema, messageBodySchema } from '@udgu/core';

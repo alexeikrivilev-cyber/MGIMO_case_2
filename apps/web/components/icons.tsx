@@ -110,3 +110,45 @@ export function IconMinus({ className }: IconProps): React.JSX.Element {
     </svg>
   );
 }
+
+/** Студенческий билет (карточка с фото и строкой данных) — очередь верификаций. */
+export function IconIdCard({ className }: IconProps): React.JSX.Element {
+  return (
+    <svg viewBox="0 0 24 24" className={className ?? BASE} fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="3" y="5.5" width="18" height="13" rx="2.5" />
+      <circle cx="9" cy="11" r="2" />
+      <path d="M6 15.6c.6-1.3 1.7-2 3-2s2.4.7 3 2M15 10h4M15 13h3" />
+    </svg>
+  );
+}
+
+/** Рупор — публикация объявления деканата. */
+export function IconMegaphone({ className }: IconProps): React.JSX.Element {
+  return (
+    <svg viewBox="0 0 24 24" className={className ?? BASE} fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M4 10.5v3a1.5 1.5 0 0 0 1.5 1.5H7l6.5 3.5V5.5L7 9H5.5A1.5 1.5 0 0 0 4 10.5Z" />
+      <path d="M18 9.5a4 4 0 0 1 0 5M20.5 7.5a7 7 0 0 1 0 9" />
+    </svg>
+  );
+}
+
+/** Перенос занятия: календарь со стрелкой. */
+export function IconMove({ className }: IconProps): React.JSX.Element {
+  return (
+    <svg viewBox="0 0 24 24" className={className ?? BASE} fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M4 8.5h11M4 12h7" />
+      <path d="M14.5 15.5 17 18l2.5-2.5" />
+      <path d="M17 18v-5" />
+    </svg>
+  );
+}
+
+/** Сообщение в переписке (облако с текстом). */
+export function IconChat({ className }: IconProps): React.JSX.Element {
+  return (
+    <svg viewBox="0 0 24 24" className={className ?? BASE} fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M4 6.5A2.5 2.5 0 0 1 6.5 4h11A2.5 2.5 0 0 1 20 6.5v7A2.5 2.5 0 0 1 17.5 16H10l-4 3.5V16h-.5A1.5 1.5 0 0 1 4 14.5v-8Z" />
+      <path d="M8 9h8M8 12h5" />
+    </svg>
+  );
+}

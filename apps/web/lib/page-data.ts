@@ -34,8 +34,18 @@ import {
   getTeacherCard,
   getVerificationGate,
   getMyVerification,
+  getStaffDashboard,
   isSickNow,
+  listMyConversations,
+  listStaffAnnouncements,
+  listStaffGroups,
+  listStaffRequests,
+  listStaffSchedule,
+  listStaffSickLeaves,
+  listStaffVerifications,
   listTeachers,
+  getConversation,
+  requireStaffScope,
   OwnershipError,
   ValidationError,
   VerificationRequiredError,
@@ -44,6 +54,8 @@ import {
   type AcademicSummary,
   type AnnouncementItem,
   type AuthSession,
+  type ConversationDetail,
+  type ConversationListItem,
   type FreeGap,
   type LessonOccurrence,
   type MyGradesResult,
@@ -54,6 +66,12 @@ import {
   type MyVerification,
   type ScheduleLesson,
   type ScheduleWeek,
+  type StaffAnnouncementItem,
+  type StaffDashboard,
+  type StaffLessonItem,
+  type StaffRequestItem,
+  type StaffSickLeaveItem,
+  type StaffVerificationItem,
   type TeacherCard,
   type TeacherListItem,
   type VerificationGate,
@@ -482,4 +500,289 @@ export async function loadTeacherCardData(
     const to = addUtcDays(from, TEACHER_CARD_HORIZON_DAYS - 1);
     return getTeacherCard(sessionResult.value, teacherId, from, to);
   });
+}
+
+// ---------------------------------------------------------------------------
+// Кабинет сотрудника деканата (/staff)
+// ---------------------------------------------------------------------------
+
+/**
+ * Загрузчики кабинета сотрудника деканата.
+ *
+ * Правило то же, что у кабинета студента: данные берутся из ТЕХ ЖЕ
+ * сервисов packages/core, что и роуты /api/staff/* (единая реализация),
+ * поэтому страница не может показать больше, чем разрешает API. Сотрудник
+ * видит только свой институт: faculty приходит из сессии, а не из query —
+ * подмена параметров фильтра на чужие данные не работает.
+ *
+ * Ошибки резолвятся в состояния страницы: преподаватель (STAFF без
+ * faculty) и студент получают понятную карточку «раздел недоступен»
+ * вместо падения (services/staff-scope.ts → STAFF_ONLY → 404).
+ */
+
+/** Горизонт расписания сотрудника по умолчанию — две недели от сегодня. */
+const STAFF_SCHEDULE_HORIZON_DAYS = 14;
+
+/** Статус заявки в фильтре очереди. */
+export type StaffRequestStatusFilter = 'NEW' | 'IN_PROGRESS' | 'READY' | 'REJECTED';
+
+/** Статус верификации в фильтре очереди. */
+export type StaffVerificationStatusFilter = 'PENDING' | 'VERIFIED' | 'REJECTED';
+
+/** Дата YYYY-MM-DD из query: любое иное значение → undefined (значение по умолчанию). */
+function normalizeDateKey(raw: string | undefined): string | undefined {
+  if (raw === undefined || !/^\d{4}-\d{2}-\d{2}$/.test(raw.trim())) {
+    return undefined;
+  }
+  const date = new Date(`${raw.trim()}T00:00:00.000Z`);
+  if (Number.isNaN(date.getTime()) || dateKey(date) !== raw.trim()) {
+    return undefined;
+  }
+  return raw.trim();
+}
+
+export interface StaffDashboardPageData {
+  readonly dashboard: StaffDashboard;
+}
+
+export async function loadStaffDashboardPageData(cookieHeader: string): Promise<LoadResult<StaffDashboardPageData>> {
+  const sessionResult = await requirePageSession(cookieHeader);
+  if (!sessionResult.ok) {
+    return sessionResult;
+  }
+  return attempt(async () => ({ dashboard: await getStaffDashboard(sessionResult.value) }));
+}
+
+export interface StaffRequestsPageData {
+  readonly requests: readonly StaffRequestItem[];
+  /** Выбранный фильтр (null — все статусы). */
+  readonly status: StaffRequestStatusFilter | null;
+}
+
+export async function loadStaffRequestsPageData(
+  cookieHeader: string,
+  status: string | undefined,
+): Promise<LoadResult<StaffRequestsPageData>> {
+  const sessionResult = await requirePageSession(cookieHeader);
+  if (!sessionResult.ok) {
+    return sessionResult;
+  }
+  const filter: StaffRequestStatusFilter | null =
+    status === 'NEW' || status === 'IN_PROGRESS' || status === 'READY' || status === 'REJECTED'
+      ? status
+      : null;
+  return attempt(async () => ({
+    requests: await listStaffRequests(sessionResult.value, filter === null ? {} : { status: filter }),
+    status: filter,
+  }));
+}
+
+export interface StaffVerificationsPageData {
+  readonly verifications: readonly StaffVerificationItem[];
+  readonly status: StaffVerificationStatusFilter | null;
+}
+
+export async function loadStaffVerificationsPageData(
+  cookieHeader: string,
+  status: string | undefined,
+): Promise<LoadResult<StaffVerificationsPageData>> {
+  const sessionResult = await requirePageSession(cookieHeader);
+  if (!sessionResult.ok) {
+    return sessionResult;
+  }
+  const filter: StaffVerificationStatusFilter | null =
+    status === 'PENDING' || status === 'VERIFIED' || status === 'REJECTED' ? status : null;
+  return attempt(async () => ({
+    verifications: await listStaffVerifications(
+      sessionResult.value,
+      filter === null ? {} : { status: filter },
+    ),
+    status: filter,
+  }));
+}
+
+export interface StaffSickLeavesPageData {
+  readonly sickLeaves: readonly StaffSickLeaveItem[];
+  readonly onlyActive: boolean;
+  /** «Болеет прямо сейчас» — для сводки над списком. */
+  readonly activeCount: number;
+}
+
+export async function loadStaffSickLeavesPageData(
+  cookieHeader: string,
+  onlyActive: boolean,
+): Promise<LoadResult<StaffSickLeavesPageData>> {
+  const sessionResult = await requirePageSession(cookieHeader);
+  if (!sessionResult.ok) {
+    return sessionResult;
+  }
+  return attempt(async () => {
+    const sickLeaves = await listStaffSickLeaves(sessionResult.value, { onlyActive });
+    const today = startOfUtcDay(new Date()).getTime();
+    return {
+      sickLeaves,
+      onlyActive,
+      activeCount: sickLeaves.filter(
+        (leave) => leave.dateFrom.getTime() <= today && leave.dateTo.getTime() >= today,
+      ).length,
+    };
+  });
+}
+
+/** Пары одного дня в расписании сотрудника. */
+export interface StaffScheduleDay {
+  readonly date: string;
+  readonly lessons: readonly StaffLessonItem[];
+}
+
+export interface StaffSchedulePageData {
+  readonly days: readonly StaffScheduleDay[];
+  readonly from: string;
+  readonly to: string;
+}
+
+export async function loadStaffSchedulePageData(
+  cookieHeader: string,
+  from: string | undefined,
+  to: string | undefined,
+): Promise<LoadResult<StaffSchedulePageData>> {
+  const sessionResult = await requirePageSession(cookieHeader);
+  if (!sessionResult.ok) {
+    return sessionResult;
+  }
+  const start = startOfUtcDay(new Date());
+  const fromKey = normalizeDateKey(from) ?? dateKey(start);
+  const toKey = normalizeDateKey(to) ?? dateKey(addUtcDays(start, STAFF_SCHEDULE_HORIZON_DAYS - 1));
+
+  return attempt(async () => {
+    const lessons = await listStaffSchedule(sessionResult.value, { from: fromKey, to: toKey });
+    const byDay = new Map<string, StaffLessonItem[]>();
+    for (const lesson of lessons) {
+      const key = dateKey(lesson.date);
+      byDay.set(key, [...(byDay.get(key) ?? []), lesson]);
+    }
+    const days: StaffScheduleDay[] = [...byDay.entries()]
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([date, dayLessons]) => ({ date, lessons: dayLessons }));
+    return { days, from: fromKey, to: toKey };
+  });
+}
+
+export interface StaffAnnouncementsPageData {
+  readonly announcements: readonly StaffAnnouncementItem[];
+  /** Группы института сотрудника — для аудитории «Группа». */
+  readonly groups: readonly { id: string; name: string }[];
+  /** Институт сотрудника; null у ADMIN (все институты). */
+  readonly faculty: string | null;
+  /** ADMIN публикует и «весь университет», и в любой институт. */
+  readonly allFaculties: boolean;
+}
+
+export async function loadStaffAnnouncementsPageData(
+  cookieHeader: string,
+): Promise<LoadResult<StaffAnnouncementsPageData>> {
+  const sessionResult = await requirePageSession(cookieHeader);
+  if (!sessionResult.ok) {
+    return sessionResult;
+  }
+  return attempt(async () => {
+    const session = sessionResult.value;
+    const scope = requireStaffScope(session);
+    const [announcements, groups] = await Promise.all([
+      listStaffAnnouncements(session),
+      listStaffGroups(session),
+    ]);
+    return {
+      announcements,
+      groups,
+      faculty: scope.faculty,
+      allFaculties: scope.allFaculties,
+    };
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Переписка (/messages)
+// ---------------------------------------------------------------------------
+
+/** Режим переписки по роли сессии. */
+export type MessagesMode = 'student' | 'teacher' | 'none';
+
+export interface MessagesPageData {
+  readonly mode: MessagesMode;
+  readonly conversations: readonly ConversationListItem[];
+  /**
+   * Открытый диалог — отдельным результатом: ошибка доступа к ЧУЖОМУ
+   * диалогу (подстанов conversationId) не должна уносить весь список,
+   * страница показывает объяснение в панели диалога.
+   */
+  readonly active: LoadResult<ConversationDetail> | null;
+  /** Преподаватели для «Написать преподавателю» (только студент). */
+  readonly teachers: readonly TeacherListItem[];
+  /** Идентификатор преподавателя сессии — для ссылки «моё расписание». */
+  readonly teacherId: string | null;
+}
+
+/**
+ * Переписка кабинета. Два режима по роли (BRIEF v2 §4):
+ * - студент: диалоги с преподавателями. До верификации загрузчик
+ *   возвращает verification-required — страница рисует честную заглушку
+ *   гейта со ссылкой на /verification (не 500 и не пустой экран);
+ * - преподаватель (STAFF с профилем Teacher): диалоги, где ему пишут;
+ *   в каждом видно ФИО и группу автора;
+ * - сотрудник деканат и админ: перепиской не пользуются — mode='none',
+ *   страница объясняет это и ведёт в их разделы.
+ */
+export async function loadMessagesPageData(
+  cookieHeader: string,
+  conversationId: string | undefined,
+): Promise<LoadResult<MessagesPageData>> {
+  const sessionResult = await requirePageSession(cookieHeader);
+  if (!sessionResult.ok) {
+    return sessionResult;
+  }
+  const session = sessionResult.value;
+  const user = session.user;
+
+  if (user.role === 'STUDENT') {
+    return attempt(async () => {
+      // Гейт верификации: listMyConversations бросает
+      // VerificationRequiredError → состояние verification-required.
+      const [conversations, teachers] = await Promise.all([
+        listMyConversations(session),
+        listTeachers(session),
+      ]);
+      return {
+        mode: 'student' as const,
+        conversations,
+        active: conversationId === undefined ? null : await attempt(() => getConversation(session, conversationId)),
+        teachers,
+        teacherId: null,
+      };
+    });
+  }
+
+  if (typeof user.teacherId === 'string' && user.teacherId !== '') {
+    return attempt(async () => {
+      const conversations = await listMyConversations(session);
+      return {
+        mode: 'teacher' as const,
+        conversations,
+        active: conversationId === undefined ? null : await attempt(() => getConversation(session, conversationId)),
+        teachers: [] as readonly TeacherListItem[],
+        teacherId: user.teacherId,
+      };
+    });
+  }
+
+  return {
+    ok: true,
+    value: {
+      mode: 'none' as const,
+      conversations: [],
+      active: null,
+      teachers: [],
+      teacherId: null,
+    },
+  };
 }

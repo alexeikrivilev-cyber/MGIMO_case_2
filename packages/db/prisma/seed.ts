@@ -8,9 +8,10 @@
  */
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
-import { buildSeedData } from '../src/seed-data.js';
+import { mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { buildSeedData, SYNTHETIC_ID_CARD_JPEG_BASE64 } from '../src/seed-data.js';
 import { getPrisma, Prisma } from '../src/client.js';
-import { idCardPhotoRelativePath } from '@udgu/core';
+import { idCardPhotoRelativePath, idCardRoot, storageRoot } from '@udgu/core';
 
 const configDir = path.dirname(fileURLToPath(import.meta.url));
 
@@ -42,6 +43,10 @@ async function cleanDatabase(): Promise<void> {
   await prisma.sickLeave.deleteMany();
   await prisma.officeHour.deleteMany();
   await prisma.identityRegistry.deleteMany();
+  // Переписка: сообщения ссылаются на диалог И на автора (User),
+  // поэтому чистим до удаления студентов, преподавателей и пользователей.
+  await prisma.message.deleteMany();
+  await prisma.conversation.deleteMany();
   await prisma.student.deleteMany();
   await prisma.teacher.deleteMany();
   await prisma.subject.deleteMany();
@@ -57,8 +62,39 @@ function toDateTime(value: string): Date {
   return new Date(value);
 }
 
+/**
+ * Пишет синтетическое фото студбилета в ПРИВАТНОЕ хранилище
+ * (storage/, вне webroot) по относительному пути из БД.
+ *
+ * Каталоги создаются при необходимости: повторный сидер пишет тот же
+ * файл заново (идемпотентность), поэтому ошибку «каталог есть» не
+ * проверяем.
+ */
+function writeIdCardPhoto(relativePath: string): void {
+  const absolutePath = path.join(storageRoot(), relativePath);
+  mkdirSync(path.dirname(absolutePath), { recursive: true });
+  writeFileSync(absolutePath, Buffer.from(SYNTHETIC_ID_CARD_JPEG_BASE64, 'base64'));
+}
+
+/**
+ * Убирает прошлые фото студбилетов: идентификаторы студентов при каждом
+ * сидере новые (UUID из БД), поэтому без очистки в хранилище копились бы
+ * файлы, на которые не ссылается ни одна запись.
+ *
+ * Удаляются ТОЛЬКО подкаталоги студентов — служебный .gitkeep (он держит
+ * каталог в репозитории) остаётся на месте, как и всё остальное хранилище.
+ */
+function cleanIdCardStorage(): void {
+  for (const entry of readdirSync(idCardRoot(), { withFileTypes: true })) {
+    if (entry.isDirectory()) {
+      rmSync(path.join(idCardRoot(), entry.name), { recursive: true, force: true });
+    }
+  }
+}
+
 async function main(): Promise<void> {
   await cleanDatabase();
+  cleanIdCardStorage();
 
   const data = await buildSeedData();
 
@@ -67,6 +103,7 @@ async function main(): Promise<void> {
       login: user.login,
       passwordHash: user.passwordHash,
       role: user.role,
+      faculty: user.faculty,
     })),
   });
 
@@ -287,7 +324,9 @@ async function main(): Promise<void> {
   });
 
   // ---- Заявки на верификацию студбилета ----
-  // Фото в приватном хранилище не создаём: путь фикстуры, файлов на диске нет.
+  // Каждой заявке нужно фото в приватном хранилище: иначе очередь
+  // верификаций в кабинете сотрудника показывала бы ошибку вместо
+  // изображения (роут /api/staff/verifications/[id]/photo читает файл).
   await prisma.studentVerification.createMany({
     data: data.studentVerifications.map((verification) => {
       const studentId = studentIdByLogin.get(verification.studentLogin);
@@ -298,10 +337,12 @@ async function main(): Promise<void> {
       if (verification.reviewerLogin && !reviewerId) {
         throw new Error(`Сидер: не найден проверяющий ${verification.reviewerLogin}`);
       }
+      const photoPath = idCardPhotoRelativePath(studentId, verification.photoFileName);
+      writeIdCardPhoto(photoPath);
       return {
         studentId,
         status: verification.status,
-        idCardPhotoPath: idCardPhotoRelativePath(studentId, verification.photoFileName),
+        idCardPhotoPath: photoPath,
         recognizedLastName: verification.recognizedLastName,
         recognizedFirstName: verification.recognizedFirstName,
         recognizedGroupName: verification.recognizedGroupName,
@@ -375,6 +416,46 @@ async function main(): Promise<void> {
     }),
   });
 
+  // ---- Переписка студент ↔ преподаватель ----
+  // Диалог создаётся парой (студент, преподаватель) — она уникальна,
+  // поэтому повторный сидер не плодит копии. Сообщения пишутся по одному
+  // (нужен authorUserId и порядок createdAt).
+  for (const conversation of data.conversations) {
+    const studentId = studentIdByLogin.get(conversation.studentLogin);
+    const teacherId = teacherIdByLogin.get(conversation.teacherLogin);
+    if (!studentId) throw new Error(`Сидер: не найден студент ${conversation.studentLogin}`);
+    if (!teacherId) throw new Error(`Сидер: не найден преподаватель ${conversation.teacherLogin}`);
+
+    const created = await prisma.conversation.create({
+      data: { studentId, teacherId },
+      select: { id: true },
+    });
+
+    for (const message of conversation.messages) {
+      const authorId = userIdByLogin.get(message.authorLogin);
+      if (!authorId) throw new Error(`Сидер: не найден автор сообщения ${message.authorLogin}`);
+      const createdAt = new Date(Date.now() - message.minutesAgo * 60_000);
+      await prisma.message.create({
+        data: {
+          conversationId: created.id,
+          authorUserId: authorId,
+          body: message.body,
+          createdAt,
+          readAt: message.read ? new Date(createdAt.getTime() + 60_000) : null,
+        },
+      });
+    }
+
+    // updatedAt диалога = время последнего сообщения: список сортируется по нему.
+    const lastMessage = conversation.messages[conversation.messages.length - 1];
+    if (lastMessage) {
+      await prisma.conversation.update({
+        where: { id: created.id },
+        data: { updatedAt: new Date(Date.now() - lastMessage.minutesAgo * 60_000) },
+      });
+    }
+  }
+
   const counts = {
     users: await prisma.user.count(),
     groups: await prisma.group.count(),
@@ -395,6 +476,8 @@ async function main(): Promise<void> {
     oauthIntents: await prisma.oAuthIntent.count(),
     sickLeaves: await prisma.sickLeave.count(),
     officeHours: await prisma.officeHour.count(),
+    conversations: await prisma.conversation.count(),
+    messages: await prisma.message.count(),
   };
 
   console.log('Сидер завершён. Записей в базе:');

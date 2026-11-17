@@ -245,6 +245,14 @@ export interface SessionUser {
   readonly studentId: string | null;
   /** Заполнен для преподавателей (кабинет преподавателя — P2). */
   readonly teacherId: string | null;
+  /**
+   * Факультет (институт) сотрудника деканата (users.faculty). Заполнен
+   * только у сотрудника деканата (STAFF с привязанным факультетом):
+   * очередь заявок, верификаций, болезней и расписание ограничены им
+   * (ARCHITECTURE §4). У ADMIN null — все факультеты; у преподавателей
+   * и студентов null — кабинет деканата им недоступен (fail-closed).
+   */
+  readonly faculty: string | null;
 }
 
 /** Метаданные сессии (без токена и хеша). */
@@ -326,6 +334,7 @@ export async function validateSession(token: string): Promise<AuthSession | null
           id: true,
           login: true,
           role: true,
+          faculty: true,
           student: { select: { id: true } },
           teacher: { select: { id: true } },
         },
@@ -347,6 +356,7 @@ export async function validateSession(token: string): Promise<AuthSession | null
       id: record.user.id,
       login: record.user.login,
       role: record.user.role,
+      faculty: record.user.faculty,
       studentId: record.user.student?.id ?? null,
       teacherId: record.user.teacher?.id ?? null,
     },

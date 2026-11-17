@@ -27,6 +27,7 @@ function makeUser(overrides: Partial<SessionUser> = {}): SessionUser {
     role: 'STUDENT',
     studentId: 'student-1',
     teacherId: null,
+    faculty: null,
     ...overrides,
   };
 }
