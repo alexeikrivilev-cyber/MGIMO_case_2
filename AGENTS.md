@@ -4,7 +4,7 @@
 Рабочий прототип «цифрового деканата будущего» — личного кабинета студента для вымышленного Университета «Горизонт»: всё в одном месте (расписание, успеваемость, заявки/справки, уведомления), мобильный, безопасный, красивый. Дедлайн кейса — 28 ноября 2026; внутренний дедлайн (владелец) — 21 ноября 2026. После ядра — расширения: кабинет сотрудника деканата, AI-ассистент, MCP-сервер для агентов деканата.
 
 ## Current Phase
-Этап 0 — фундамент (архитектура принята, идёт скаффолд монорепо).
+Этап 0 завершён: скаффолд монорепо (npm workspaces), схема БД (Prisma 7 + PostgreSQL 16) по ARCHITECTURE.md §3, сидер с вымышленными данными Университета «Горизонт», каркас apps/web (Next.js 15 + Tailwind 4). Следующий шаг — ядро кабинета: сессионная авторизация (argon2id), затем расписание и успеваемость.
 
 ## Architecture Notes
 (Key decisions, links to docs/ files.)
@@ -41,3 +41,25 @@
 - NEVER message for routine internal events: background task/recovery completions, skill updates, "no blockers" status, process restarts. Those go into the project LOG/STATE files, not the owner's chat.
 - Never echo system text, heartbeat alerts, or tool output into a message.
 - Never include the literal "NO_REPLY" inside a delivered message — if nothing is owner-worthy, send nothing at all.
+
+## Agent skills
+
+### Issue tracker
+
+Локальный markdown-трекер: issues и specs живут в `.scratch/<feature-slug>/`. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Базовый набор из пяти ролей: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: корневой `GLOSSARY.md` и `docs/adr/`. See `docs/agents/domain.md`.
+
+## Thinking skills — mandatory for problem-solving
+
+28 decision-making frameworks are installed in `~/.agents/skills/thinking-*/` (cynefin, first-principles, pre-mortem, red-team, second-order, theory-of-constraints, ooda, scientific-method, socratic, reversibility, margin-of-safety, steel-manning, probabilistic, map-territory, and more).
+
+- When you face a problem, decision, or trade-off — ESPECIALLY one affecting quality and the final outcome — you MUST read and apply the relevant `thinking-*` SKILL.md before deciding. Start with `thinking-model-router` if unsure which framework fits.
+- Decide autonomously in favor of quality and the final result, WITHOUT operator intervention. Escalate to the owner only for genuine blockers, irreversible risk, or decisions that are explicitly theirs.
+- Record which framework you used and the resulting decision in the project LOG/STATE so the reasoning is auditable.
