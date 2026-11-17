@@ -58,6 +58,8 @@ enum NotificationType {
   ANNOUNCEMENT
   DEADLINE
   SYSTEM
+  /// Сообщение в переписке студент ↔ преподаватель (P2a).
+  MESSAGE
 }
 
 /// Решение по верификации студенческого билета.
@@ -96,6 +98,8 @@ model User {
   auditEvents   AuditEvent[]
   oauthAccounts OAuthAccount[]
   reviewedVerifications StudentVerification[] @relation("VerificationReviewer")
+  staffProfile  StaffProfile?
+  messages      Message[]
 
   @@map("users")
 }
@@ -120,6 +124,7 @@ model Student {
   requests Request[]
   verification StudentVerification?
   sickLeaves SickLeave[]
+  conversations Conversation[]
 
   @@index([faculty])
   @@index([groupId])
@@ -138,6 +143,8 @@ model Teacher {
   user            User             @relation(fields: [userId], references: [id], onDelete: Restrict)
   scheduleEntries ScheduleEntry[]
   officeHours     OfficeHour[]
+  conversations   Conversation[]
+  studyPlans      StudyPlan[]
 
   @@index([department])
   @@map("teachers")
@@ -412,4 +419,85 @@ model OfficeHour {
 
   @@index([teacherId, weekday])
   @@map("office_hours")
+}
+
+/// Привязка сотрудника деканата (роль STAFF) к факультету: очереди заявок,
+/// верификаций и болезней сотрудника ограничены его факультетом (ARCHITECTURE
+/// §4: «сотрудник деканата — свой факультет; админ — всё»).
+///
+/// ПОЧЕМУ ОТДЕЛЬНАЯ МОДЕЛЬ, А НЕ ПОЛЕ В Teacher: сотрудник деканата — не
+/// преподаватель (учётная запись staff1 не имеет записи Teacher), а faculty
+/// нужен именно учётной записи сотрудника. Поле в Teacher заставило бы
+/// заводить преподавателя для каждого сотрудника деканата — это искажает
+/// смысл обеих сущностей. Отдельная модель — минимальное решение: один
+/// ряд на сотрудника, и её отсутствие означает «факультет не привязан»
+/// (fail-closed: такой сотрудник не видит чужих данных вообще).
+model StaffProfile {
+  id      String @id @default(uuid())
+  userId  String @unique
+  faculty String
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([faculty])
+  @@map("staff_profiles")
+}
+
+/// Диалог студента с преподавателем (BRIEF v2 §4). Один диалог на пару
+/// студент—преподаватель (@@unique): повторное «написать» открывает тот же
+/// диалог, а не плодит новые. Переписка доступна только верифицированным
+/// студентам — гейт проверяется в services/messaging.ts, не в UI.
+model Conversation {
+  id        String   @id @default(uuid())
+  studentId String
+  teacherId String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  student  Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  teacher  Teacher   @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  messages Message[]
+
+  @@unique([studentId, teacherId])
+  @@index([teacherId, updatedAt])
+  @@map("conversations")
+}
+
+/// Сообщение переписки. authorUserId — автор (User), владение диалогом
+/// проверяется по паре studentId/teacherId из сессии (services/messaging.ts).
+/// readAt проставляет получатель — счётчик непрочитанных считается по нему.
+model Message {
+  id             String    @id @default(uuid())
+  conversationId String
+  authorUserId   String
+  body           String
+  readAt         DateTime?
+  createdAt      DateTime  @default(now())
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  author       User         @relation(fields: [authorUserId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, createdAt])
+  @@map("messages")
+}
+
+/// Учебный план преподавателя для RAG-ассистента (BRIEF v2 §5, P2b).
+/// Модель нужна уже в P2a: файл лежит в приватном хранилище
+/// (storage/study-plans/<teacherId>/…), обработка и ответы по плану —
+/// отдельный этап P2b. storagePath — путь относительно корня хранилища,
+/// публичных ссылок нет.
+model StudyPlan {
+  id          String   @id @default(uuid())
+  teacherId   String
+  title       String
+  fileName    String
+  mime        String
+  sizeBytes   Int
+  storagePath String
+  uploadedAt  DateTime @default(now())
+
+  teacher Teacher @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+
+  @@index([teacherId, uploadedAt])
+  @@map("study_plans")
 }
