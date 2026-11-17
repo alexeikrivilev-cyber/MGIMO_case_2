@@ -587,16 +587,27 @@ function isWeekday(date: Date): boolean {
   return day >= 1 && day <= 5;
 }
 
-function nextWeekdayOnwards(date: Date, minOffset: number, horizon: Date): Date {
-  let candidate = addDays(date, minOffset);
-  while (!isWeekday(candidate) || candidate.getTime() > horizon.getTime()) {
-    candidate = addDays(candidate, -1);
-    if (candidate.getTime() < date.getTime()) {
-      candidate = addDays(date, 1);
-      break;
+/**
+ * Дата переноса: ближайший будний день строго после исходной даты, не
+ * позже горизонта, в котором у группы ещё нет пары в это же время.
+ * Если подходящего дня нет (горизонт кончается) — null, и занятие
+ * остаётся в исходном слоте: перенос «в никуда» сломал бы расписание.
+ */
+function findMovedDate(
+  original: Date,
+  groupName: string,
+  startTime: string,
+  horizon: Date,
+  taken: (groupName: string, dateKey: string, startTime: string) => boolean,
+): Date | null {
+  let candidate = addDays(original, 1);
+  while (candidate.getTime() <= horizon.getTime()) {
+    if (isWeekday(candidate) && !taken(groupName, toDateKey(candidate), startTime)) {
+      return candidate;
     }
+    candidate = addDays(candidate, 1);
   }
-  return candidate;
+  return null;
 }
 
 function pick<T>(rng: () => number, items: readonly T[]): T {
@@ -763,7 +774,7 @@ export async function buildSeedData(options: BuildSeedDataOptions = {}): Promise
 
   const allUsers: UserSeed[] = [...studentUsers, ...teacherUsers, staffUser, adminUser];
 
-  // ---- Расписание: 2 недели вперёд от сегодня, 5-6 пар в будний день ----
+  // ---- Расписание: 2 недели, начиная с сегодня, 5-6 пар в будний день ----
   const scheduleEntries: ScheduleEntrySeed[] = [];
 
   GROUP_DEFS.forEach((groupDef, groupIndex) => {
@@ -774,7 +785,9 @@ export async function buildSeedData(options: BuildSeedDataOptions = {}): Promise
     const groupName = groupNameByInstitute.get(faculty);
     if (!groupName) return;
 
-    for (let dayOffset = 1; dayOffset <= SCHEDULE_HORIZON_DAYS; dayOffset += 1) {
+    // dayOffset 0 — сегодняшний день: экран «Сегодня» показывает реальные
+    // пары, а не пустое состояние.
+    for (let dayOffset = 0; dayOffset < SCHEDULE_HORIZON_DAYS; dayOffset += 1) {
       const date = addDays(now, dayOffset);
       if (!isWeekday(date)) continue;
 
@@ -817,7 +830,7 @@ export async function buildSeedData(options: BuildSeedDataOptions = {}): Promise
 
   // ---- Переносы и отмены (требование кейса) ----
   const totalEntries = scheduleEntries.length;
-  const movedIndexes = [0.07, 0.23, 0.51].map((f) =>
+  const movedIndexes = [0.07, 0.23, 0.51, 0.75].map((f) =>
     Math.min(totalEntries - 1, Math.floor(totalEntries * f)),
   );
   const cancelledIndexes = [0.13, 0.31, 0.62, 0.83].map((f) =>
@@ -826,11 +839,22 @@ export async function buildSeedData(options: BuildSeedDataOptions = {}): Promise
 
   const uniqueIndexes = (indexes: number[]): number[] => [...new Set(indexes)];
 
+  /** Занят ли слот группы: действующая пара (не перенесенная и не отменённая). */
+  const slotTaken = (groupName: string, dateKey: string, startTime: string): boolean =>
+    scheduleEntries.some(
+      (entry) =>
+        entry.groupName === groupName &&
+        entry.date === dateKey &&
+        entry.startTime === startTime &&
+        entry.status === 'SCHEDULED',
+    );
+
   for (const index of uniqueIndexes(movedIndexes)) {
     const entry = scheduleEntries[index];
     if (!entry || entry.status !== 'SCHEDULED') continue;
     const original = new Date(`${entry.date}T00:00:00.000Z`);
-    const movedToDate = nextWeekdayOnwards(original, 2, scheduleEnd);
+    const movedToDate = findMovedDate(original, entry.groupName, entry.startTime, scheduleEnd, slotTaken);
+    if (movedToDate === null) continue;
     const movedToRoom = pick(
       rng,
       ROOMS.filter((room) => room !== entry.room),
@@ -912,6 +936,32 @@ export async function buildSeedData(options: BuildSeedDataOptions = {}): Promise
       const index = grades.indexOf(debt);
       grades[index] = { ...debt, passed: false };
     }
+  }
+
+  // ---- Текущий семестр: работы в процессе (семестр 3, осень 2026) ----
+  // Предстоящие работы (value === null): экзамен и курсовая, которые
+  // ещё не сданы. Они делают смысловым блок «Леверидж» в кабинете —
+  // расчёт баллов до целевого среднего на оставшихся работах.
+  const PLANNED_WORKS: readonly { type: GradeType; date: string }[] = [
+    { type: 'EXAM', date: '2026-12-18' },
+    { type: 'COURSEWORK', date: '2027-01-15' },
+  ];
+
+  for (const student of students) {
+    const facultySubjects = subjectsByFaculty.get(student.faculty) ?? [];
+    PLANNED_WORKS.forEach((planned, index) => {
+      const subject = facultySubjects[index];
+      if (!subject) return;
+      grades.push({
+        studentLogin: student.login,
+        subjectCode: subject.code,
+        value: null,
+        passed: null,
+        type: planned.type,
+        date: toDateKey(new Date(`${planned.date}T00:00:00.000Z`)),
+        semester: 3,
+      });
+    });
   }
 
   // ---- Заявки: 1-3 на студента, разные типы и статусы ----

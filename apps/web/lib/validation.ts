@@ -134,7 +134,14 @@ export { requestFormSchema as requestCreateSchema } from '@udgu/core';
 // Статус «болею»
 // ---------------------------------------------------------------------------
 
-export const sickLeaveCreateSchema = z.object({
+/**
+ * Статус «болею»: граница маршрута POST /api/sick-leave (multipart).
+ * Дата — YYYY-MM-DD (как хранятся @db.Date); причина необязательна.
+ * Необязательное фото справки проверяется в самом маршруте (MIME/размер)
+ * и уходит в приватное хранилище packages/core; путь в БД пишет
+ * createMySickLeave — здесь он не принимается извне.
+ */
+export const sickLeaveMultipartSchema = z.object({
   dateFrom: z.string().regex(DATE_KEY, 'Дата начала в формате YYYY-MM-DD'),
   dateTo: z.string().regex(DATE_KEY, 'Дата окончания в формате YYYY-MM-DD'),
   reason: z.string().trim().max(500, 'Причина слишком длинная (максимум 500 символов).').optional(),
@@ -164,6 +171,18 @@ export const gradesQuerySchema = z.object({
       z.coerce.number().int().min(1, 'Номер семестра — целое число от 1.').max(20, 'Номер семестра вне диапазона.'),
     )
     .optional(),
+});
+
+/**
+ * Тело POST /api/grades/leverage: целевой средний балл на шкале УдГУ
+ * (2–5). Расчёт делает packages/core (calculateLeverage) — на клиенте
+ * формула не дублируется.
+ */
+export const leverageBodySchema = z.object({
+  targetGpa: z
+    .number()
+    .min(2, 'Целевой средний балл должен быть в диапазоне 2-5.')
+    .max(5, 'Целевой средний балл должен быть в диапазоне 2-5.'),
 });
 
 /** Идентификатор сущности в пути (заявка, уведомление). */

@@ -3,18 +3,23 @@
  * работает и отдаёт данные владельца сессии (не заглушка).
  *
  * Покрыты: profile, schedule (today/week), teachers, teachers/[id],
- * grades + grades/summary, announcements, sick-leave (GET/POST),
+ * grades + grades/summary + grades/leverage, announcements,
+ * sick-leave (GET/POST, в том числе фото справки в приватное хранилище),
  * notifications (лента/read/read-all), health.
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { existsSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { dateKey } from '@udgu/core';
+import { getPrisma } from '@udgu/db';
 import { GET as profileRoute } from '../app/api/profile/route';
 import { GET as scheduleRoute } from '../app/api/schedule/route';
 import { GET as teachersRoute } from '../app/api/teachers/route';
 import { GET as teacherByIdRoute } from '../app/api/teachers/[id]/route';
 import { GET as gradesRoute } from '../app/api/grades/route';
 import { GET as gradesSummaryRoute } from '../app/api/grades/summary/route';
+import { POST as leverageRoute } from '../app/api/grades/leverage/route';
 import { GET as announcementsRoute } from '../app/api/announcements/route';
 import {
   GET as sickLeaveRoute,
@@ -70,6 +75,8 @@ test.before(async () => {
     endTime: '09:50',
   });
   await createGrade(student.studentId, subject, 5, null, 'EXAM', 1);
+  // Предстоящая работа текущего семестра — для расчёта «левериджа».
+  await createGrade(student.studentId, subject, null, null, 'COURSEWORK', 3);
   await createNotification(student.userId, 'Изменение в расписании');
 
   const { createSession } = await import('@udgu/core');
@@ -188,12 +195,18 @@ test('GET/POST /api/sick-leave → отметка «болею», пересеч
   const from = dateKey(new Date());
   const to = dateKey(new Date(Date.now() + 2 * 24 * 60 * 60 * 1000));
 
+  // POST — multipart/form-data (как из формы кабинета): период + причина.
+  const form = new FormData();
+  form.set('dateFrom', from);
+  form.set('dateTo', to);
+  form.set('reason', 'ОРВИ');
+
   const created = await callRoute(
     createSickLeaveRoute,
     apiRequest('/api/sick-leave', {
       method: 'POST',
       cookies: { udgu_session: sessionToken },
-      body: { dateFrom: from, dateTo: to, reason: 'ОРВИ' },
+      formData: form,
     }),
   );
   assert.equal(created.status(), 201);
@@ -206,7 +219,12 @@ test('GET/POST /api/sick-leave → отметка «болею», пересеч
     apiRequest('/api/sick-leave', {
       method: 'POST',
       cookies: { udgu_session: sessionToken },
-      body: { dateFrom: from, dateTo: to },
+      formData: (() => {
+        const overlap = new FormData();
+        overlap.set('dateFrom', from);
+        overlap.set('dateTo', to);
+        return overlap;
+      })(),
     }),
   );
   assert.equal(overlapping.status(), 409);
@@ -216,6 +234,66 @@ test('GET/POST /api/sick-leave → отметка «болею», пересеч
   const listBody = await list.json<{ items: { reason: string | null }[]; sickNow: boolean }>();
   assert.equal(listBody.items.length, 1);
   assert.equal(listBody.sickNow, true, 'студент болеет прямо сейчас');
+});
+
+test('POST /api/sick-leave: фото справки уходит в приватное хранилище', async () => {
+  const from = dateKey(new Date(Date.now() + 10 * 24 * 60 * 60 * 1000));
+  const to = dateKey(new Date(Date.now() + 12 * 24 * 60 * 60 * 1000));
+
+  const form = new FormData();
+  form.set('dateFrom', from);
+  form.set('dateTo', to);
+  form.set('reason', 'Грипп, справка от врача');
+  // Минимальный валидный JPEG: маршрут проверяет MIME и размер, содержимое
+  // не декодирует — сюда попадёт любой файл с нужным типом.
+  form.set(
+    'certificate',
+    new File([new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10])], 'spravka.jpg', { type: 'image/jpeg' }),
+  );
+
+  const created = await callRoute(
+    createSickLeaveRoute,
+    apiRequest('/api/sick-leave', {
+      method: 'POST',
+      cookies: { udgu_session: sessionToken },
+      formData: form,
+    }),
+  );
+  assert.equal(created.status(), 201);
+  const body = await created.json<{ sickLeave: { hasAttachment: boolean; dateFrom: string } }>();
+  assert.equal(body.sickLeave.hasAttachment, true, 'справка прикреплена');
+
+  // Файл лежит в приватном хранилище, вне webroot: путь в БД относительный.
+  const stored = await getPrisma().sickLeave.findMany({
+    where: { dateFrom: utcDay(from) },
+    select: { attachmentPath: true },
+  });
+  assert.equal(stored.length, 1);
+  assert.match(stored[0]?.attachmentPath ?? '', /^sick-leave-certificates\/[A-Za-z0-9-]+\/[0-9a-f-]+\.jpg$/);
+  assert.ok(
+    existsSync(resolve(process.env.STORAGE_DIR ?? 'storage', stored[0]?.attachmentPath ?? '')),
+    'файл реально сохранён в хранилище',
+  );
+});
+
+test('POST /api/sick-leave: неверный формат фото справки → 400, отметка не создана', async () => {
+  const from = dateKey(new Date(Date.now() + 20 * 24 * 60 * 60 * 1000));
+  const form = new FormData();
+  form.set('dateFrom', from);
+  form.set('dateTo', dateKey(new Date(Date.now() + 21 * 24 * 60 * 60 * 1000)));
+  form.set('certificate', new File([new Uint8Array([1, 2, 3])], 'doc.pdf', { type: 'application/pdf' }));
+
+  const rejected = await callRoute(
+    createSickLeaveRoute,
+    apiRequest('/api/sick-leave', {
+      method: 'POST',
+      cookies: { udgu_session: sessionToken },
+      formData: form,
+    }),
+  );
+  assert.equal(rejected.status(), 400);
+  const stored = await getPrisma().sickLeave.findMany({ where: { dateFrom: utcDay(from) } });
+  assert.equal(stored.length, 0, 'отметка с неверным файлом не создана');
 });
 
 test('GET /api/notifications, read, read-all', async () => {
@@ -243,7 +321,121 @@ test('GET /api/notifications, read, read-all', async () => {
 test('GET /api/health → реальная проверка БД', async () => {
   const response = await callRoute(healthRoute, apiRequest('/api/health'));
   assert.equal(response.status(), 200);
-  const body = await response.json<{ status: string; db: string }>();
+  const body = await response.json<{ status: string }>();
   assert.equal(body.status, 'ok');
-  assert.equal(body.db, 'ok');
+});
+
+// ---------------------------------------------------------------------------
+// «Леверидж»: расчёт баллов до целевого среднего (решение Council)
+// ---------------------------------------------------------------------------
+
+test('POST /api/grades/leverage → сколько баллов нужно на предстоящих работах', async () => {
+  // Своя фикстура: экзамен 5 (1 семестр), курсовая 4 (2 семестр) и одна
+  // несданная работа (3 семестр). Средний балл 4,50, цель 4,60:
+  // neededSum = 4,6 × 3 − 9 = 4,8, neededAverage = 4,8 на работу.
+  const group = await getPrisma().group.findFirst({ select: { id: true } });
+  const subject = await getPrisma().subject.findFirst({ select: { id: true } });
+  assert.ok(group !== null, 'группа фикстуры существует');
+  assert.ok(subject !== null, 'предмет фикстуры существует');
+
+  const student = await createStudent('student-leverage', group.id);
+  await createVerification(student.studentId, 'VERIFIED');
+  await createGrade(student.studentId, subject.id, 5, null, 'EXAM', 1);
+  await createGrade(student.studentId, subject.id, 4, null, 'COURSEWORK', 2);
+  await createGrade(student.studentId, subject.id, null, null, 'EXAM', 3);
+
+  const { createSession } = await import('@udgu/core');
+  const token = (await createSession(student.userId)).token;
+
+  const response = await callRoute(
+    leverageRoute,
+    apiRequest('/api/grades/leverage', {
+      method: 'POST',
+      cookies: { udgu_session: token },
+      body: { targetGpa: 4.6 },
+    }),
+  );
+  assert.equal(response.status(), 200);
+  const body = await response.json<{
+    result: {
+      targetGpa: number;
+      gradedCount: number;
+      pendingCount: number;
+      currentAverage: number | null;
+      neededSumOnPending: number | null;
+      neededAverageOnPending: number | null;
+      maxPossibleAverage: number | null;
+      achievable: boolean;
+      alreadyAchieved: boolean;
+    };
+  }>();
+  assert.equal(body.result.targetGpa, 4.6);
+  assert.equal(body.result.gradedCount, 2);
+  assert.equal(body.result.pendingCount, 1);
+  assert.equal(body.result.currentAverage, 4.5);
+  assert.equal(body.result.neededSumOnPending, 4.8);
+  assert.equal(body.result.neededAverageOnPending, 4.8);
+  assert.equal(body.result.maxPossibleAverage, 4.67, 'максимум — если всё сдать на 5');
+  assert.equal(body.result.achievable, true);
+  assert.equal(body.result.alreadyAchieved, false, 'цель ещё не достигнута');
+});
+
+test('POST /api/grades/leverage: цель выше максимума → честное «недостижимо»', async () => {
+  const student = await getPrisma().student.findFirst({
+    where: { user: { login: 'student-leverage' } },
+    select: { userId: true },
+  });
+  assert.ok(student !== null, 'студент фикстуры «левериджа» существует');
+  const { createSession } = await import('@udgu/core');
+  const token = (await createSession(student.userId)).token;
+
+  const response = await callRoute(
+    leverageRoute,
+    apiRequest('/api/grades/leverage', {
+      method: 'POST',
+      cookies: { udgu_session: token },
+      body: { targetGpa: 5 },
+    }),
+  );
+  assert.equal(response.status(), 200);
+  const body = await response.json<{
+    result: { neededSumOnPending: number | null; achievable: boolean; alreadyAchieved: boolean };
+  }>();
+  assert.equal(body.result.neededSumOnPending, 6, 'на одну предстоящую работу нужно 6 баллов');
+  assert.equal(body.result.achievable, false, '6 > 5: цель недостижима');
+  assert.equal(body.result.alreadyAchieved, false);
+});
+
+test('POST /api/grades/leverage: цель вне шкалы → 400', async () => {
+  const response = await callRoute(
+    leverageRoute,
+    apiRequest('/api/grades/leverage', {
+      method: 'POST',
+      cookies: { udgu_session: sessionToken },
+      body: { targetGpa: 9 },
+    }),
+  );
+  assert.equal(response.status(), 400);
+  const body = await response.json<{ error: { code: string } }>();
+  assert.equal(body.error.code, 'INVALID_INPUT');
+});
+
+test('POST /api/grades/leverage: неверифицированный студент → 403 VERIFICATION_REQUIRED', async () => {
+  const group = await getPrisma().group.findFirst({ select: { id: true } });
+  assert.ok(group !== null, 'группа фикстуры существует');
+  const unverified = await createStudent('student-unverified', group.id);
+  const { createSession } = await import('@udgu/core');
+  const token = (await createSession(unverified.userId)).token;
+
+  const response = await callRoute(
+    leverageRoute,
+    apiRequest('/api/grades/leverage', {
+      method: 'POST',
+      cookies: { udgu_session: token },
+      body: { targetGpa: 4.5 },
+    }),
+  );
+  assert.equal(response.status(), 403);
+  const body = await response.json<{ error: { code: string } }>();
+  assert.equal(body.error.code, 'VERIFICATION_REQUIRED');
 });

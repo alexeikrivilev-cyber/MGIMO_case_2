@@ -8,7 +8,9 @@
  * Создаёт OAuthIntent: одноразовый state (uuid), срок 10 минут, purpose
  * 'register', необязательные предзаполненные логин/ФИО/группа из формы.
  * Возвращает {consentUrl} — адрес страницы-эмуляции согласия провайдера
- * (/register?state=…). Реальных ключей провайдеров в прототипе нет.
+ * (/register?state=…&provider=…: провайдер в ссылке, чтобы страница
+ * согласия показывала того же провайдера, через которого нажали «Войти»).
+ * Реальных ключей провайдеров в прототипе нет.
  */
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
@@ -53,7 +55,7 @@ export async function POST(
     });
 
     const response = NextResponse.json({
-      consentUrl: `/register?state=${state}`,
+      consentUrl: `/register?state=${state}&provider=${parsedProvider.data}`,
       state,
       expiresInSeconds: INTENT_TTL_MINUTES * 60,
     });

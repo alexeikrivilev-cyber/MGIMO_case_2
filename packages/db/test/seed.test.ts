@@ -33,7 +33,9 @@ function addDays(date: Date, days: number): Date {
 const data: SeedData = await buildSeedData();
 const today = startOfDay(new Date());
 const todayKey = today.toISOString().slice(0, 10);
-const windowStart = addDays(today, 1);
+// Расписание покрывает две недели, НАЧИНАЯ С СЕГОДНЯ: экран «Сегодня»
+// показывает реальные пары, а не пустое состояние.
+const windowStart = today;
 const windowEnd = addDays(today, SCHEDULE_HORIZON_DAYS);
 const windowStartKey = windowStart.toISOString().slice(0, 10);
 const windowEndKey = windowEnd.toISOString().slice(0, 10);
@@ -109,7 +111,7 @@ test('группы и предметы уникальны', () => {
   }
 });
 
-test('расписание покрывает 2 недели вперёд с 5-6 парами в день', () => {
+test('расписание покрывает 2 недели от сегодня с 5-6 парами в день', () => {
   const teacherLogins = new Set(data.teachers.map((teacher) => teacher.login));
   const groupNames = new Set(data.groups.map((group) => group.name));
 
@@ -159,7 +161,25 @@ test('расписание содержит переносы (MOVED) и отме
   }
 });
 
-test('оценки: 2 семестра по 6-9 дисциплин, корректные типы и значения', () => {
+test('расписание начинается с сегодня: экран «Сегодня» не пустой', () => {
+  const byGroupDay = new Map<string, number>();
+  for (const entry of data.scheduleEntries) {
+    const dayKey = `${entry.groupName}|${entry.date}`;
+    byGroupDay.set(dayKey, (byGroupDay.get(dayKey) ?? 0) + 1);
+  }
+  // Сегодня — будний день? Тогда у каждой группы есть пары на сегодня.
+  const weekday = (today.getUTCDay() + 6) % 7; // 0 — понедельник
+  if (weekday < 5) {
+    for (const group of data.groups) {
+      const count = byGroupDay.get(`${group.name}|${todayKey}`) ?? 0;
+      assert.ok(count >= 5, `группа ${group.name}: ${count} пар сегодня`);
+    }
+  }
+  // Окно двух недель: минимум 10 будних дней × 8 групп.
+  assert.ok(byGroupDay.size >= 8 * 10, `группо-дней: ${byGroupDay.size}, ожидалось >= 80`);
+});
+
+test('оценки: семестры 1-2 закрыты, семестр 3 — работы в процессе', () => {
   const byStudent = new Map<string, GradeSeed[]>();
   for (const grade of data.grades) {
     const list = byStudent.get(grade.studentLogin) ?? [];
@@ -171,14 +191,19 @@ test('оценки: 2 семестра по 6-9 дисциплин, коррек
   for (const [login, grades] of byStudent) {
     assert.ok(grades.length >= 12, `${login}: ${grades.length} оценок (ожидалось >= 12)`);
     const semesters = new Set(grades.map((grade) => grade.semester));
-    assert.deepEqual([...semesters].sort(), [1, 2], `${login}: оба семестра`);
+    assert.deepEqual([...semesters].sort(), [1, 2, 3], `${login}: три семестра`);
 
     for (const grade of grades) {
       const key = `${grade.studentLogin}|${grade.subjectCode}|${grade.semester}|${grade.type}`;
       assert.equal(uniqueKeys.has(key), false, `дубль оценки ${key}`);
       uniqueKeys.add(key);
 
-      if (grade.type === 'EXAM' || grade.type === 'COURSEWORK') {
+      if (grade.semester === 3) {
+        // Текущий семестр: предстоящие работы без оценки — для «левериджа».
+        assert.equal(grade.value, null, `семестр 3: работа ${grade.subjectCode} без оценки`);
+        assert.equal(grade.passed, null);
+        assert.ok(['EXAM', 'COURSEWORK'].includes(grade.type), 'предстоящая работа — экзамен или курсовая');
+      } else if (grade.type === 'EXAM' || grade.type === 'COURSEWORK') {
         assert.ok(typeof grade.value === 'number' && grade.value >= 2 && grade.value <= 5, `значение ${grade.value} в диапазоне 2-5`);
         assert.equal(grade.passed, null);
       } else {
@@ -186,6 +211,12 @@ test('оценки: 2 семестра по 6-9 дисциплин, коррек
         assert.equal(typeof grade.passed, 'boolean', 'у зачёта передан passed');
       }
     }
+  }
+
+  // Предстоящие работы есть у каждого студента — иначе «леверидж» считать нечем.
+  for (const [login, grades] of byStudent) {
+    const pending = grades.filter((grade) => grade.value === null && grade.type !== 'CREDIT');
+    assert.equal(pending.length, 2, `${login}: ${pending.length} предстоящих работ`);
   }
 });
 

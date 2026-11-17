@@ -12,7 +12,7 @@ import { addUtcDays, getTeacherCard } from '@udgu/core';
 import { pathParam } from '@/lib/http';
 import { coreErrorResponse, requireSession } from '@/lib/session';
 
-/** Горизонт расписания преподавателя, дни. */
+/** Период расписания преподавателя, дни. */
 const TEACHER_HORIZON_DAYS = 14;
 
 export async function GET(

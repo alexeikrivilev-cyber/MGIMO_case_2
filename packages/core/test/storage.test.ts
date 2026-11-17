@@ -17,9 +17,15 @@ import {
   deleteIdCardPhoto,
   idCardPhotoRelativePath,
   idCardRoot,
+  saveSickLeaveCertificate,
+  readSickLeaveCertificate,
+  deleteSickLeaveCertificate,
+  sickLeaveCertificateRelativePath,
+  sickLeaveRoot,
   storageRoot,
   IdCardStorageError,
   ID_CARD_DIR_NAME,
+  SICK_LEAVE_DIR_NAME,
   MAX_ID_CARD_SIZE_BYTES,
 } from '../src/index.js';
 
@@ -223,4 +229,48 @@ test('удаление файла работает и идемпотентно',
 
   // Повторное удаление не является ошибкой.
   await deleteIdCardPhoto(relativePath);
+});
+
+// ---------------------------------------------------------------------------
+// Фото справок о болезни (SickLeave.attachmentPath): то же приватное
+// хранилище, отдельный каталог — те же правила безопасности.
+// ---------------------------------------------------------------------------
+
+test('справка о болезни: сохранение в отдельный каталог, чтение, удаление', async () => {
+  const relativePath = await saveSickLeaveCertificate(STUDENT_ID, JPEG_BYTES, 'image/jpeg');
+
+  assert.match(relativePath, /^sick-leave-certificates\/8f14e45f-ceea-467a-9f0b-3f1d6b2c7a11\/[0-9a-f-]{36}\.jpg$/);
+  assert.equal(
+    sickLeaveCertificateRelativePath(STUDENT_ID, 'photo.png'),
+    `sick-leave-certificates/${STUDENT_ID}/photo.png`,
+  );
+  assert.equal(sickLeaveRoot(), join(storageDir, SICK_LEAVE_DIR_NAME));
+
+  const readBack = await readSickLeaveCertificate(relativePath);
+  assert.deepEqual(readBack, JPEG_BYTES, 'содержимое справки совпадает');
+
+  // Каталоги студбилетов и справок изолированы: путь одной сущности
+  // не читается через функции другой.
+  const wrongDir = await catchStorageError(readIdCardPhoto(relativePath));
+  assert.equal(wrongDir.code, 'INVALID_PATH', 'путь справки не читается как фото студбилета');
+  const wrongDir2 = await catchStorageError(readSickLeaveCertificate(idCardPhotoRelativePath(STUDENT_ID, 'x.jpg')));
+  assert.equal(wrongDir2.code, 'INVALID_PATH', 'путь студбилета не читается как справка');
+
+  await deleteSickLeaveCertificate(relativePath);
+  const afterDelete = await catchStorageError(readSickLeaveCertificate(relativePath));
+  assert.equal(afterDelete.code, 'NOT_FOUND');
+  // Идемпотентность удаления.
+  await deleteSickLeaveCertificate(relativePath);
+});
+
+test('справка о болезни: невалидный MIME и превышение размера отклоняются', async () => {
+  const badMime = await catchStorageError(
+    saveSickLeaveCertificate(STUDENT_ID, JPEG_BYTES, 'application/pdf'),
+  );
+  assert.equal(badMime.code, 'INVALID_MIME');
+
+  const tooLarge = await catchStorageError(
+    saveSickLeaveCertificate(STUDENT_ID, Buffer.alloc(MAX_ID_CARD_SIZE_BYTES + 1, 1), 'image/png'),
+  );
+  assert.equal(tooLarge.code, 'FILE_TOO_LARGE');
 });

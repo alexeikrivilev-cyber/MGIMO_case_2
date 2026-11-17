@@ -20,6 +20,9 @@ import { fileURLToPath } from 'node:url';
 /** Имя каталога с фото студбилетов внутри корня хранилища. */
 export const ID_CARD_DIR_NAME = 'id-cards';
 
+/** Имя каталога с фото справок о болезни внутри корня хранилища. */
+export const SICK_LEAVE_DIR_NAME = 'sick-leave-certificates';
+
 /** Максимальный размер фото — 5 МБ. */
 export const MAX_ID_CARD_SIZE_BYTES = 5 * 1024 * 1024;
 
@@ -70,12 +73,22 @@ export function idCardRoot(): string {
   return resolve(storageRoot(), ID_CARD_DIR_NAME);
 }
 
+/** Корень каталога фото справок о болезни. */
+export function sickLeaveRoot(): string {
+  return resolve(storageRoot(), SICK_LEAVE_DIR_NAME);
+}
+
 /**
  * Путь фото относительно корня хранилища — именно он лежит в БД
  * (StudentVerification.idCardPhotoPath).
  */
 export function idCardPhotoRelativePath(studentId: string, fileName: string): string {
   return `${ID_CARD_DIR_NAME}/${studentId}/${fileName}`;
+}
+
+/** Путь фото справки относительно корня хранилища (SickLeave.attachmentPath). */
+export function sickLeaveCertificateRelativePath(studentId: string, fileName: string): string {
+  return `${SICK_LEAVE_DIR_NAME}/${studentId}/${fileName}`;
 }
 
 function assertSafeSegment(value: string, what: string): void {
@@ -88,26 +101,25 @@ function assertSafeSegment(value: string, what: string): void {
 }
 
 /**
- * Нормализует путь и гарантирует, что он остаётся внутри каталога
- * студбилетов: защита от path traversal (`../../../etc/passwd`, абсолютные
- * пути, обход через `..`). Путь в БД — относительный от корня хранилища
- * и всегда начинается с `id-cards/`.
+ * Нормализует путь и гарантирует, что он остаётся внутри указанного
+ * каталога хранилища: защита от path traversal (`../../../etc/passwd`,
+ * абсолютные пути, обход через `..`). Путь в БД — относительный от корня
+ * хранилища и всегда начинается с имени каталога сущности.
  */
-function resolveInsideIdCardRoot(pathValue: string): string {
+function resolveInsideRoot(root: string, pathValue: string, what: string): string {
   if (typeof pathValue !== 'string' || pathValue.trim() === '') {
     throw new IdCardStorageError('INVALID_PATH', 'Путь к файлу не задан.');
   }
 
-  const idCards = idCardRoot();
   const candidate = isAbsolute(pathValue) ? resolve(pathValue) : resolve(storageRoot(), pathValue);
 
-  if (candidate === idCards || candidate === resolve(storageRoot())) {
+  if (candidate === root || candidate === resolve(storageRoot())) {
     throw new IdCardStorageError('INVALID_PATH', 'Путь должен указывать на файл внутри хранилища.');
   }
-  if (!candidate.startsWith(idCards + sep)) {
+  if (!candidate.startsWith(root + sep)) {
     throw new IdCardStorageError(
       'INVALID_PATH',
-      'Путь выходит за пределы приватного хранилища студбилетов.',
+      `Путь выходит за пределы приватного хранилища (${what}).`,
     );
   }
 
@@ -133,10 +145,12 @@ function extensionForMime(mime: string): string {
 }
 
 /**
- * Сохраняет фото студбилета и возвращает путь относительно корня хранилища.
- * Создаёт каталог `id-cards/<studentId>/` при необходимости.
+ * Общее сохранение файла в каталог сущности: проверка сегмента студента,
+ * MIME и размера (≤5 МБ), имя файла — uuid с расширением по MIME.
+ * Возвращает путь относительно корня хранилища.
  */
-export async function saveIdCardPhoto(
+async function saveFile(
+  dirName: string,
   studentId: string,
   buffer: Buffer,
   mime: string,
@@ -157,8 +171,8 @@ export async function saveIdCardPhoto(
   }
 
   const fileName = `${randomUUID()}.${extension}`;
-  const relativePath = idCardPhotoRelativePath(studentId, fileName);
-  const absolutePath = resolveInsideIdCardRoot(relativePath);
+  const relativePath = `${dirName}/${studentId}/${fileName}`;
+  const absolutePath = resolve(storageRoot(), relativePath);
 
   await mkdir(dirname(absolutePath), { recursive: true });
   await writeFile(absolutePath, buffer, { flag: 'wx' });
@@ -166,26 +180,26 @@ export async function saveIdCardPhoto(
   return relativePath;
 }
 
-/** Читает фото студбилета по пути из БД. */
-export async function readIdCardPhoto(pathValue: string): Promise<Buffer> {
-  const absolutePath = resolveInsideIdCardRoot(pathValue);
+/** Читает файл по пути из БД внутри указанного каталога. */
+async function readFileInside(root: string, pathValue: string, what: string): Promise<Buffer> {
+  const absolutePath = resolveInsideRoot(root, pathValue, what);
   try {
     return await readFile(absolutePath);
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
-      throw new IdCardStorageError('NOT_FOUND', 'Фото студбилета не найдено в хранилище.');
+      throw new IdCardStorageError('NOT_FOUND', `Файл (${what}) не найден в хранилище.`);
     }
     throw error;
   }
 }
 
 /**
- * Удаляет фото студбилета. Идемпотентен: отсутствующий файл не считается
- * ошибкой (повторное удаление при отзыве заявки не должно ломать процесс).
+ * Удаляет файл. Идемпотентен: отсутствующий файл не считается ошибкой
+ * (повторное удаление при отзыве заявки не должно ломать процесс).
  * Попытка выйти за пределы хранилища всегда отклоняется.
  */
-export async function deleteIdCardPhoto(pathValue: string): Promise<void> {
-  const absolutePath = resolveInsideIdCardRoot(pathValue);
+async function deleteFileInside(root: string, pathValue: string, what: string): Promise<void> {
+  const absolutePath = resolveInsideRoot(root, pathValue, what);
   try {
     await unlink(absolutePath);
   } catch (error) {
@@ -194,4 +208,49 @@ export async function deleteIdCardPhoto(pathValue: string): Promise<void> {
     }
     throw error;
   }
+}
+
+/**
+ * Сохраняет фото студбилета и возвращает путь относительно корня хранилища.
+ * Создаёт каталог `id-cards/<studentId>/` при необходимости.
+ */
+export async function saveIdCardPhoto(
+  studentId: string,
+  buffer: Buffer,
+  mime: string,
+): Promise<string> {
+  return saveFile(ID_CARD_DIR_NAME, studentId, buffer, mime);
+}
+
+/** Сохраняет фото справки о болезни (каталог `sick-leave-certificates/`). */
+export async function saveSickLeaveCertificate(
+  studentId: string,
+  buffer: Buffer,
+  mime: string,
+): Promise<string> {
+  return saveFile(SICK_LEAVE_DIR_NAME, studentId, buffer, mime);
+}
+
+/** Читает фото студбилета по пути из БД. */
+export async function readIdCardPhoto(pathValue: string): Promise<Buffer> {
+  return readFileInside(idCardRoot(), pathValue, 'студбилетов');
+}
+
+/** Читает фото справки о болезни по пути из БД. */
+export async function readSickLeaveCertificate(pathValue: string): Promise<Buffer> {
+  return readFileInside(sickLeaveRoot(), pathValue, 'справок о болезни');
+}
+
+/**
+ * Удаляет фото студбилета. Идемпотентен: отсутствующий файл не считается
+ * ошибкой (повторное удаление при отзыве заявки не должно ломать процесс).
+ * Попытка выйти за пределы хранилища всегда отклоняется.
+ */
+export async function deleteIdCardPhoto(pathValue: string): Promise<void> {
+  return deleteFileInside(idCardRoot(), pathValue, 'студбилетов');
+}
+
+/** Удаляет фото справки о болезни (идемпотентно, как и студбилет). */
+export async function deleteSickLeaveCertificate(pathValue: string): Promise<void> {
+  return deleteFileInside(sickLeaveRoot(), pathValue, 'справок о болезни');
 }
