@@ -84,10 +84,6 @@ export function csrfCookieName(): string {
 }
 
 /**
- * Secure-флаг включается только в продакшне: на http://localhost (dev)
- * cookie с Secure браузер отвергает, и разрабочик не сможет войти.
- */
-/**
  * Нужен ли флаг `Secure` у cookie сессии.
  *
  * `Secure` означает «отправлять cookie только по HTTPS». Это правильно для
