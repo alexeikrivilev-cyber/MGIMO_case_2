@@ -1,8 +1,8 @@
 {
-  "name": "horizon-deanery",
+  "name": "udgu-deanery",
   "version": "0.1.0",
   "private": true,
-  "description": "Цифровой деканат будущего — прототип личного кабинета студента Университета «Горизонт»",
+  "description": "Цифровой деканат будущего — прототип личного кабинета студента УдГУ",
   "workspaces": [
     "apps/*",
     "packages/*"
@@ -11,15 +11,15 @@
     "node": ">=22.0.0"
   },
   "scripts": {
-    "dev": "npm run dev -w @horizon/web",
-    "build": "npm run build -w @horizon/db && npm run build -w @horizon/web",
-    "start": "npm run start -w @horizon/web",
-    "db:generate": "npm run db:generate -w @horizon/db",
-    "db:migrate": "npm run db:migrate -w @horizon/db",
-    "db:deploy": "npm run db:deploy -w @horizon/db",
-    "db:seed": "npm run db:seed -w @horizon/db",
-    "db:reset": "npm run db:reset -w @horizon/db",
-    "test": "npm test -w @horizon/db",
+    "dev": "npm run dev -w @udgu/web",
+    "build": "npm run build -w @udgu/db && npm run build -w @udgu/web",
+    "start": "npm run start -w @udgu/web",
+    "db:generate": "npm run db:generate -w @udgu/db",
+    "db:migrate": "npm run db:migrate -w @udgu/db",
+    "db:deploy": "npm run db:deploy -w @udgu/db",
+    "db:seed": "npm run db:seed -w @udgu/db",
+    "db:reset": "npm run db:reset -w @udgu/db",
+    "test": "npm test -w @udgu/db && npm test -w @udgu/core",
     "typecheck": "npm run typecheck --workspaces --if-present"
   },
   "devDependencies": {

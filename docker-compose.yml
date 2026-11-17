@@ -21,7 +21,7 @@ services:
     build:
       context: .
       dockerfile: apps/web/Dockerfile
-    container_name: horizon-web
+    container_name: udgu-web
     restart: unless-stopped
     depends_on:
       db:
@@ -29,8 +29,14 @@ services:
     environment:
       DATABASE_URL: ${DATABASE_URL}
       NODE_ENV: production
+      # Приватное хранилище фото студбилетов: именованный том, чтобы файлы
+      # пережили пересборку образа. Секретов здесь нет — только путь.
+      STORAGE_DIR: ${STORAGE_DIR:-/app/storage}
     ports:
       - "3000:3000"
+    volumes:
+      - udgu-storage-data:/app/storage
 
 volumes:
   horizon-db-data:
+  udgu-storage-data:

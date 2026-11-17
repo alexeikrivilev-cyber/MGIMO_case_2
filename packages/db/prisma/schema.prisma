@@ -60,6 +60,27 @@ enum NotificationType {
   SYSTEM
 }
 
+/// Решение по верификации студенческого билета.
+enum VerificationStatus {
+  PENDING
+  VERIFIED
+  REJECTED
+}
+
+/// Провайдер OAuth-входа (в прототипе — эмуляция согласия, без реальных ключей).
+enum OAuthProvider {
+  VK_ID
+  MAX
+  TELEGRAM
+}
+
+/// Тип часа приёма преподавателя.
+enum OfficeHourType {
+  CONSULTATION
+  RECEPTION
+  EXTRA_CLASS
+}
+
 model User {
   id           String   @id @default(uuid())
   login        String   @unique
@@ -73,6 +94,8 @@ model User {
   notifications Notification[]
   announcements Announcement[]
   auditEvents   AuditEvent[]
+  oauthAccounts OAuthAccount[]
+  reviewedVerifications StudentVerification[] @relation("VerificationReviewer")
 
   @@map("users")
 }
@@ -95,6 +118,8 @@ model Student {
   group  Group  @relation(fields: [groupId], references: [id], onDelete: Restrict)
   grades Grade[]
   requests Request[]
+  verification StudentVerification?
+  sickLeaves SickLeave[]
 
   @@index([faculty])
   @@index([groupId])
@@ -112,6 +137,7 @@ model Teacher {
 
   user            User             @relation(fields: [userId], references: [id], onDelete: Restrict)
   scheduleEntries ScheduleEntry[]
+  officeHours     OfficeHour[]
 
   @@index([department])
   @@map("teachers")
@@ -140,6 +166,7 @@ model Group {
   students      Student[]
   scheduleEntries ScheduleEntry[]
   announcements Announcement[]
+  identityRegistry IdentityRegistry[]
 
   @@index([faculty, course])
   @@map("groups")
@@ -267,4 +294,122 @@ model AuditEvent {
   @@index([entity, entityId])
   @@index([createdAt])
   @@map("audit_events")
+}
+
+/// Синтетический реестр студенческих билетов для мок-сверки при верификации.
+/// В прототипе заменяет справку из «системы университета»: реальные ПДн не
+/// обрабатываются, все записи вымышленные.
+model IdentityRegistry {
+  id         String   @id @default(uuid())
+  cardNumber String   @unique
+  lastName   String
+  firstName  String
+  middleName String?
+  groupId    String
+  faculty    String
+  program    String
+  course     Int
+  issuedAt   DateTime @db.Date
+
+  group Group @relation(fields: [groupId], references: [id], onDelete: Restrict)
+
+  @@index([groupId])
+  @@index([lastName])
+  @@map("identity_registry")
+}
+
+/// Заявка на верификацию по фото студенческого билета.
+/// Фото лежит в приватном хранилище вне webroot (см. packages/core/src/storage.ts),
+/// idCardPhotoPath — путь относительно корня хранилища, публичных ссылок нет.
+model StudentVerification {
+  id                   String             @id @default(uuid())
+  studentId            String             @unique
+  status               VerificationStatus @default(PENDING)
+  idCardPhotoPath      String
+  recognizedLastName   String
+  recognizedFirstName  String
+  recognizedGroupName  String
+  recognizedCardNumber String
+  matchScore           Float?
+  reviewerId           String?
+  reviewComment        String?
+  submittedAt          DateTime           @default(now())
+  reviewedAt           DateTime?
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+
+  student  Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  reviewer User?   @relation("VerificationReviewer", fields: [reviewerId], references: [id], onDelete: SetNull)
+
+  @@index([status, submittedAt])
+  @@map("student_verifications")
+}
+
+/// Привязка университетской учётной записи к OAuth-провайдеру
+/// (VK ID / MAX / Telegram). В прототипе согласие эмулируется — OAuthIntent.
+model OAuthAccount {
+  id                String        @id @default(uuid())
+  userId            String
+  provider          OAuthProvider
+  providerAccountId String        @unique
+  createdAt         DateTime      @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, provider])
+  @@map("oauth_accounts")
+}
+
+/// Эмуляция OAuth-согласия: одноразовый state, заявленный логин/ФИО/группа
+/// и цель входа. Реальных ключей провайдеров в прототипе нет.
+model OAuthIntent {
+  state     String   @id
+  provider  OAuthProvider
+  login     String?
+  fullName  String?
+  groupName String?
+  purpose   String
+  expiresAt DateTime
+  consumedAt DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([expiresAt])
+  @@map("oauth_intents")
+}
+
+/// Статус «болею»: период заболевания студента. Виден преподавателям
+/// и деканату (в прототипе — синтетический реестр), влияет на посещаемость.
+model SickLeave {
+  id             String   @id @default(uuid())
+  studentId      String
+  dateFrom       DateTime @db.Date
+  dateTo         DateTime @db.Date
+  reason         String?
+  attachmentPath String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@index([studentId, dateFrom])
+  @@index([dateFrom, dateTo])
+  @@map("sick_leaves")
+}
+
+/// Консультации и часы приёма преподавателя (видно студенту, чтобы понять,
+/// когда можно подойти).
+model OfficeHour {
+  id        String        @id @default(uuid())
+  teacherId String
+  weekday   Int
+  startTime String
+  endTime   String
+  room      String
+  type      OfficeHourType
+  note      String?
+
+  teacher Teacher @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+
+  @@index([teacherId, weekday])
+  @@map("office_hours")
 }

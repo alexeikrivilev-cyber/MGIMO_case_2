@@ -1,7 +1,7 @@
 import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
-  transpilePackages: ['@horizon/ui', '@horizon/core', '@horizon/db'],
+  transpilePackages: ['@udgu/ui', '@udgu/core', '@udgu/db'],
   output: 'standalone',
   reactStrictMode: true,
 };

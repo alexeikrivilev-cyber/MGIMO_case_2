@@ -1,42 +1,42 @@
 @import "tailwindcss";
 
 @theme inline {
-  --color-bg: var(--horizon-color-bg);
-  --color-surface: var(--horizon-color-surface);
-  --color-surface-2: var(--horizon-color-surface-2);
-  --color-border: var(--horizon-color-border);
-  --color-text: var(--horizon-color-text);
-  --color-text-muted: var(--horizon-color-text-muted);
-  --color-primary: var(--horizon-color-primary);
-  --color-primary-hover: var(--horizon-color-primary-hover);
-  --color-primary-soft: var(--horizon-color-primary-soft);
-  --color-on-primary: var(--horizon-color-on-primary);
-  --color-success: var(--horizon-color-success);
-  --color-success-soft: var(--horizon-color-success-soft);
-  --color-warning: var(--horizon-color-warning);
-  --color-warning-soft: var(--horizon-color-warning-soft);
-  --color-danger: var(--horizon-color-danger);
-  --color-danger-soft: var(--horizon-color-danger-soft);
+  --color-bg: var(--udgu-color-bg);
+  --color-surface: var(--udgu-color-surface);
+  --color-surface-2: var(--udgu-color-surface-2);
+  --color-border: var(--udgu-color-border);
+  --color-text: var(--udgu-color-text);
+  --color-text-muted: var(--udgu-color-text-muted);
+  --color-primary: var(--udgu-color-primary);
+  --color-primary-hover: var(--udgu-color-primary-hover);
+  --color-primary-soft: var(--udgu-color-primary-soft);
+  --color-on-primary: var(--udgu-color-on-primary);
+  --color-success: var(--udgu-color-success);
+  --color-success-soft: var(--udgu-color-success-soft);
+  --color-warning: var(--udgu-color-warning);
+  --color-warning-soft: var(--udgu-color-warning-soft);
+  --color-danger: var(--udgu-color-danger);
+  --color-danger-soft: var(--udgu-color-danger-soft);
 
-  --radius-sm: var(--horizon-radius-sm);
-  --radius-md: var(--horizon-radius-md);
-  --radius-lg: var(--horizon-radius-lg);
-  --radius-xl: var(--horizon-radius-xl);
+  --radius-sm: var(--udgu-radius-sm);
+  --radius-md: var(--udgu-radius-md);
+  --radius-lg: var(--udgu-radius-lg);
+  --radius-xl: var(--udgu-radius-xl);
 
-  --shadow-sm: var(--horizon-shadow-sm);
-  --shadow-md: var(--horizon-shadow-md);
-  --shadow-lg: var(--horizon-shadow-lg);
+  --shadow-sm: var(--udgu-shadow-sm);
+  --shadow-md: var(--udgu-shadow-md);
+  --shadow-lg: var(--udgu-shadow-lg);
 
-  --font-sans: var(--horizon-font-sans);
-  --font-mono: var(--horizon-font-mono);
+  --font-sans: var(--udgu-font-sans);
+  --font-mono: var(--udgu-font-mono);
 
-  --text-xs: var(--horizon-text-xs);
-  --text-sm: var(--horizon-text-sm);
-  --text-base: var(--horizon-text-base);
-  --text-lg: var(--horizon-text-lg);
-  --text-xl: var(--horizon-text-xl);
-  --text-2xl: var(--horizon-text-2xl);
-  --text-3xl: var(--horizon-text-3xl);
+  --text-xs: var(--udgu-text-xs);
+  --text-sm: var(--udgu-text-sm);
+  --text-base: var(--udgu-text-base);
+  --text-lg: var(--udgu-text-lg);
+  --text-xl: var(--udgu-text-xl);
+  --text-2xl: var(--udgu-text-2xl);
+  --text-3xl: var(--udgu-text-3xl);
 }
 
 @layer base {

@@ -17,10 +17,10 @@
     "plugins": [{ "name": "next" }],
     "paths": {
       "@/*": ["./*"],
-      "@horizon/ui": ["../../packages/ui/src/index.ts"],
-      "@horizon/ui/tokens.css": ["../../packages/ui/tokens.css"],
-      "@horizon/core": ["../../packages/core/src/index.ts"],
-      "@horizon/db": ["../../packages/db/src/index.ts"]
+      "@udgu/ui": ["../../packages/ui/src/index.ts"],
+      "@udgu/ui/tokens.css": ["../../packages/ui/tokens.css"],
+      "@udgu/core": ["../../packages/core/src/index.ts"],
+      "@udgu/db": ["../../packages/db/src/index.ts"]
     }
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],

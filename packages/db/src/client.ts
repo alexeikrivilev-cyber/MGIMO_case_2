@@ -9,7 +9,7 @@ import { PrismaClient } from './generated/client';
  * В dev-режиме клиент кешируется на globalThis, чтобы горячая перезагрузка
  * не открывала новые подключения к PostgreSQL.
  */
-const globalForPrisma = globalThis as unknown as { horizonPrisma?: PrismaClient };
+const globalForPrisma = globalThis as unknown as { udguPrisma?: PrismaClient };
 
 function createClient(): PrismaClient {
   const connectionString = process.env.DATABASE_URL;
@@ -23,8 +23,8 @@ function createClient(): PrismaClient {
 }
 
 export function getPrisma(): PrismaClient {
-  globalForPrisma.horizonPrisma ??= createClient();
-  return globalForPrisma.horizonPrisma;
+  globalForPrisma.udguPrisma ??= createClient();
+  return globalForPrisma.udguPrisma;
 }
 
 export * from './generated/client';

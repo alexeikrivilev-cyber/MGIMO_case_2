@@ -45,7 +45,7 @@ export default function LoginPage(): React.JSX.Element {
       <div className="w-full max-w-sm rounded-xl border border-border bg-surface p-6 shadow-md">
         <h1 className="text-2xl font-semibold tracking-tight">Вход в кабинет</h1>
         <p className="mt-1 text-sm text-text-muted">
-          Университет «Горизонт» — цифровой деканат
+          УдГУ — цифровой деканат
         </p>
 
         <form className="mt-6 space-y-4" onSubmit={handleSubmit} noValidate>

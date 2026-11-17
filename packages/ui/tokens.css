@@ -1,124 +1,124 @@
 :root {
   /* Палитра — светлая тема (по умолчанию) */
-  --horizon-color-bg: #f6f7f9;
-  --horizon-color-surface: #ffffff;
-  --horizon-color-surface-2: #eef1f5;
-  --horizon-color-border: #d9dee6;
-  --horizon-color-text: #101828;
-  --horizon-color-text-muted: #5c6577;
-  --horizon-color-primary: #4f46e5;
-  --horizon-color-primary-hover: #4338ca;
-  --horizon-color-primary-soft: #eef2ff;
-  --horizon-color-on-primary: #ffffff;
-  --horizon-color-success: #15803d;
-  --horizon-color-success-soft: #ecfdf3;
-  --horizon-color-warning: #b45309;
-  --horizon-color-warning-soft: #fffaeb;
-  --horizon-color-danger: #b42318;
-  --horizon-color-danger-soft: #fef3f2;
+  --udgu-color-bg: #f6f7f9;
+  --udgu-color-surface: #ffffff;
+  --udgu-color-surface-2: #eef1f5;
+  --udgu-color-border: #d9dee6;
+  --udgu-color-text: #101828;
+  --udgu-color-text-muted: #5c6577;
+  --udgu-color-primary: #4f46e5;
+  --udgu-color-primary-hover: #4338ca;
+  --udgu-color-primary-soft: #eef2ff;
+  --udgu-color-on-primary: #ffffff;
+  --udgu-color-success: #15803d;
+  --udgu-color-success-soft: #ecfdf3;
+  --udgu-color-warning: #b45309;
+  --udgu-color-warning-soft: #fffaeb;
+  --udgu-color-danger: #b42318;
+  --udgu-color-danger-soft: #fef3f2;
 
   /* Отступы */
-  --horizon-space-1: 0.25rem;
-  --horizon-space-2: 0.5rem;
-  --horizon-space-3: 0.75rem;
-  --horizon-space-4: 1rem;
-  --horizon-space-5: 1.25rem;
-  --horizon-space-6: 1.5rem;
-  --horizon-space-8: 2rem;
-  --horizon-space-12: 3rem;
-  --horizon-space-16: 4rem;
+  --udgu-space-1: 0.25rem;
+  --udgu-space-2: 0.5rem;
+  --udgu-space-3: 0.75rem;
+  --udgu-space-4: 1rem;
+  --udgu-space-5: 1.25rem;
+  --udgu-space-6: 1.5rem;
+  --udgu-space-8: 2rem;
+  --udgu-space-12: 3rem;
+  --udgu-space-16: 4rem;
 
   /* Радиусы */
-  --horizon-radius-sm: 0.375rem;
-  --horizon-radius-md: 0.5rem;
-  --horizon-radius-lg: 0.75rem;
-  --horizon-radius-xl: 1rem;
-  --horizon-radius-full: 9999px;
+  --udgu-radius-sm: 0.375rem;
+  --udgu-radius-md: 0.5rem;
+  --udgu-radius-lg: 0.75rem;
+  --udgu-radius-xl: 1rem;
+  --udgu-radius-full: 9999px;
 
   /* Тени */
-  --horizon-shadow-sm: 0 1px 2px rgb(16 24 40 / 0.06);
-  --horizon-shadow-md: 0 4px 12px rgb(16 24 40 / 0.08);
-  --horizon-shadow-lg: 0 12px 32px rgb(16 24 40 / 0.12);
+  --udgu-shadow-sm: 0 1px 2px rgb(16 24 40 / 0.06);
+  --udgu-shadow-md: 0 4px 12px rgb(16 24 40 / 0.08);
+  --udgu-shadow-lg: 0 12px 32px rgb(16 24 40 / 0.12);
 
   /* Типографика */
-  --horizon-font-sans: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
-  --horizon-font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
-  --horizon-text-xs: 0.75rem;
-  --horizon-text-sm: 0.875rem;
-  --horizon-text-base: 1rem;
-  --horizon-text-lg: 1.125rem;
-  --horizon-text-xl: 1.25rem;
-  --horizon-text-2xl: 1.5rem;
-  --horizon-text-3xl: 1.875rem;
-  --horizon-leading-tight: 1.25;
-  --horizon-leading-normal: 1.5;
-  --horizon-font-regular: 400;
-  --horizon-font-medium: 500;
-  --horizon-font-semibold: 600;
-  --horizon-font-bold: 700;
+  --udgu-font-sans: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --udgu-font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --udgu-text-xs: 0.75rem;
+  --udgu-text-sm: 0.875rem;
+  --udgu-text-base: 1rem;
+  --udgu-text-lg: 1.125rem;
+  --udgu-text-xl: 1.25rem;
+  --udgu-text-2xl: 1.5rem;
+  --udgu-text-3xl: 1.875rem;
+  --udgu-leading-tight: 1.25;
+  --udgu-leading-normal: 1.5;
+  --udgu-font-regular: 400;
+  --udgu-font-medium: 500;
+  --udgu-font-semibold: 600;
+  --udgu-font-bold: 700;
 
   /* Брейкпоинты */
-  --horizon-breakpoint-sm: 40rem;
-  --horizon-breakpoint-md: 48rem;
-  --horizon-breakpoint-lg: 64rem;
-  --horizon-breakpoint-xl: 80rem;
+  --udgu-breakpoint-sm: 40rem;
+  --udgu-breakpoint-md: 48rem;
+  --udgu-breakpoint-lg: 64rem;
+  --udgu-breakpoint-xl: 80rem;
 
   /* Прочее */
-  --horizon-transition-fast: 150ms ease;
-  --horizon-transition-base: 220ms ease;
-  --horizon-z-dropdown: 100;
-  --horizon-z-modal: 200;
-  --horizon-z-toast: 300;
+  --udgu-transition-fast: 150ms ease;
+  --udgu-transition-base: 220ms ease;
+  --udgu-z-dropdown: 100;
+  --udgu-z-modal: 200;
+  --udgu-z-toast: 300;
 
   color-scheme: light;
 }
 
 /* Тёмная тема: класс .dark на <html> принудительно, иначе — системная настройка */
 .dark {
-  --horizon-color-bg: #0b0e14;
-  --horizon-color-surface: #131824;
-  --horizon-color-surface-2: #1b2233;
-  --horizon-color-border: #2a3348;
-  --horizon-color-text: #e8ebf2;
-  --horizon-color-text-muted: #9aa4b8;
-  --horizon-color-primary: #818cf8;
-  --horizon-color-primary-hover: #a5b4fc;
-  --horizon-color-primary-soft: #1e2140;
-  --horizon-color-on-primary: #0b0e14;
-  --horizon-color-success: #4ade80;
-  --horizon-color-success-soft: #10281c;
-  --horizon-color-warning: #fbbf24;
-  --horizon-color-warning-soft: #2b2110;
-  --horizon-color-danger: #f87171;
-  --horizon-color-danger-soft: #33161a;
-  --horizon-shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4);
-  --horizon-shadow-md: 0 4px 12px rgb(0 0 0 / 0.45);
-  --horizon-shadow-lg: 0 12px 32px rgb(0 0 0 / 0.55);
+  --udgu-color-bg: #0b0e14;
+  --udgu-color-surface: #131824;
+  --udgu-color-surface-2: #1b2233;
+  --udgu-color-border: #2a3348;
+  --udgu-color-text: #e8ebf2;
+  --udgu-color-text-muted: #9aa4b8;
+  --udgu-color-primary: #818cf8;
+  --udgu-color-primary-hover: #a5b4fc;
+  --udgu-color-primary-soft: #1e2140;
+  --udgu-color-on-primary: #0b0e14;
+  --udgu-color-success: #4ade80;
+  --udgu-color-success-soft: #10281c;
+  --udgu-color-warning: #fbbf24;
+  --udgu-color-warning-soft: #2b2110;
+  --udgu-color-danger: #f87171;
+  --udgu-color-danger-soft: #33161a;
+  --udgu-shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4);
+  --udgu-shadow-md: 0 4px 12px rgb(0 0 0 / 0.45);
+  --udgu-shadow-lg: 0 12px 32px rgb(0 0 0 / 0.55);
 
   color-scheme: dark;
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not(.light):not(.dark) {
-    --horizon-color-bg: #0b0e14;
-    --horizon-color-surface: #131824;
-    --horizon-color-surface-2: #1b2233;
-    --horizon-color-border: #2a3348;
-    --horizon-color-text: #e8ebf2;
-    --horizon-color-text-muted: #9aa4b8;
-    --horizon-color-primary: #818cf8;
-    --horizon-color-primary-hover: #a5b4fc;
-    --horizon-color-primary-soft: #1e2140;
-    --horizon-color-on-primary: #0b0e14;
-    --horizon-color-success: #4ade80;
-    --horizon-color-success-soft: #10281c;
-    --horizon-color-warning: #fbbf24;
-    --horizon-color-warning-soft: #2b2110;
-    --horizon-color-danger: #f87171;
-    --horizon-color-danger-soft: #33161a;
-    --horizon-shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4);
-    --horizon-shadow-md: 0 4px 12px rgb(0 0 0 / 0.45);
-    --horizon-shadow-lg: 0 12px 32px rgb(0 0 0 / 0.55);
+    --udgu-color-bg: #0b0e14;
+    --udgu-color-surface: #131824;
+    --udgu-color-surface-2: #1b2233;
+    --udgu-color-border: #2a3348;
+    --udgu-color-text: #e8ebf2;
+    --udgu-color-text-muted: #9aa4b8;
+    --udgu-color-primary: #818cf8;
+    --udgu-color-primary-hover: #a5b4fc;
+    --udgu-color-primary-soft: #1e2140;
+    --udgu-color-on-primary: #0b0e14;
+    --udgu-color-success: #4ade80;
+    --udgu-color-success-soft: #10281c;
+    --udgu-color-warning: #fbbf24;
+    --udgu-color-warning-soft: #2b2110;
+    --udgu-color-danger: #f87171;
+    --udgu-color-danger-soft: #33161a;
+    --udgu-shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4);
+    --udgu-shadow-md: 0 4px 12px rgb(0 0 0 / 0.45);
+    --udgu-shadow-lg: 0 12px 32px rgb(0 0 0 / 0.55);
 
     color-scheme: dark;
   }

@@ -16,4 +16,10 @@ coverage/
 npm-debug.log*
 .DS_Store
 
+# Приватное хранилище фото студбилетов (вне webroot) — в git только .gitkeep
+storage/*
+!storage/id-cards/
+storage/id-cards/*
+!storage/id-cards/.gitkeep
+
 packages/db/src/generated/

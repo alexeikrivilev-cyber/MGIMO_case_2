@@ -12,6 +12,9 @@ import {
   TEST_PASSWORD,
   SCHEDULE_HORIZON_DAYS,
   SEED_COUNTS,
+  UNIVERSITY_NAME,
+  UNIVERSITY_SHORT_NAME,
+  UNIVERSITY_CITY,
   type GradeSeed,
   type NotificationSeed,
   type SeedData,
@@ -29,17 +32,22 @@ function addDays(date: Date, days: number): Date {
 
 const data: SeedData = await buildSeedData();
 const today = startOfDay(new Date());
+const todayKey = today.toISOString().slice(0, 10);
 const windowStart = addDays(today, 1);
 const windowEnd = addDays(today, SCHEDULE_HORIZON_DAYS);
 const windowStartKey = windowStart.toISOString().slice(0, 10);
 const windowEndKey = windowEnd.toISOString().slice(0, 10);
 
+/** Код направления подготовки ФГОС: NN.NN.NN */
+const PROGRAM_CODE = /^\d{2}\.\d{2}\.\d{2}$/;
+
 test('сидер создаёт заявленный набор сущностей', () => {
   assert.equal(data.users.length, SEED_COUNTS.students + SEED_COUNTS.teachers + 2);
   assert.equal(data.students.length, 4);
   assert.equal(data.groups.length, 8);
-  assert.equal(data.subjects.length, 40);
-  assert.equal(data.teachers.length, 12);
+  assert.equal(data.subjects.length, 80);
+  assert.equal(data.teachers.length, 16);
+  assert.equal(SEED_COUNTS.institutes, 8);
 });
 
 test('логины пользователей уникальны и роли распределены верно', () => {
@@ -258,5 +266,282 @@ test('аудит: события ссылаются на существующи�
   for (const event of data.auditEvents) {
     assert.ok(logins.has(event.actorLogin), `актор ${event.actorLogin} существует`);
     assert.ok(event.action.length > 0 && event.entity.length > 0);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Пивот на УдГУ: институты, направления, город
+// ---------------------------------------------------------------------------
+
+test('институты УдГУ: 8 штук, уникальные названия, город Ижевск', () => {
+  assert.equal(data.groups.length, SEED_COUNTS.institutes);
+  assert.equal(UNIVERSITY_NAME, 'Удмуртский государственный университет');
+  assert.equal(UNIVERSITY_SHORT_NAME, 'УдГУ');
+  assert.equal(UNIVERSITY_CITY, 'Ижевск');
+
+  const instituteNames = new Set(data.groups.map((group) => group.faculty));
+  assert.equal(instituteNames.size, 8, 'на каждый институт — своя группа');
+
+  const expectedInstitutes = [
+    'Институт математики, информационных технологий и физики',
+    'Институт языка и литературы',
+    'Институт истории и социологии',
+    'Институт права, социального управления и безопасности',
+    'Институт экономики и управления',
+    'Институт физической культуры и спорта',
+    'Институт искусств и дизайна',
+    'Институт педагогики, психологии и социальных технологий',
+  ];
+  for (const name of expectedInstitutes) {
+    assert.ok(instituteNames.has(name), `институт «${name}» присутствует в сидере`);
+  }
+});
+
+test('направления подготовки — реальные коды бакалавриата УдГУ', () => {
+  for (const group of data.groups) {
+    const [code, ...rest] = group.direction.split(' ');
+    assert.match(code ?? '', PROGRAM_CODE, `код направления ${code} — формат ФГОС`);
+    assert.ok(rest.join(' ').length > 0, 'у направления есть название');
+  }
+
+  const codes = data.groups.map((group) => group.direction.split(' ')[0]);
+  assert.equal(new Set(codes).size, codes.length, 'коды направлений не повторяются');
+
+  const knownCodes = new Set([
+    '09.03.03', '45.03.01', '46.03.01', '40.03.01',
+    '38.03.05', '49.03.01', '54.03.01', '44.03.05',
+  ]);
+  for (const code of codes) {
+    assert.ok(knownCodes.has(code ?? ''), `код ${code} — реальное направление УдГУ`);
+  }
+});
+
+test('группы: корректные курсы и названия вида ПИ-24-1', () => {
+  const names = data.groups.map((group) => group.name);
+  assert.equal(new Set(names).size, names.length);
+
+  for (const group of data.groups) {
+    assert.ok(group.course >= 1 && group.course <= 4, `курс ${group.course} в диапазоне 1-4`);
+    assert.match(group.name, /^[А-ЯЁ]{2,3}-\d{2}-\d$/, `название группы ${group.name}`);
+    assert.ok(group.direction.length > 0);
+  }
+
+  for (const student of data.students) {
+    const group = data.groups.find((candidate) => candidate.name === student.groupName);
+    assert.ok(group, `группа ${student.groupName} существует`);
+    assert.equal(group?.course, student.course, 'курс студента совпадает с курсом группы');
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Синтетический реестр студбилетов
+// ---------------------------------------------------------------------------
+
+test('реестр студбилетов покрывает всех студентов и 2 незарегистрированные карточки', () => {
+  const registry = data.identityRegistry;
+  assert.equal(registry.length, SEED_COUNTS.identityRegistry);
+
+  const cardNumbers = registry.map((entry) => entry.cardNumber);
+  assert.equal(new Set(cardNumbers).size, cardNumbers.length, 'номера карточек уникальны');
+
+  const groupNames = new Set(data.groups.map((group) => group.name));
+  for (const entry of registry) {
+    assert.ok(groupNames.has(entry.groupName), `группа ${entry.groupName} существует`);
+    assert.ok(entry.lastName.length > 0 && entry.firstName.length > 0);
+    assert.match(entry.program.split(' ')[0] ?? '', PROGRAM_CODE, `программа ${entry.program} содержит код ФГОС`);
+    assert.ok(entry.course >= 1 && entry.course <= 4);
+    assert.ok(entry.issuedAt < todayKey, 'карточка выдана в прошлом');
+  }
+
+  const studentCards = new Set(data.students.map((student) => student.studentCardNumber));
+  for (const card of studentCards) {
+    assert.ok(cardNumbers.includes(card), `карточка ${card} есть в реестре`);
+  }
+
+  const unregistered = registry.filter((entry) => !studentCards.has(entry.cardNumber));
+  assert.equal(unregistered.length, 2, 'две «незарегистрированные» карточки');
+  for (const entry of unregistered) {
+    assert.ok(!data.students.some((student) => student.lastName === entry.lastName && student.firstName === entry.firstName),
+      'незарегистрированная карточка принадлежит другому человеку');
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Верификация студбилетов
+// ---------------------------------------------------------------------------
+
+test('верификация: статусы распределены как заявлено', () => {
+  const byLogin = new Map(data.studentVerifications.map((v) => [v.studentLogin, v]));
+  assert.equal(data.studentVerifications.length, 4);
+
+  const expected: Record<string, 'VERIFIED' | 'PENDING' | 'REJECTED'> = {
+    student1: 'VERIFIED',
+    student2: 'PENDING',
+    student3: 'REJECTED',
+    student4: 'VERIFIED',
+  };
+  for (const [login, status] of Object.entries(expected)) {
+    assert.equal(byLogin.get(login)?.status, status, `${login} → ${status}`);
+  }
+
+  const logins = new Set(data.users.map((user) => user.login));
+  const groupNames = new Set(data.groups.map((group) => group.name));
+
+  for (const verification of data.studentVerifications) {
+    const student = data.students.find((candidate) => candidate.login === verification.studentLogin);
+    assert.ok(student, `студент ${verification.studentLogin} существует`);
+    assert.match(
+      verification.photoFileName,
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-8[0-9a-f]{3}-[0-9a-f]{12}\.jpg$/,
+      'имя файла фото — uuid с расширением',
+    );
+    assert.equal(verification.recognizedCardNumber, student?.studentCardNumber, 'распознанный номер совпадает с реестром');
+    assert.equal(verification.recognizedLastName, student?.lastName);
+    assert.equal(verification.recognizedFirstName, student?.firstName);
+    assert.ok(groupNames.has(verification.recognizedGroupName), 'распознанная группа существует');
+
+    if (verification.status === 'VERIFIED') {
+      assert.ok(verification.reviewerLogin && logins.has(verification.reviewerLogin), 'у проверенной заявки есть проверяющий');
+      assert.ok(verification.reviewedAt, 'у проверенной заявки есть дата решения');
+      assert.ok((verification.matchScore ?? 0) >= 0.9, 'высокий балл сверки');
+      assert.ok(verification.reviewComment === null);
+    }
+
+    if (verification.status === 'PENDING') {
+      assert.equal(verification.reviewerLogin, null, 'заявка в очереди без проверяющего');
+      assert.equal(verification.reviewedAt, null, 'заявка в очереди без даты решения');
+      assert.equal(verification.reviewComment, null);
+      assert.ok(verification.submittedAt <= new Date().toISOString(), 'подана в прошлом');
+    }
+
+    if (verification.status === 'REJECTED') {
+      assert.ok(verification.reviewerLogin, 'у отказа есть проверяющий');
+      assert.ok(verification.reviewedAt, 'у отказа есть дата решения');
+      assert.ok(verification.reviewComment && verification.reviewComment.length > 0, 'у отказа есть комментарий');
+      assert.ok((verification.matchScore ?? 1) < 0.8, 'низкий балл сверки');
+      assert.notEqual(verification.recognizedGroupName, student?.groupName, 'отказ — из-за несовпадения группы');
+    }
+  }
+});
+
+// ---------------------------------------------------------------------------
+// OAuth: привязки и эмуляция согласия
+// ---------------------------------------------------------------------------
+
+test('oauth-привязки: у двух студентов по одному провайдеру', () => {
+  assert.equal(data.oauthAccounts.length, 2);
+
+  const userLogins = new Set(data.users.map((user) => user.login));
+  const pairs = new Set<string>();
+  const providerAccounts = new Set<string>();
+  const providers = new Set<string>();
+
+  for (const account of data.oauthAccounts) {
+    assert.ok(userLogins.has(account.userLogin), `пользователь ${account.userLogin} существует`);
+    assert.ok(['VK_ID', 'MAX', 'TELEGRAM'].includes(account.provider), `провайдер ${account.provider}`);
+    assert.ok(account.providerAccountId.length > 0);
+    assert.ok(account.createdAt.length > 0);
+
+    pairs.add(`${account.userLogin}|${account.provider}`);
+    providerAccounts.add(account.providerAccountId);
+    providers.add(account.provider);
+  }
+
+  assert.equal(pairs.size, data.oauthAccounts.length, 'пары (пользователь, провайдер) уникальны');
+  assert.equal(providerAccounts.size, data.oauthAccounts.length, 'идентификаторы провайдеров уникальны');
+  assert.ok(providers.has('VK_ID') && providers.has('TELEGRAM'), 'есть VK ID и Telegram');
+
+  const studentsWithAccounts = new Set(data.oauthAccounts.map((account) => account.userLogin));
+  assert.equal(studentsWithAccounts.size, 2, 'два разных студента');
+  for (const login of studentsWithAccounts) {
+    assert.match(login, /^student\d$/, 'привязки только у студентов');
+  }
+});
+
+test('oauth-интенты: уникальные state, активный интент жив', () => {
+  const states = data.oauthIntents.map((intent) => intent.state);
+  assert.equal(new Set(states).size, states.length, 'state уникален');
+
+  const groupNames = new Set(data.groups.map((group) => group.name));
+  const nowIso = new Date().toISOString();
+
+  for (const intent of data.oauthIntents) {
+    assert.ok(['VK_ID', 'MAX', 'TELEGRAM'].includes(intent.provider));
+    assert.ok(intent.purpose.length > 0);
+    assert.ok(intent.fullName !== null || intent.login !== null, 'интент несёт ФИО или логин');
+    if (intent.groupName !== null) {
+      assert.ok(groupNames.has(intent.groupName), 'группа интента существует');
+    }
+    if (intent.consumedAt !== null) {
+      assert.ok(intent.consumedAt >= intent.createdAt, 'использован после создания');
+      assert.ok(intent.expiresAt >= intent.consumedAt, 'использован до истечения срока');
+    } else {
+      assert.ok(intent.expiresAt > nowIso, 'активный интент не истёк');
+    }
+  }
+
+  assert.equal(data.oauthIntents.filter((intent) => intent.consumedAt === null).length, 1, 'один активный интент');
+});
+
+// ---------------------------------------------------------------------------
+// Статус «болею»
+// ---------------------------------------------------------------------------
+
+test('болезни: 2 записи, корректные периоды, у student2 активная на сегодня', () => {
+  assert.equal(data.sickLeaves.length, 2);
+
+  const studentLogins = new Set(data.students.map((student) => student.login));
+  for (const leave of data.sickLeaves) {
+    assert.ok(studentLogins.has(leave.studentLogin), `студент ${leave.studentLogin} существует`);
+    assert.ok(leave.dateFrom <= leave.dateTo, 'дата начала не позже даты окончания');
+    if (leave.reason !== null) {
+      assert.ok(leave.reason.length > 0, 'причина заполнена');
+    }
+  }
+
+  const active = data.sickLeaves.filter(
+    (leave) => leave.dateFrom <= todayKey && leave.dateTo >= todayKey,
+  );
+  assert.equal(active.length, 1, 'ровно одна активная болезнь');
+  assert.equal(active[0]?.studentLogin, 'student2', 'болеет student2');
+
+  const finished = data.sickLeaves.filter((leave) => leave.dateTo < todayKey);
+  assert.equal(finished.length, 1, 'одна завершившаяся болезнь');
+  assert.equal(finished[0]?.studentLogin, 'student1');
+});
+
+// ---------------------------------------------------------------------------
+// Расписание преподавателей: консультации и часы приёма
+// ---------------------------------------------------------------------------
+
+test('часы приёма: 2-3 на преподавателя у 6 преподавателей, будни, время корректно', () => {
+  const teacherLogins = new Set(data.teachers.map((teacher) => teacher.login));
+  const byTeacher = new Map<string, number>();
+
+  for (const hour of data.officeHours) {
+    assert.ok(teacherLogins.has(hour.teacherLogin), `преподаватель ${hour.teacherLogin} существует`);
+    assert.ok(Number.isInteger(hour.weekday), 'день недели — целое число');
+    assert.ok(hour.weekday >= 1 && hour.weekday <= 7, `weekday ${hour.weekday} в диапазоне 1-7`);
+    assert.ok(hour.weekday <= 5, 'консультации только по будням');
+    assert.ok(hour.startTime < hour.endTime, `время начала ${hour.startTime} раньше окончания ${hour.endTime}`);
+    assert.match(hour.startTime, /^([01]\d|2[0-3]):[0-5]\d$/, 'время в формате HH:MM');
+    assert.match(hour.endTime, /^([01]\d|2[0-3]):[0-5]\d$/, 'время в формате HH:MM');
+    assert.ok(hour.room.length > 0, 'аудитория указана');
+    assert.ok(['CONSULTATION', 'RECEPTION', 'EXTRA_CLASS'].includes(hour.type), `тип ${hour.type}`);
+
+    byTeacher.set(hour.teacherLogin, (byTeacher.get(hour.teacherLogin) ?? 0) + 1);
+  }
+
+  assert.equal(byTeacher.size, SEED_COUNTS.officeHourTeachers, 'шесть преподавателей с часами приёма');
+  for (const [login, count] of byTeacher) {
+    assert.ok(count >= 2 && count <= 3, `${login}: ${count} записи (ожидалось 2-3)`);
+  }
+
+  // У каждого преподавателя дни недели не повторяются.
+  const weekdayKeys = new Set<string>();
+  for (const hour of data.officeHours) {
+    const key = `${hour.teacherLogin}|${hour.weekday}`;
+    assert.equal(weekdayKeys.has(key), false, `дубль часа приёма ${key}`);
+    weekdayKeys.add(key);
   }
 });

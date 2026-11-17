@@ -1,100 +1,205 @@
 /**
- * Генератор синтетических данных Университета «Горизонт».
+ * Генератор синтетических данных Удмуртского государственного университета
+ * (УдГУ), город Ижевск.
  *
  * Чистая функция без обращений к БД: строит все сущности сидера в памяти.
  * Благодаря этому инварианты данных проверяются в тестах (test/seed.test.ts)
  * без подключения к PostgreSQL, а запись в БД живёт в prisma/seed.ts.
  *
- * Все данные вымышленные. Пароль тестовых аккаунтов — фикстура сидера,
- * в продакшене пароли задаются только через переменные окружения.
+ * Структура вуза (институты, коды и названия направлений подготовки)
+ * соответствует открытым сведениям об УдГУ, но ВСЕ люди, группы, оценки,
+ * зачётки и фото студбилетов — вымышленные. Пароль тестовых аккаунтов —
+ * фикстура сидера, в продакшене пароли задаются только через переменные
+ * окружения.
  */
 import { hash as argon2Hash } from 'argon2';
 
 export const TEST_PASSWORD = 'password123';
 
-export interface FacultyDef {
+/** Полное наименование вуза. */
+export const UNIVERSITY_NAME = 'Удмуртский государственный университет';
+/** Короткое наименование вуза. */
+export const UNIVERSITY_SHORT_NAME = 'УдГУ';
+/** Город вуза. */
+export const UNIVERSITY_CITY = 'Ижевск';
+
+/** Направление подготовки бакалавриата (код и название — реальные у УдГУ). */
+interface DirectionDef {
+  /** Короткий код направления — используется в названиях групп и зачёток. */
   readonly short: string;
+  /** Код направления подготовки по ФГОС. */
+  readonly code: string;
+  /** Название направления подготовки. */
   readonly name: string;
-  readonly directions: readonly string[];
 }
 
-export const FACULTIES: readonly FacultyDef[] = [
+/** Институт УдГУ (реальная структура вуза). */
+interface InstituteDef {
+  readonly name: string;
+  readonly directions: readonly DirectionDef[];
+}
+
+export const INSTITUTES: readonly InstituteDef[] = [
   {
-    short: 'ИТ',
-    name: 'Факультет информационных технологий',
-    directions: ['Программная инженерия', 'Прикладная информатика'],
+    name: 'Институт математики, информационных технологий и физики',
+    directions: [
+      { short: 'ПИ', code: '09.03.03', name: 'Прикладная информатика' },
+      { short: 'ПМИ', code: '01.03.02', name: 'Прикладная математика и информатика' },
+    ],
   },
   {
-    short: 'ЭК',
-    name: 'Экономический факультет',
-    directions: ['Экономика', 'Менеджмент'],
+    name: 'Институт языка и литературы',
+    directions: [
+      { short: 'ФИЛ', code: '45.03.01', name: 'Филология' },
+      { short: 'ЛИН', code: '45.03.02', name: 'Лингвистика' },
+    ],
   },
   {
-    short: 'ИН',
-    name: 'Инженерный факультет',
-    directions: ['Робототехника', 'Энергетика'],
+    name: 'Институт истории и социологии',
+    directions: [
+      { short: 'ИОР', code: '46.03.01', name: 'История' },
+      { short: 'СОЦ', code: '39.03.01', name: 'Социология' },
+    ],
   },
   {
-    short: 'ГУ',
-    name: 'Гуманитарный факультет',
-    directions: ['Лингвистика', 'Психология'],
+    name: 'Институт права, социального управления и безопасности',
+    directions: [
+      { short: 'ЮР', code: '40.03.01', name: 'Юриспруденция' },
+      { short: 'ИБ', code: '10.03.01', name: 'Информационная безопасность' },
+    ],
+  },
+  {
+    name: 'Институт экономики и управления',
+    directions: [
+      { short: 'БИ', code: '38.03.05', name: 'Бизнес-информатика' },
+      { short: 'ЭК', code: '38.03.01', name: 'Экономика' },
+    ],
+  },
+  {
+    name: 'Институт физической культуры и спорта',
+    directions: [
+      { short: 'ФК', code: '49.03.01', name: 'Физическая культура' },
+      { short: 'ТУР', code: '43.03.02', name: 'Туризм' },
+    ],
+  },
+  {
+    name: 'Институт искусств и дизайна',
+    directions: [
+      { short: 'ДЗ', code: '54.03.01', name: 'Дизайн' },
+      { short: 'ДПИ', code: '54.03.02', name: 'Декоративно-прикладное искусство и народные промыслы' },
+    ],
+  },
+  {
+    name: 'Институт педагогики, психологии и социальных технологий',
+    directions: [
+      { short: 'ПО', code: '44.03.05', name: 'Педагогическое образование (с двумя профилями подготовки)' },
+      { short: 'ПСИ', code: '37.03.01', name: 'Психология' },
+    ],
   },
 ];
 
 interface SubjectDef {
   readonly code: string;
   readonly name: string;
-  readonly faculty: string;
 }
 
-const SUBJECT_DEFS: readonly Omit<SubjectDef, 'faculty'>[][] = [
+/** Дисциплины по институтам (по 10 на институт — все названия общие для вуза). */
+const SUBJECT_DEFS: readonly (readonly SubjectDef[])[] = [
   [
-    { code: 'ИТ-101', name: 'Алгоритмы и структуры данных' },
-    { code: 'ИТ-102', name: 'Базы данных' },
-    { code: 'ИТ-103', name: 'Операционные системы' },
-    { code: 'ИТ-104', name: 'Веб-технологии' },
-    { code: 'ИТ-105', name: 'Компьютерные сети' },
-    { code: 'ИТ-106', name: 'Дискретная математика' },
-    { code: 'ИТ-107', name: 'Программирование на Python' },
-    { code: 'ИТ-108', name: 'Архитектура ЭВМ' },
-    { code: 'ИТ-109', name: 'Иностранный язык' },
-    { code: 'ИТ-110', name: 'Математический анализ' },
+    { code: 'ПИ-101', name: 'Математический анализ' },
+    { code: 'ПИ-102', name: 'Линейная алгебра и аналитическая геометрия' },
+    { code: 'ПИ-103', name: 'Дискретная математика' },
+    { code: 'ПИ-104', name: 'Алгоритмы и структуры данных' },
+    { code: 'ПИ-105', name: 'Базы данных' },
+    { code: 'ПИ-106', name: 'Операционные системы' },
+    { code: 'ПИ-107', name: 'Веб-технологии' },
+    { code: 'ПИ-108', name: 'Программирование на Python' },
+    { code: 'ПИ-109', name: 'Иностранный язык' },
+    { code: 'ПИ-110', name: 'Физика' },
   ],
   [
-    { code: 'ЭК-201', name: 'Микроэкономика' },
-    { code: 'ЭК-202', name: 'Макроэкономика' },
-    { code: 'ЭК-203', name: 'Бухгалтерский учёт' },
-    { code: 'ЭК-204', name: 'Статистика' },
-    { code: 'ЭК-205', name: 'Финансовый менеджмент' },
-    { code: 'ЭК-206', name: 'Маркетинг' },
-    { code: 'ЭК-207', name: 'Экономическая теория' },
-    { code: 'ЭК-208', name: 'Информационные технологии в экономике' },
-    { code: 'ЭК-209', name: 'Иностранный язык' },
-    { code: 'ЭК-210', name: 'Высшая математика' },
+    { code: 'ФИЛ-201', name: 'Русский язык и культура речи' },
+    { code: 'ФИЛ-202', name: 'История русской литературы' },
+    { code: 'ФИЛ-203', name: 'Зарубежная литература' },
+    { code: 'ФИЛ-204', name: 'Лексикология и стилистика' },
+    { code: 'ФИЛ-205', name: 'Практический курс английского языка' },
+    { code: 'ФИЛ-206', name: 'Практический курс французского языка' },
+    { code: 'ФИЛ-207', name: 'Латинский язык' },
+    { code: 'ФИЛ-208', name: 'Культурология' },
+    { code: 'ФИЛ-209', name: 'Логика' },
+    { code: 'ФИЛ-210', name: 'Риторика' },
   ],
   [
-    { code: 'ИН-301', name: 'Теоретическая механика' },
-    { code: 'ИН-302', name: 'Сопротивление материалов' },
-    { code: 'ИН-303', name: 'Электротехника' },
-    { code: 'ИН-304', name: 'Термодинамика' },
-    { code: 'ИН-305', name: 'Машиностроительное черчение' },
-    { code: 'ИН-306', name: 'Автоматизация производства' },
-    { code: 'ИН-307', name: 'Робототехника' },
-    { code: 'ИН-308', name: 'Материаловедение' },
-    { code: 'ИН-309', name: 'Иностранный язык' },
-    { code: 'ИН-310', name: 'Физика' },
+    { code: 'ИОР-301', name: 'История России' },
+    { code: 'ИОР-302', name: 'Всеобщая история' },
+    { code: 'ИОР-303', name: 'История Удмуртии' },
+    { code: 'ИОР-304', name: 'Археология' },
+    { code: 'ИОР-305', name: 'Этнология Удмуртии' },
+    { code: 'ИОР-306', name: 'Социология' },
+    { code: 'ИОР-307', name: 'Документоведение и архивоведение' },
+    { code: 'ИОР-308', name: 'Международные отношения' },
+    { code: 'ИОР-309', name: 'Методика исторического исследования' },
+    { code: 'ИОР-310', name: 'Политология' },
   ],
   [
-    { code: 'ГУ-401', name: 'Лингвистика' },
-    { code: 'ГУ-402', name: 'Культурология' },
-    { code: 'ГУ-403', name: 'Психология общения' },
-    { code: 'ГУ-404', name: 'Философия' },
-    { code: 'ГУ-405', name: 'Риторика' },
-    { code: 'ГУ-406', name: 'Социология' },
-    { code: 'ГУ-407', name: 'История России' },
-    { code: 'ГУ-408', name: 'Логика' },
-    { code: 'ГУ-409', name: 'Иностранный язык' },
-    { code: 'ГУ-410', name: 'Правоведение' },
+    { code: 'ЮР-401', name: 'Гражданское право' },
+    { code: 'ЮР-402', name: 'Уголовное право' },
+    { code: 'ЮР-403', name: 'Конституционное право' },
+    { code: 'ЮР-404', name: 'Административное право' },
+    { code: 'ЮР-405', name: 'Трудовое право' },
+    { code: 'ЮР-406', name: 'Экологическое право' },
+    { code: 'ЮР-407', name: 'Правоведение' },
+    { code: 'ЮР-408', name: 'Информационная безопасность' },
+    { code: 'ЮР-409', name: 'Логика и юридическая техника' },
+    { code: 'ЮР-410', name: 'История государства и права России' },
+  ],
+  [
+    { code: 'БИ-501', name: 'Микроэкономика' },
+    { code: 'БИ-502', name: 'Макроэкономика' },
+    { code: 'БИ-503', name: 'Бухгалтерский учёт' },
+    { code: 'БИ-504', name: 'Статистика' },
+    { code: 'БИ-505', name: 'Финансовый менеджмент' },
+    { code: 'БИ-506', name: 'Маркетинг' },
+    { code: 'БИ-507', name: 'Менеджмент' },
+    { code: 'БИ-508', name: 'Экономика предприятий и организаций' },
+    { code: 'БИ-509', name: 'Информационные технологии в экономике' },
+    { code: 'БИ-510', name: 'Государственное и муниципальное управление' },
+  ],
+  [
+    { code: 'ФК-601', name: 'Анатомия и физиология человека' },
+    { code: 'ФК-602', name: 'Биомеханика двигательных действий' },
+    { code: 'ФК-603', name: 'Спортивные игры' },
+    { code: 'ФК-604', name: 'Лёгкая атлетика' },
+    { code: 'ФК-605', name: 'Плавание' },
+    { code: 'ФК-606', name: 'Гимнастика' },
+    { code: 'ФК-607', name: 'Основы здорового образа жизни' },
+    { code: 'ФК-608', name: 'Психология физической культуры' },
+    { code: 'ФК-609', name: 'Теория и методика физического воспитания' },
+    { code: 'ФК-610', name: 'Первая помощь' },
+  ],
+  [
+    { code: 'ДЗ-701', name: 'Рисунок' },
+    { code: 'ДЗ-702', name: 'Живопись' },
+    { code: 'ДЗ-703', name: 'Композиция' },
+    { code: 'ДЗ-704', name: 'История искусств' },
+    { code: 'ДЗ-705', name: 'Цветоведение' },
+    { code: 'ДЗ-706', name: 'Графический дизайн' },
+    { code: 'ДЗ-707', name: 'Проектирование костюма' },
+    { code: 'ДЗ-708', name: 'Типографика' },
+    { code: 'ДЗ-709', name: 'История костюма' },
+    { code: 'ДЗ-710', name: 'Керамика и декоративно-прикладное искусство' },
+  ],
+  [
+    { code: 'ПО-801', name: 'Педагогика' },
+    { code: 'ПО-802', name: 'Психология развития' },
+    { code: 'ПО-803', name: 'Социальная психология' },
+    { code: 'ПО-804', name: 'Психология общения' },
+    { code: 'ПО-805', name: 'Основы логопедии' },
+    { code: 'ПО-806', name: 'Социальная работа с семьёй' },
+    { code: 'ПО-807', name: 'Организация работы с молодёжью' },
+    { code: 'ПО-808', name: 'Основы инклюзивного образования' },
+    { code: 'ПО-809', name: 'Психологическая диагностика' },
+    { code: 'ПО-810', name: 'Педагогическая практика' },
   ],
 ];
 
@@ -106,63 +211,75 @@ interface TeacherDef {
   readonly position: string;
 }
 
+/** Преподаватели: по 2 на институт (все — вымышленные). */
 const TEACHER_DEFS: readonly TeacherDef[][] = [
   [
-    { lastName: 'Соколов', firstName: 'Андрей', middleName: 'Викторович', department: 'Кафедра программной инженерии', position: 'Доцент' },
-    { lastName: 'Лебедева', firstName: 'Ольга', middleName: 'Петровна', department: 'Кафедра информационных систем', position: 'Профессор' },
-    { lastName: 'Кузнецов', firstName: 'Денис', middleName: 'Игоревич', department: 'Кафедра прикладной математики', position: 'Старший преподаватель' },
+    { lastName: 'Соколов', firstName: 'Андрей', middleName: 'Викторович', department: 'Кафедра прикладной информатики', position: 'Доцент' },
+    { lastName: 'Лебедева', firstName: 'Ольга', middleName: 'Петровна', department: 'Кафедра информационных технологий', position: 'Профессор' },
   ],
   [
-    { lastName: 'Морозова', firstName: 'Елена', middleName: 'Сергеевна', department: 'Кафедра экономики', position: 'Доцент' },
-    { lastName: 'Волков', firstName: 'Игорь', middleName: 'Николаевич', department: 'Кафедра финансов', position: 'Профессор' },
-    { lastName: 'Никитина', firstName: 'Татьяна', middleName: 'Юрьевна', department: 'Кафедра менеджмента', position: 'Старший преподаватель' },
+    { lastName: 'Романова', firstName: 'Ирина', middleName: 'Викторовна', department: 'Кафедра русской литературы', position: 'Доцент' },
+    { lastName: 'Гусев', firstName: 'Виктор', middleName: 'Александрович', department: 'Кафедра иностранных языков', position: 'Профессор' },
   ],
   [
-    { lastName: 'Зайцев', firstName: 'Павел', middleName: 'Романович', department: 'Кафедра робототехники', position: 'Доцент' },
-    { lastName: 'Орлова', firstName: 'Марина', middleName: 'Львовна', department: 'Кафедра энергетики', position: 'Профессор' },
-    { lastName: 'Белов', firstName: 'Артём', middleName: 'Олегович', department: 'Кафедра машиностроения', position: 'Старший преподаватель' },
+    { lastName: 'Захаров', firstName: 'Пётр', middleName: 'Николаевич', department: 'Кафедра истории России', position: 'Профессор' },
+    { lastName: 'Крылова', firstName: 'Светлана', middleName: 'Дмитриевна', department: 'Кафедра социологии', position: 'Старший преподаватель' },
   ],
   [
-    { lastName: 'Романова', firstName: 'Ирина', middleName: 'Викторовна', department: 'Кафедра лингвистики', position: 'Доцент' },
-    { lastName: 'Гусев', firstName: 'Виктор', middleName: 'Александрович', department: 'Кафедра философии', position: 'Профессор' },
-    { lastName: 'Крылова', firstName: 'Светлана', middleName: 'Дмитриевна', department: 'Кафедра психологии', position: 'Старший преподаватель' },
+    { lastName: 'Морозов', firstName: 'Денис', middleName: 'Игоревич', department: 'Кафедра гражданского права', position: 'Доцент' },
+    { lastName: 'Волкова', firstName: 'Елена', middleName: 'Сергеевна', department: 'Кафедра теории и истории права', position: 'Профессор' },
+  ],
+  [
+    { lastName: 'Никитин', firstName: 'Артём', middleName: 'Олегович', department: 'Кафедра экономики предприятия', position: 'Доцент' },
+    { lastName: 'Тарасова', firstName: 'Марина', middleName: 'Львовна', department: 'Кафедра менеджмента и маркетинга', position: 'Старший преподаватель' },
+  ],
+  [
+    { lastName: 'Белов', firstName: 'Павел', middleName: 'Романович', department: 'Кафедра физического воспитания', position: 'Доцент' },
+    { lastName: 'Орлова', firstName: 'Наталья', middleName: 'Ильинична', department: 'Кафедра спортивных дисциплин', position: 'Старший преподаватель' },
+  ],
+  [
+    { lastName: 'Зайцев', firstName: 'Кирилл', middleName: 'Андреевич', department: 'Кафедра графического дизайна', position: 'Доцент' },
+    { lastName: 'Ефимова', firstName: 'Алёна', middleName: 'Владимировна', department: 'Кафедра декоративно-прикладного искусства', position: 'Профессор' },
+  ],
+  [
+    { lastName: 'Верещагин', firstName: 'Игорь', middleName: 'Юрьевич', department: 'Кафедра педагогики и психологии', position: 'Профессор' },
+    { lastName: 'Комарова', firstName: 'Лидия', middleName: 'Павловна', department: 'Кафедра социальной педагогики', position: 'Доцент' },
   ],
 ];
 
+/** Группа: одна группа на институт, направление — directions[0] института. */
 interface GroupDef {
-  readonly name: string;
-  readonly facultyShort: string;
+  /** Индекс института в INSTITUTES. */
+  readonly instituteIndex: number;
+  readonly directionIndex: number;
   readonly course: number;
-  readonly direction: string;
 }
 
 const GROUP_DEFS: readonly GroupDef[] = [
-  { name: 'ИТ-21-1', facultyShort: 'ИТ', course: 2, direction: 'Программная инженерия' },
-  { name: 'ИТ-21-2', facultyShort: 'ИТ', course: 2, direction: 'Прикладная информатика' },
-  { name: 'ЭК-22-1', facultyShort: 'ЭК', course: 2, direction: 'Экономика' },
-  { name: 'ЭК-22-2', facultyShort: 'ЭК', course: 2, direction: 'Менеджмент' },
-  { name: 'ИН-20-1', facultyShort: 'ИН', course: 1, direction: 'Робототехника' },
-  { name: 'ИН-20-2', facultyShort: 'ИН', course: 1, direction: 'Энергетика' },
-  { name: 'ГУ-23-1', facultyShort: 'ГУ', course: 3, direction: 'Лингвистика' },
-  { name: 'ГУ-23-2', facultyShort: 'ГУ', course: 3, direction: 'Психология' },
+  { instituteIndex: 0, directionIndex: 0, course: 3 },
+  { instituteIndex: 1, directionIndex: 0, course: 2 },
+  { instituteIndex: 2, directionIndex: 0, course: 4 },
+  { instituteIndex: 3, directionIndex: 0, course: 3 },
+  { instituteIndex: 4, directionIndex: 0, course: 2 },
+  { instituteIndex: 5, directionIndex: 0, course: 1 },
+  { instituteIndex: 6, directionIndex: 0, course: 2 },
+  { instituteIndex: 7, directionIndex: 0, course: 3 },
 ];
 
 interface StudentDef {
   readonly login: string;
-  readonly group: string;
-  readonly facultyShort: string;
-  readonly direction: string;
-  readonly course: number;
+  /** Индекс института. */
+  readonly instituteIndex: number;
   readonly lastName: string;
   readonly firstName: string;
   readonly middleName: string;
 }
 
 const STUDENT_DEFS: readonly StudentDef[] = [
-  { login: 'student1', group: 'ИТ-21-1', facultyShort: 'ИТ', direction: 'Программная инженерия', course: 2, lastName: 'Иванов', firstName: 'Александр', middleName: 'Дмитриевич' },
-  { login: 'student2', group: 'ЭК-22-1', facultyShort: 'ЭК', direction: 'Экономика', course: 2, lastName: 'Петрова', firstName: 'Мария', middleName: 'Андреевна' },
-  { login: 'student3', group: 'ИТ-21-2', facultyShort: 'ИТ', direction: 'Прикладная информатика', course: 2, lastName: 'Смирнов', firstName: 'Никита', middleName: 'Иванович' },
-  { login: 'student4', group: 'ИН-20-1', facultyShort: 'ИН', direction: 'Робототехника', course: 1, lastName: 'Кузнецова', firstName: 'Анна', middleName: 'Сергеевна' },
+  { login: 'student1', instituteIndex: 0, lastName: 'Иванов', firstName: 'Александр', middleName: 'Дмитриевич' },
+  { login: 'student2', instituteIndex: 4, lastName: 'Петрова', firstName: 'Мария', middleName: 'Андреевна' },
+  { login: 'student3', instituteIndex: 3, lastName: 'Смирнов', firstName: 'Никита', middleName: 'Иванович' },
+  { login: 'student4', instituteIndex: 7, lastName: 'Кузнецова', firstName: 'Анна', middleName: 'Сергеевна' },
 ];
 
 export const SCHEDULE_HORIZON_DAYS = 14;
@@ -176,11 +293,16 @@ const TIME_SLOTS: readonly { start: string; end: string }[] = [
   { start: '16:30', end: '17:50' },
 ];
 
+/**
+ * Аудитории. Префиксы условно обозначают корпуса вуза: У — главный корпус
+ * (Университетская, 1), Л — лекционный корпус, С — спортивный корпус,
+ * Т — технический корпус. Все номера вымышленные.
+ */
 const ROOMS: readonly string[] = [
-  'А-101', 'А-204', 'А-311', 'А-418',
-  'Б-202', 'Б-315',
-  'В-107', 'В-210',
+  'У-101', 'У-204', 'У-311', 'У-418',
   'Л-201', 'Л-305',
+  'С-105', 'С-207',
+  'Т-302',
 ];
 
 const CANCELLED_REASONS: readonly string[] = [
@@ -211,6 +333,9 @@ export type NotificationType =
   | 'ANNOUNCEMENT'
   | 'DEADLINE'
   | 'SYSTEM';
+export type VerificationStatus = 'PENDING' | 'VERIFIED' | 'REJECTED';
+export type OAuthProvider = 'VK_ID' | 'MAX' | 'TELEGRAM';
+export type OfficeHourType = 'CONSULTATION' | 'RECEPTION' | 'EXTRA_CLASS';
 
 export interface UserSeed {
   readonly login: string;
@@ -318,6 +443,77 @@ export interface AuditEventSeed {
   readonly createdAt: string;
 }
 
+/** Запись синтетического реестра студенческих билетов (мок-сверка). */
+export interface IdentityRegistrySeed {
+  readonly cardNumber: string;
+  readonly lastName: string;
+  readonly firstName: string;
+  readonly middleName: string | null;
+  readonly groupName: string;
+  readonly faculty: string;
+  readonly program: string;
+  readonly course: number;
+  readonly issuedAt: string;
+}
+
+/** Заявка на верификацию по фото студенческого билета. */
+export interface StudentVerificationSeed {
+  readonly studentLogin: string;
+  readonly status: VerificationStatus;
+  /** Имя файла внутри каталога id-cards/<studentId>/ приватного хранилища. */
+  readonly photoFileName: string;
+  readonly recognizedLastName: string;
+  readonly recognizedFirstName: string;
+  readonly recognizedGroupName: string;
+  readonly recognizedCardNumber: string;
+  readonly matchScore: number | null;
+  readonly reviewerLogin: string | null;
+  readonly reviewComment: string | null;
+  readonly submittedAt: string;
+  readonly reviewedAt: string | null;
+}
+
+/** Привязка учётной записи к OAuth-провайдеру (эмуляция согласия). */
+export interface OAuthAccountSeed {
+  readonly userLogin: string;
+  readonly provider: OAuthProvider;
+  readonly providerAccountId: string;
+  readonly createdAt: string;
+}
+
+/** Одноразовый эмулятор согласия OAuth-провайдера. */
+export interface OAuthIntentSeed {
+  readonly state: string;
+  readonly provider: OAuthProvider;
+  readonly login: string | null;
+  readonly fullName: string | null;
+  readonly groupName: string | null;
+  readonly purpose: string;
+  readonly expiresAt: string;
+  readonly consumedAt: string | null;
+  readonly createdAt: string;
+}
+
+/** Статус «болею». */
+export interface SickLeaveSeed {
+  readonly studentLogin: string;
+  readonly dateFrom: string;
+  readonly dateTo: string;
+  readonly reason: string | null;
+  readonly attachmentPath: string | null;
+}
+
+/** Консультация или час приёма преподавателя. */
+export interface OfficeHourSeed {
+  readonly teacherLogin: string;
+  readonly weekday: number;
+  readonly startTime: string;
+  readonly endTime: string;
+  readonly room: string;
+  readonly type: OfficeHourType;
+  readonly note: string | null;
+}
+
 export interface SeedData {
   readonly users: readonly UserSeed[];
   readonly groups: readonly GroupSeed[];
@@ -330,6 +526,12 @@ export interface SeedData {
   readonly announcements: readonly AnnouncementSeed[];
   readonly notifications: readonly NotificationSeed[];
   readonly auditEvents: readonly AuditEventSeed[];
+  readonly identityRegistry: readonly IdentityRegistrySeed[];
+  readonly studentVerifications: readonly StudentVerificationSeed[];
+  readonly oauthAccounts: readonly OAuthAccountSeed[];
+  readonly oauthIntents: readonly OAuthIntentSeed[];
+  readonly sickLeaves: readonly SickLeaveSeed[];
+  readonly officeHours: readonly OfficeHourSeed[];
 }
 
 function mulberry32(seed: number): () => number {
@@ -353,8 +555,31 @@ function addDays(date: Date, days: number): Date {
   return next;
 }
 
+function addMinutes(date: Date, minutes: number): Date {
+  return new Date(date.getTime() + minutes * 60_000);
+}
+
+/** Дата в конкретное время суток (UTC). */
+function atTime(date: Date, hours: number, minutes: number): Date {
+  return new Date(
+    Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(), hours, minutes),
+  );
+}
+
 function toDateKey(date: Date): string {
   return date.toISOString().slice(0, 10);
+}
+
+function toDateTimeKey(date: Date): string {
+  return date.toISOString();
+}
+
+/** Детерминированный UUID (v4-подобный) из PRNG — сидер воспроизводим. */
+function uuidFromRng(rng: () => number): string {
+  const hex = '0123456789abcdef';
+  const block = (length: number): string =>
+    Array.from({ length }, () => hex[Math.floor(rng() * 16)]).join('');
+  return `${block(8)}-${block(4)}-4${block(3)}-8${block(3)}-${block(12)}`;
 }
 
 function isWeekday(date: Date): boolean {
@@ -395,6 +620,16 @@ function shuffled<T>(rng: () => number, items: readonly T[]): T[] {
   return copy;
 }
 
+/** Учебный год, начавшийся в сентябре (сентябрь = 8-й месяц). */
+function academicYear(now: Date): number {
+  return now.getUTCMonth() >= 8 ? now.getUTCFullYear() : now.getUTCFullYear() - 1;
+}
+
+/** Год поступления для группы заданного курса. */
+function admissionYear(now: Date, course: number): number {
+  return academicYear(now) - (course - 1);
+}
+
 export interface BuildSeedDataOptions {
   /** Базовая дата для расписания (по умолчанию — сегодня). */
   readonly now?: Date;
@@ -409,17 +644,52 @@ export async function buildSeedData(options: BuildSeedDataOptions = {}): Promise
     type: 2, // argon2id
   });
 
-  const facultyNameByShort = new Map(FACULTIES.map((f) => [f.short, f.name]));
+  // ---- Группы: название вида ПИ-24-1 (код направления + год поступления) ----
+  const groups: GroupSeed[] = GROUP_DEFS.map((groupDef) => {
+    const institute = INSTITUTES[groupDef.instituteIndex];
+    const direction = institute?.directions[groupDef.directionIndex];
+    if (!institute || !direction) {
+      throw new Error('Сидер: описанию группы не соответствует институт или направление');
+    }
+    const year = admissionYear(now, groupDef.course) % 100;
+    return {
+      name: `${direction.short}-${String(year).padStart(2, '0')}-1`,
+      faculty: institute.name,
+      course: groupDef.course,
+      direction: `${direction.code} ${direction.name}`,
+    };
+  });
 
-  const groups: GroupSeed[] = GROUP_DEFS.map((g) => ({
-    name: g.name,
-    faculty: facultyNameByShort.get(g.facultyShort) ?? g.facultyShort,
-    course: g.course,
-    direction: g.direction,
-  }));
+  const groupNameByInstitute = new Map<string, string>();
+  GROUP_DEFS.forEach((groupDef, index) => {
+    const institute = INSTITUTES[groupDef.instituteIndex];
+    const group = groups[index];
+    if (institute && group) groupNameByInstitute.set(institute.name, group.name);
+  });
 
-  const subjects: SubjectSeed[] = FACULTIES.flatMap((faculty, index) =>
-    (SUBJECT_DEFS[index] ?? []).map((s) => ({ ...s, faculty: faculty.name })),
+  const groupNameByDirectionShort = new Map<string, string>();
+  const groupInfoByDirectionShort = new Map<
+    string,
+    { name: string; faculty: string; course: number; direction: string }
+  >();
+  GROUP_DEFS.forEach((groupDef, index) => {
+    const institute = INSTITUTES[groupDef.instituteIndex];
+    const direction = institute?.directions[groupDef.directionIndex];
+    const group = groups[index];
+    if (direction && group) {
+      groupNameByDirectionShort.set(direction.short, group.name);
+      groupInfoByDirectionShort.set(direction.short, {
+        name: group.name,
+        faculty: group.faculty,
+        course: group.course,
+        direction: group.direction,
+      });
+    }
+  });
+
+  // ---- Дисциплины: 10 на институт ----
+  const subjects: SubjectSeed[] = INSTITUTES.flatMap((institute, index) =>
+    (SUBJECT_DEFS[index] ?? []).map((subject) => ({ ...subject, faculty: institute.name })),
   );
 
   const subjectsByFaculty = new Map<string, SubjectSeed[]>();
@@ -429,51 +699,67 @@ export async function buildSeedData(options: BuildSeedDataOptions = {}): Promise
     subjectsByFaculty.set(subject.faculty, list);
   }
 
-  const teachers: TeacherSeed[] = TEACHER_DEFS.flatMap((facultyTeachers, index) =>
-    facultyTeachers.map((t, teacherIndex) => ({
-      login: `teacher${index * 3 + teacherIndex + 1}`,
-      lastName: t.lastName,
-      firstName: t.firstName,
-      middleName: t.middleName,
-      department: t.department,
-      position: t.position,
+  // ---- Преподаватели: по 2 на институт ----
+  const teachers: TeacherSeed[] = TEACHER_DEFS.flatMap((instituteTeachers, index) =>
+    instituteTeachers.map((teacher, teacherIndex) => ({
+      login: `teacher${index * 2 + teacherIndex + 1}`,
+      lastName: teacher.lastName,
+      firstName: teacher.firstName,
+      middleName: teacher.middleName,
+      department: teacher.department,
+      position: teacher.position,
     })),
   );
 
   const teachersByFaculty = new Map<string, TeacherSeed[]>();
-  TEACHER_DEFS.forEach((facultyTeachers, index) => {
-    const faculty = FACULTIES[index]?.name;
+  TEACHER_DEFS.forEach((instituteTeachers, index) => {
+    const faculty = INSTITUTES[index]?.name;
     if (!faculty) return;
     const list: TeacherSeed[] = [];
-    facultyTeachers.forEach((_, teacherIndex) => {
-      const teacher = teachers[index * 3 + teacherIndex];
+    instituteTeachers.forEach((_, teacherIndex) => {
+      const teacher = teachers[index * 2 + teacherIndex];
       if (teacher) list.push(teacher);
     });
     teachersByFaculty.set(faculty, list);
   });
 
+  // ---- Студенты ----
   const students: StudentSeed[] = STUDENT_DEFS.map((def, index) => {
-    const cardIndex = String(100 + index * 7).padStart(3, '0');
+    const institute = INSTITUTES[def.instituteIndex];
+    const direction = institute?.directions[0];
+    const groupDef = GROUP_DEFS.find((candidate) => candidate.instituteIndex === def.instituteIndex);
+    const groupName = groupNameByInstitute.get(institute?.name ?? '');
+    if (!institute || !direction || !groupDef || !groupName) {
+      throw new Error(`Сидер: для студента ${def.login} не найдена группа`);
+    }
+    const cardSerial = String(101 + index * 37).padStart(4, '0');
     const phoneIndex = String(100 + index * 37).padStart(3, '0');
     return {
       login: def.login,
       lastName: def.lastName,
       firstName: def.firstName,
       middleName: def.middleName,
-      faculty: facultyNameByShort.get(def.facultyShort) ?? def.facultyShort,
-      direction: def.direction,
-      course: def.course,
-      groupName: def.group,
-      email: `${def.login}@horizon-university.ru`,
-      studentCardNumber: `HZ-${def.facultyShort}-2026-${cardIndex}`,
-      phone: def.login === 'student2' ? null : `+7 (900) ${phoneIndex}-${String(20 + index * 11).padStart(2, '0')}-${String(10 + index * 5).padStart(2, '0')}`,
+      faculty: institute.name,
+      direction: `${direction.code} ${direction.name}`,
+      course: groupDef.course,
+      groupName,
+      email: `${def.login}@udsu.ru`,
+      studentCardNumber: `${direction.short}-${admissionYear(now, groupDef.course)}-${cardSerial}`,
+      phone:
+        def.login === 'student2'
+          ? null
+          : `+7 (900) ${phoneIndex}-${String(20 + index * 11).padStart(2, '0')}-${String(10 + index * 5).padStart(2, '0')}`,
     };
   });
 
   const staffUser: UserSeed = { login: 'staff1', passwordHash, role: 'STAFF' };
   const adminUser: UserSeed = { login: 'admin1', passwordHash, role: 'ADMIN' };
-  const teacherUsers: UserSeed[] = teachers.map((t) => ({ login: t.login, passwordHash, role: 'STAFF' }));
-  const studentUsers: UserSeed[] = students.map((s) => ({ login: s.login, passwordHash, role: 'STUDENT' }));
+  const teacherUsers: UserSeed[] = teachers.map((teacher) => ({
+    login: teacher.login,
+    passwordHash,
+    role: 'STAFF',
+  }));
+  const studentUsers: UserSeed[] = students.map((student) => ({ login: student.login, passwordHash, role: 'STUDENT' }));
 
   const allUsers: UserSeed[] = [...studentUsers, ...teacherUsers, staffUser, adminUser];
 
@@ -481,9 +767,12 @@ export async function buildSeedData(options: BuildSeedDataOptions = {}): Promise
   const scheduleEntries: ScheduleEntrySeed[] = [];
 
   GROUP_DEFS.forEach((groupDef, groupIndex) => {
-    const faculty = facultyNameByShort.get(groupDef.facultyShort) ?? groupDef.facultyShort;
+    const institute = INSTITUTES[groupDef.instituteIndex];
+    const faculty = institute?.name ?? '';
     const facultySubjects = subjectsByFaculty.get(faculty) ?? [];
     const facultyTeachers = teachersByFaculty.get(faculty) ?? [];
+    const groupName = groupNameByInstitute.get(faculty);
+    if (!groupName) return;
 
     for (let dayOffset = 1; dayOffset <= SCHEDULE_HORIZON_DAYS; dayOffset += 1) {
       const date = addDays(now, dayOffset);
@@ -509,7 +798,7 @@ export async function buildSeedData(options: BuildSeedDataOptions = {}): Promise
         else if (seen > 1) type = rng() < 0.5 ? 'LAB' : 'SEMINAR';
 
         scheduleEntries.push({
-          groupName: groupDef.name,
+          groupName,
           subjectCode: subject.code,
           teacherLogin: teacher.login,
           date: toDateKey(date),
@@ -577,7 +866,7 @@ export async function buildSeedData(options: BuildSeedDataOptions = {}): Promise
       const to = new Date(`${range.to}T00:00:00.000Z`);
       const span = Math.round((to.getTime() - from.getTime()) / 86_400_000);
 
-      chosen.forEach((subject, subjectIndex) => {
+      chosen.forEach((subject) => {
         const roll = rng();
         let type: GradeType;
         let value: number | null = null;
@@ -613,11 +902,11 @@ export async function buildSeedData(options: BuildSeedDataOptions = {}): Promise
   const student1 = students[0];
   if (student1) {
     const debt = grades.find(
-      (g) =>
-        g.studentLogin === student1.login &&
-        g.semester === 2 &&
-        g.type === 'CREDIT' &&
-        g.passed === true,
+      (grade) =>
+        grade.studentLogin === student1.login &&
+        grade.semester === 2 &&
+        grade.type === 'CREDIT' &&
+        grade.passed === true,
     );
     if (debt) {
       const index = grades.indexOf(debt);
@@ -637,7 +926,10 @@ export async function buildSeedData(options: BuildSeedDataOptions = {}): Promise
 
   const APPLICATION_FORMS: Record<string, string>[] = [
     { topic: 'Академический отпуск', reason: 'По состоянию здоровья' },
-    { topic: 'Перевод на другую программу', program: 'Прикладная информатика' },
+    {
+      topic: 'Перевод на другую программу',
+      program: '01.03.02 Прикладная математика и информатика',
+    },
     { topic: 'Материальная помощь', reason: 'Тяжёлые семейные обстоятельства' },
     { topic: 'Повышенная стипендия', reason: 'Успехи в учёбе и науке' },
   ];
@@ -670,7 +962,9 @@ export async function buildSeedData(options: BuildSeedDataOptions = {}): Promise
     }
   });
 
-  // ---- Объявления: 4-6 штук, разные аудитории, 2 закреплённых ----
+  // ---- Объявления ----
+  const firstInstitute = INSTITUTES[0]?.name ?? null;
+  const secondInstitute = INSTITUTES[1]?.name ?? null;
   const announcements: AnnouncementSeed[] = [
     {
       title: 'График сессии опубликован',
@@ -693,10 +987,10 @@ export async function buildSeedData(options: BuildSeedDataOptions = {}): Promise
       publishedAt: toDateKey(addDays(now, -6)),
     },
     {
-      title: 'День открытых дверей факультета',
-      body: 'Приглашаем школьников и абитуриентов: экскурсии по лабораториям и встречи с преподавателями.',
+      title: 'День открытых дверей института',
+      body: `Приглашаем школьников и абитуриентов ${UNIVERSITY_CITY}а: экскурсии по лабораториям и встречи с преподавателями.`,
       audience: 'FACULTY',
-      faculty: FACULTIES[0]?.name ?? null,
+      faculty: firstInstitute,
       groupName: null,
       pinned: true,
       authorLogin: 'staff1',
@@ -706,7 +1000,7 @@ export async function buildSeedData(options: BuildSeedDataOptions = {}): Promise
       title: 'Сдача курсовых работ',
       body: 'Курсовые работы принимаются до 30 ноября в электронном виде через кабинет.',
       audience: 'FACULTY',
-      faculty: FACULTIES[1]?.name ?? null,
+      faculty: secondInstitute,
       groupName: null,
       pinned: false,
       authorLogin: 'staff1',
@@ -714,20 +1008,20 @@ export async function buildSeedData(options: BuildSeedDataOptions = {}): Promise
     },
     {
       title: 'Консультация перед экзаменом',
-      body: 'Групповая консультация по базам данных — в субботу в 10:00, аудитория Б-202.',
+      body: 'Групповая консультация по базам данных — в субботу в 10:00, аудитория Л-201.',
       audience: 'GROUP',
       faculty: null,
-      groupName: 'ИТ-21-1',
+      groupName: groupNameByDirectionShort.get('ПИ') ?? null,
       pinned: false,
       authorLogin: 'staff1',
       publishedAt: toDateKey(addDays(now, -1)),
     },
     {
       title: 'Экскурсия на предприятие',
-      body: 'Организованная экскурсия для 1 курса — сбор у главного входа в 09:00.',
+      body: 'Организованная экскурсия для студентов 3 курса — сбор у главного входа в 09:00.',
       audience: 'GROUP',
       faculty: null,
-      groupName: 'ИН-20-1',
+      groupName: groupNameByDirectionShort.get('ЮР') ?? null,
       pinned: false,
       authorLogin: 'staff1',
       publishedAt: toDateKey(addDays(now, -2)),
@@ -775,7 +1069,7 @@ export async function buildSeedData(options: BuildSeedDataOptions = {}): Promise
     },
     {
       type: 'SYSTEM',
-      title: 'Добро пожаловать в «Горизонт»',
+      title: `Добро пожаловать в кабинет ${UNIVERSITY_SHORT_NAME}`,
       body: 'Ваш личный кабинет готов к работе: расписание, оценки и заявки в одном месте.',
       link: null,
     },
@@ -851,7 +1145,281 @@ export async function buildSeedData(options: BuildSeedDataOptions = {}): Promise
       meta: { status: 'MOVED' },
       createdAt: toDateKey(addDays(now, -2)),
     },
+    {
+      actorLogin: 'staff1',
+      action: 'verification.review',
+      entity: 'StudentVerification',
+      entityId: null,
+      meta: { decision: 'VERIFIED' },
+      createdAt: toDateKey(addDays(now, -2)),
+    },
+    {
+      actorLogin: 'staff1',
+      action: 'sick_leave.notify_deanery',
+      entity: 'SickLeave',
+      entityId: null,
+      meta: { student: 'student2' },
+      createdAt: toDateKey(now),
+    },
   ];
+
+  // ---- Синтетический реестр студбилетов ----
+  // По записи на каждого студента + 2 «незарегистрированные» карточки
+  // (одногруппники без учётной записи) — на них мок-сверка должна отвечать
+  // «найдено в реестре, но заявка не ваша».
+  /** Карточка одногруппника, у которого нет учётной записи в кабинете. */
+  function unregisteredCard(
+    directionShort: string,
+    serial: string,
+    lastName: string,
+    firstName: string,
+    middleName: string,
+  ): IdentityRegistrySeed {
+    const info = groupInfoByDirectionShort.get(directionShort);
+    if (!info) {
+      throw new Error(`Сидер: для незарегистрированной карточки не найдена группа ${directionShort}`);
+    }
+    return {
+      cardNumber: `${directionShort}-${admissionYear(now, info.course)}-${serial}`,
+      lastName,
+      firstName,
+      middleName,
+      groupName: info.name,
+      faculty: info.faculty,
+      program: info.direction,
+      course: info.course,
+      issuedAt: toDateKey(addDays(now, -700)),
+    };
+  }
+
+  const identityRegistry: IdentityRegistrySeed[] = [
+    ...students.map((student) => ({
+      cardNumber: student.studentCardNumber,
+      lastName: student.lastName,
+      firstName: student.firstName,
+      middleName: student.middleName,
+      groupName: student.groupName,
+      faculty: student.faculty,
+      program: student.direction,
+      course: student.course,
+      issuedAt: toDateKey(addDays(now, -700)),
+    })),
+    unregisteredCard('ПИ', '0777', 'Крылов', 'Артём', 'Олегович'),
+    unregisteredCard('ЮР', '0888', 'Горохова', 'Дарья', 'Игоревна'),
+  ];
+
+  // ---- Заявки на верификацию студбилета ----
+  const studentByLogin = new Map(students.map((student) => [student.login, student]));
+
+  const verificationDefs: readonly {
+    login: string;
+    status: VerificationStatus;
+    /** Группа, «распознанная» на фото; null — совпадает с группой студента. */
+    recognizedGroupShort: string | null;
+    matchScore: number | null;
+    reviewerLogin: string | null;
+    reviewComment: string | null;
+    submittedDaysAgo: number;
+    reviewedDaysAgo: number | null;
+  }[] = [
+    {
+      login: 'student1',
+      status: 'VERIFIED',
+      recognizedGroupShort: null,
+      matchScore: 1,
+      reviewerLogin: 'staff1',
+      reviewComment: null,
+      submittedDaysAgo: 12,
+      reviewedDaysAgo: 11,
+    },
+    {
+      login: 'student4',
+      status: 'VERIFIED',
+      recognizedGroupShort: null,
+      matchScore: 0.97,
+      reviewerLogin: 'staff1',
+      reviewComment: null,
+      submittedDaysAgo: 9,
+      reviewedDaysAgo: 8,
+    },
+    {
+      login: 'student2',
+      status: 'PENDING',
+      recognizedGroupShort: null,
+      matchScore: null,
+      reviewerLogin: null,
+      reviewComment: null,
+      submittedDaysAgo: 1,
+      reviewedDaysAgo: null,
+    },
+    {
+      login: 'student3',
+      status: 'REJECTED',
+      recognizedGroupShort: 'БИ',
+      matchScore: 0.61,
+      reviewerLogin: 'staff1',
+      reviewComment:
+        'На фото указана другая группа — сверка не пройдена. Подайте заявку повторно с актуальным фото студбилета.',
+      submittedDaysAgo: 6,
+      reviewedDaysAgo: 5,
+    },
+  ];
+
+  const studentVerifications: StudentVerificationSeed[] = verificationDefs.map((def) => {
+    const student = studentByLogin.get(def.login);
+    if (!student) {
+      throw new Error(`Сидер: не найден студент для верификации ${def.login}`);
+    }
+    const recognizedGroupName =
+      def.recognizedGroupShort === null
+        ? student.groupName
+        : groupNameByDirectionShort.get(def.recognizedGroupShort) ?? student.groupName;
+    const submittedAt = toDateTimeKey(addMinutes(addDays(now, -def.submittedDaysAgo), 11 * 60 + 15));
+    const reviewedAt =
+      def.reviewedDaysAgo === null
+        ? null
+        : toDateTimeKey(addMinutes(addDays(now, -def.reviewedDaysAgo), 16 * 60 + 40));
+
+    return {
+      studentLogin: def.login,
+      status: def.status,
+      photoFileName: `${uuidFromRng(rng)}.jpg`,
+      recognizedLastName: student.lastName,
+      recognizedFirstName: student.firstName,
+      recognizedGroupName,
+      recognizedCardNumber: student.studentCardNumber,
+      matchScore: def.matchScore,
+      reviewerLogin: def.reviewerLogin,
+      reviewComment: def.reviewComment,
+      submittedAt,
+      reviewedAt,
+    };
+  });
+
+  // ---- OAuth-привязки (эмуляция VK ID / MAX / Telegram) ----
+  const oauthAccounts: OAuthAccountSeed[] = [
+    {
+      userLogin: 'student1',
+      provider: 'VK_ID',
+      providerAccountId: 'vk_1000421',
+      createdAt: toDateTimeKey(addDays(now, -30)),
+    },
+    {
+      userLogin: 'student2',
+      provider: 'TELEGRAM',
+      providerAccountId: 'tg_7712093',
+      createdAt: toDateTimeKey(addDays(now, -14)),
+    },
+  ];
+
+  // ---- Эмуляция согласия OAuth: один использованный интент, один активный ----
+  const exactNow = new Date();
+  const consumedCreatedAt = atTime(addDays(now, -30), 10, 0);
+
+  const oauthIntents: OAuthIntentSeed[] = [
+    {
+      state: uuidFromRng(rng),
+      provider: 'VK_ID',
+      login: 'student1',
+      fullName: 'Иванов Александр Дмитриевич',
+      groupName: groupNameByDirectionShort.get('ПИ') ?? null,
+      purpose: 'login',
+      expiresAt: toDateTimeKey(addMinutes(consumedCreatedAt, 180)),
+      consumedAt: toDateTimeKey(addMinutes(consumedCreatedAt, 120)),
+      createdAt: toDateTimeKey(consumedCreatedAt),
+    },
+    {
+      state: uuidFromRng(rng),
+      provider: 'TELEGRAM',
+      login: null,
+      fullName: 'Петрова Мария Андреевна',
+      groupName: groupNameByDirectionShort.get('БИ') ?? null,
+      purpose: 'register',
+      expiresAt: toDateTimeKey(addMinutes(exactNow, 15)),
+      consumedAt: null,
+      createdAt: toDateTimeKey(exactNow),
+    },
+  ];
+
+  // ---- Статусы «болею» ----
+  const sickLeaves: SickLeaveSeed[] = [
+    {
+      studentLogin: 'student2',
+      dateFrom: toDateKey(now),
+      dateTo: toDateKey(addDays(now, 3)),
+      reason: 'ОРВИ, температура',
+      attachmentPath: null,
+    },
+    {
+      studentLogin: 'student1',
+      dateFrom: toDateKey(addDays(now, -12)),
+      dateTo: toDateKey(addDays(now, -8)),
+      reason: 'Грипп',
+      attachmentPath: null,
+    },
+  ];
+
+  // ---- Консультации и часы приёма: 2-3 на преподавателя у 6 преподавателей ----
+  const officeHourDefs: readonly {
+    teacherLogin: string;
+    entries: readonly { weekday: number; start: string; end: string; type: OfficeHourType; note: string | null }[];
+  }[] = [
+    {
+      teacherLogin: 'teacher1',
+      entries: [
+        { weekday: 2, start: '13:00', end: '14:00', type: 'CONSULTATION', note: 'Консультация по курсовому проекту' },
+        { weekday: 4, start: '15:00', end: '16:00', type: 'RECEPTION', note: null },
+      ],
+    },
+    {
+      teacherLogin: 'teacher2',
+      entries: [
+        { weekday: 1, start: '10:00', end: '11:30', type: 'CONSULTATION', note: 'Подготовка к экзамену' },
+        { weekday: 3, start: '12:00', end: '13:00', type: 'RECEPTION', note: null },
+        { weekday: 5, start: '16:30', end: '17:50', type: 'EXTRA_CLASS', note: 'Отработка пропущенной лабораторной' },
+      ],
+    },
+    {
+      teacherLogin: 'teacher5',
+      entries: [
+        { weekday: 2, start: '11:40', end: '13:00', type: 'CONSULTATION', note: null },
+        { weekday: 4, start: '13:30', end: '14:50', type: 'RECEPTION', note: null },
+      ],
+    },
+    {
+      teacherLogin: 'teacher7',
+      entries: [
+        { weekday: 1, start: '13:00', end: '14:00', type: 'RECEPTION', note: 'Приём по учебным вопросам' },
+        { weekday: 5, start: '10:00', end: '11:20', type: 'CONSULTATION', note: null },
+      ],
+    },
+    {
+      teacherLogin: 'teacher9',
+      entries: [
+        { weekday: 3, start: '15:00', end: '16:20', type: 'CONSULTATION', note: null },
+        { weekday: 5, start: '12:00', end: '13:00', type: 'RECEPTION', note: null },
+      ],
+    },
+    {
+      teacherLogin: 'teacher15',
+      entries: [
+        { weekday: 2, start: '14:00', end: '15:00', type: 'RECEPTION', note: null },
+        { weekday: 4, start: '10:00', end: '11:20', type: 'EXTRA_CLASS', note: 'Отработка практики' },
+      ],
+    },
+  ];
+
+  const officeHours: OfficeHourSeed[] = officeHourDefs.flatMap((def) =>
+    def.entries.map((entry) => ({
+      teacherLogin: def.teacherLogin,
+      weekday: entry.weekday,
+      startTime: entry.start,
+      endTime: entry.end,
+      room: pick(rng, ROOMS),
+      type: entry.type,
+      note: entry.note,
+    })),
+  );
 
   return {
     users: allUsers,
@@ -865,12 +1433,21 @@ export async function buildSeedData(options: BuildSeedDataOptions = {}): Promise
     announcements,
     notifications,
     auditEvents,
+    identityRegistry,
+    studentVerifications,
+    oauthAccounts,
+    oauthIntents,
+    sickLeaves,
+    officeHours,
   };
 }
 
 export const SEED_COUNTS = {
+  institutes: INSTITUTES.length,
   students: STUDENT_DEFS.length,
   groups: GROUP_DEFS.length,
   subjects: SUBJECT_DEFS.reduce((sum, list) => sum + list.length, 0),
   teachers: TEACHER_DEFS.reduce((sum, list) => sum + list.length, 0),
+  identityRegistry: STUDENT_DEFS.length + 2,
+  officeHourTeachers: 6,
 };

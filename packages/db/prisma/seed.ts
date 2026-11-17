@@ -1,14 +1,16 @@
 /**
- * Сидер базы Университета «Горизонт» (вымышленные данные).
+ * Сидер базы Удмуртского государственного университета (УдГУ).
  *
  * Запуск: npm run db:seed (в packages/db) или npm run db:seed из корня.
  * Пишет все сущности из buildSeedData(); перед записью очищает таблицы
  * в порядке, безопасном для FK, поэтому сидер идемпотентен.
+ * Все данные вымышленные.
  */
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { buildSeedData } from '../src/seed-data.js';
 import { getPrisma, Prisma } from '../src/client.js';
+import { idCardPhotoRelativePath } from '@udgu/core';
 
 const configDir = path.dirname(fileURLToPath(import.meta.url));
 
@@ -34,6 +36,12 @@ async function cleanDatabase(): Promise<void> {
   await prisma.request.deleteMany();
   await prisma.grade.deleteMany();
   await prisma.scheduleEntry.deleteMany();
+  await prisma.studentVerification.deleteMany();
+  await prisma.oAuthAccount.deleteMany();
+  await prisma.oAuthIntent.deleteMany();
+  await prisma.sickLeave.deleteMany();
+  await prisma.officeHour.deleteMany();
+  await prisma.identityRegistry.deleteMany();
   await prisma.student.deleteMany();
   await prisma.teacher.deleteMany();
   await prisma.subject.deleteMany();
@@ -43,6 +51,10 @@ async function cleanDatabase(): Promise<void> {
 
 function toDate(value: string): Date {
   return new Date(`${value}T00:00:00.000Z`);
+}
+
+function toDateTime(value: string): Date {
+  return new Date(value);
 }
 
 async function main(): Promise<void> {
@@ -255,6 +267,114 @@ async function main(): Promise<void> {
     }),
   });
 
+  // ---- Синтетический реестр студбилетов ----
+  await prisma.identityRegistry.createMany({
+    data: data.identityRegistry.map((entry) => {
+      const groupId = groupIdByName.get(entry.groupName);
+      if (!groupId) throw new Error(`Сидер: не найдена группа ${entry.groupName}`);
+      return {
+        cardNumber: entry.cardNumber,
+        lastName: entry.lastName,
+        firstName: entry.firstName,
+        middleName: entry.middleName,
+        groupId,
+        faculty: entry.faculty,
+        program: entry.program,
+        course: entry.course,
+        issuedAt: toDate(entry.issuedAt),
+      };
+    }),
+  });
+
+  // ---- Заявки на верификацию студбилета ----
+  // Фото в приватном хранилище не создаём: путь фикстуры, файлов на диске нет.
+  await prisma.studentVerification.createMany({
+    data: data.studentVerifications.map((verification) => {
+      const studentId = studentIdByLogin.get(verification.studentLogin);
+      if (!studentId) throw new Error(`Сидер: не найден студент ${verification.studentLogin}`);
+      const reviewerId = verification.reviewerLogin
+        ? userIdByLogin.get(verification.reviewerLogin) ?? null
+        : null;
+      if (verification.reviewerLogin && !reviewerId) {
+        throw new Error(`Сидер: не найден проверяющий ${verification.reviewerLogin}`);
+      }
+      return {
+        studentId,
+        status: verification.status,
+        idCardPhotoPath: idCardPhotoRelativePath(studentId, verification.photoFileName),
+        recognizedLastName: verification.recognizedLastName,
+        recognizedFirstName: verification.recognizedFirstName,
+        recognizedGroupName: verification.recognizedGroupName,
+        recognizedCardNumber: verification.recognizedCardNumber,
+        matchScore: verification.matchScore,
+        reviewerId,
+        reviewComment: verification.reviewComment,
+        submittedAt: toDateTime(verification.submittedAt),
+        reviewedAt: verification.reviewedAt === null ? null : toDateTime(verification.reviewedAt),
+      };
+    }),
+  });
+
+  // ---- OAuth-привязки и эмуляция согласия ----
+  await prisma.oAuthAccount.createMany({
+    data: data.oauthAccounts.map((account) => {
+      const userId = userIdByLogin.get(account.userLogin);
+      if (!userId) throw new Error(`Сидер: не найден пользователь ${account.userLogin}`);
+      return {
+        userId,
+        provider: account.provider,
+        providerAccountId: account.providerAccountId,
+        createdAt: toDateTime(account.createdAt),
+      };
+    }),
+  });
+
+  await prisma.oAuthIntent.createMany({
+    data: data.oauthIntents.map((intent) => ({
+      state: intent.state,
+      provider: intent.provider,
+      login: intent.login,
+      fullName: intent.fullName,
+      groupName: intent.groupName,
+      purpose: intent.purpose,
+      expiresAt: toDateTime(intent.expiresAt),
+      consumedAt: intent.consumedAt === null ? null : toDateTime(intent.consumedAt),
+      createdAt: toDateTime(intent.createdAt),
+    })),
+  });
+
+  // ---- Статусы «болею» ----
+  await prisma.sickLeave.createMany({
+    data: data.sickLeaves.map((leave) => {
+      const studentId = studentIdByLogin.get(leave.studentLogin);
+      if (!studentId) throw new Error(`Сидер: не найден студент ${leave.studentLogin}`);
+      return {
+        studentId,
+        dateFrom: toDate(leave.dateFrom),
+        dateTo: toDate(leave.dateTo),
+        reason: leave.reason,
+        attachmentPath: leave.attachmentPath,
+      };
+    }),
+  });
+
+  // ---- Консультации и часы приёма преподавателей ----
+  await prisma.officeHour.createMany({
+    data: data.officeHours.map((hour) => {
+      const teacherId = teacherIdByLogin.get(hour.teacherLogin);
+      if (!teacherId) throw new Error(`Сидер: не найден преподаватель ${hour.teacherLogin}`);
+      return {
+        teacherId,
+        weekday: hour.weekday,
+        startTime: hour.startTime,
+        endTime: hour.endTime,
+        room: hour.room,
+        type: hour.type,
+        note: hour.note,
+      };
+    }),
+  });
+
   const counts = {
     users: await prisma.user.count(),
     groups: await prisma.group.count(),
@@ -269,6 +389,12 @@ async function main(): Promise<void> {
     announcements: await prisma.announcement.count(),
     notifications: await prisma.notification.count(),
     auditEvents: await prisma.auditEvent.count(),
+    identityRegistry: await prisma.identityRegistry.count(),
+    studentVerifications: await prisma.studentVerification.count(),
+    oauthAccounts: await prisma.oAuthAccount.count(),
+    oauthIntents: await prisma.oAuthIntent.count(),
+    sickLeaves: await prisma.sickLeave.count(),
+    officeHours: await prisma.officeHour.count(),
   };
 
   console.log('Сидер завершён. Записей в базе:');

@@ -26,8 +26,8 @@ COPY packages/db/prisma.config.ts packages/db/
 COPY packages/db/src packages/db/src/
 COPY apps/web apps/web/
 
-RUN npm run db:generate -w @horizon/db
-RUN npm run build -w @horizon/web
+RUN npm run db:generate -w @udgu/db
+RUN npm run build -w @udgu/web
 
 # --- Рантайм ---
 FROM node:24-alpine AS runner

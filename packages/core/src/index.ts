@@ -1,4 +1,13 @@
-// Доменная логика кабинета «Горизонт»: авторизация, владение данными, GPA.
-// Наполняется на шаге P1.2 — пока пакет существует только как барьер
-// экспорта, чтобы воркспесы и tsconfig-paths резолвились.
-export {};
+export {
+  saveIdCardPhoto,
+  readIdCardPhoto,
+  deleteIdCardPhoto,
+  storageRoot,
+  idCardRoot,
+  idCardPhotoRelativePath,
+  IdCardStorageError,
+  ID_CARD_DIR_NAME,
+  ID_CARD_ALLOWED_MIME,
+  MAX_ID_CARD_SIZE_BYTES,
+} from './storage';
+export type { IdCardStorageErrorCode } from './storage';
