@@ -20,6 +20,7 @@ export class CoreError extends Error {
 export type OwnershipErrorCode =
   | 'UNAUTHENTICATED'
   | 'NOT_A_STUDENT'
+  | 'NOT_A_TEACHER'
   | 'NOT_OWNER'
   | 'FORBIDDEN_ROLE'
   | 'STAFF_ONLY';
@@ -30,6 +31,7 @@ export type OwnershipErrorCode =
  * Коды:
  * - UNAUTHENTICATED — сессии нет или она невалидна;
  * - NOT_A_STUDENT   — операция доступна только студенту (user.studentId);
+ * - NOT_A_TEACHER   — операция доступна только преподавателю (user.teacherId);
  * - NOT_OWNER       — запрошенный идентификатор не принадлежит сессии;
  * - FORBIDDEN_ROLE  — роль не подходит для операции;
  * - STAFF_ONLY      — операция только для сотрудников деканата/админа.

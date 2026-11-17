@@ -47,20 +47,24 @@ export { TEST_DATABASE_URL };
  * Хук корневого уровня node:test: выполняется один раз перед всеми
  * тестами процесса.
  */
-let testDatabaseReady = false;
+let testDatabaseUrl: string | null = null;
 
 /**
- * Гарантия «база существует и мигрирована» с мемоизацией: вызывается и из
- * корневого хука, и из resetTestData — чтобы не зависеть от порядка хуков
- * node:test (корневой `before` из хелпера может выполниться позже
- * файлового). Идемпотентно: migrate deploy ничего не ломает.
+ * Гарантия «изолированная база создана и мигрирована» с мемоизацией.
+ * Вызывается и из корневого хука, и из resetTestData — чтобы не зависеть от
+ * порядка хуков node:test (корневой `before` из хелпера может выполниться
+ * позже файлового).
+ *
+ * Своя база на процесс: параллельный `npm test` иначе сносит чужие данные
+ * через deleteMany и даёт ложно-красные прогоны у обоих.
  */
 async function ensureTestDatabaseOnce(): Promise<void> {
-  if (testDatabaseReady) {
+  if (testDatabaseUrl !== null) {
     return;
   }
-  await ensureTestDatabase(TEST_DATABASE_URL);
-  testDatabaseReady = true;
+  testDatabaseUrl = await ensureTestDatabase(TEST_DATABASE_URL);
+  // Переключаем ДО первого обращения к Prisma — клиент читает URL лениво.
+  process.env.DATABASE_URL = testDatabaseUrl;
 }
 
 before(async () => {
@@ -87,10 +91,14 @@ export async function resetTestData(): Promise<void> {
   // чистим до студентов, преподавателей и пользователей.
   await prisma().message.deleteMany();
   await prisma().conversation.deleteMany();
+  // Учебные планы ссылаются на преподавателя — чистим до студентов.
+  await prisma().studyPlan.deleteMany();
   await prisma().student.deleteMany();
   await prisma().teacher.deleteMany();
   await prisma().subject.deleteMany();
   await prisma().group.deleteMany();
+  // FK-страховка: события аудита ссылаются на User — повторяем чистку непосредственно перед пользователями на случай записи, принятой в окно между началом reset и этим местом.
+  await prisma().auditEvent.deleteMany();
   await prisma().user.deleteMany();
 }
 

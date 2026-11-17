@@ -18,16 +18,27 @@ export {
   saveSickLeaveCertificate,
   readSickLeaveCertificate,
   deleteSickLeaveCertificate,
+  saveStudyPlan,
+  readStudyPlan,
+  // Хранилище отдаёт файловые операции под именами «…File»: сервисный
+  // deleteStudyPlan(session, id) — это удаление плана целиком (запись
+  // в БД + файл), и два разных смысла не должны путаться в имени.
+  deleteStudyPlan as deleteStudyPlanFile,
   storageRoot,
   idCardRoot,
   sickLeaveRoot,
+  studyPlanRoot,
   idCardPhotoRelativePath,
   sickLeaveCertificateRelativePath,
+  studyPlanRelativePath,
   IdCardStorageError,
   ID_CARD_DIR_NAME,
   SICK_LEAVE_DIR_NAME,
+  STUDY_PLAN_DIR_NAME,
   ID_CARD_ALLOWED_MIME,
+  STUDY_PLAN_ALLOWED_MIME,
   MAX_ID_CARD_SIZE_BYTES,
+  MAX_STUDY_PLAN_SIZE_BYTES,
 } from './storage';
 export type { IdCardStorageErrorCode } from './storage';
 
@@ -101,6 +112,7 @@ export {
   requireUser,
   requireRole,
   requireStudent,
+  requireTeacher,
   requireOwnStudent,
   requireStaffAccess,
 } from './ownership';
@@ -307,6 +319,38 @@ export {
   ASSISTANT_STARTER_QUESTIONS,
 } from './services/assistant';
 
+// Ассистент преподавателя: RAG по учебному плану (BRIEF v2 §5, P2b).
+export {
+  uploadStudyPlan,
+  listMyStudyPlans,
+  deleteStudyPlan,
+  askStudyPlanAssistant,
+  parseStudyPlanText,
+  parseStudyPlanSections,
+  buildPlanChunks,
+  buildStudyPlanIndex,
+  retrieveChunks,
+  tokenizePlanText,
+  tokensMatch,
+  studyPlanUploadSchema,
+  studyPlanQuestionSchema,
+  TEACHER_ASSISTANT_STARTER_QUESTIONS,
+} from './services/studyPlan';
+export type {
+  AskStudyPlanAssistantInput,
+  AskStudyPlanAssistantOptions,
+  ParsedPlan,
+  PlanChunk,
+  PlanSection,
+  PlanSectionLines,
+  RetrievedChunk,
+  StudyPlanAssistantAnswer,
+  StudyPlanCitation,
+  StudyPlanIndex,
+  StudyPlanListItem,
+  UploadStudyPlanInput,
+} from './services/studyPlan';
+
 // Константы ассистента, пригодные для браузерного кода (без ядра и БД):
 // их импортируют подпутем @udgu/core/assistant.
 export { ASSISTANT_VERIFICATION_SUGGESTION } from './assistantClient';
@@ -319,6 +363,7 @@ export type {
 
 export {
   ASSISTANT_SYSTEM_PROMPT,
+  TEACHER_ASSISTANT_SYSTEM_PROMPT,
   ASSISTANT_LLM_TIMEOUT_MS,
   llmConfigFromEnv,
   createLlmClient,

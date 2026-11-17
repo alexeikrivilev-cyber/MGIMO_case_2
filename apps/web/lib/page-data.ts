@@ -45,6 +45,8 @@ import {
   listStaffVerifications,
   listTeachers,
   getConversation,
+  listMyStudyPlans,
+  TEACHER_ASSISTANT_STARTER_QUESTIONS,
   requireStaffScope,
   ASSISTANT_STARTER_QUESTIONS,
   OwnershipError,
@@ -73,6 +75,7 @@ import {
   type StaffRequestItem,
   type StaffSickLeaveItem,
   type StaffVerificationItem,
+  type StudyPlanListItem,
   type TeacherCard,
   type TeacherListItem,
   type VerificationGate,
@@ -527,6 +530,57 @@ export async function loadTeacherCardData(
     const to = addUtcDays(from, TEACHER_CARD_HORIZON_DAYS - 1);
     return getTeacherCard(sessionResult.value, teacherId, from, to);
   });
+}
+
+// ---------------------------------------------------------------------------
+// Ассистент преподавателя (/teacher, BRIEF v2 §5)
+// ---------------------------------------------------------------------------
+
+/**
+ * Кабинет преподавателя: учебные планы и RAG-ассистент по ним.
+ *
+ * Правило то же, что у остальных разделов: данные берутся из ТЕХ ЖЕ
+ * сервисов packages/core, что и роуты /api/teacher/* (единая
+ * реализация), поэтому страница не может показать больше, чем
+ * разрешает API. storagePath из сервиса не приходит вовсе — файл плана
+ * живёт в приватном хранилище, публичных ссылок нет.
+ *
+ * Не-преподаватель (студент, сотрудник деканата, админ без профиля
+ * Teacher) сюда не попадает: лэйаут (teacher) рисует честную заглушку
+ * «раздел для преподавателей» вместо страницы. Если загрузчик всё же
+ * вызван не преподавателем, сервис бросает NOT_A_TEACHER → состояние
+ * forbidden, а не пустой экран.
+ */
+
+export interface TeacherPlansPageData {
+  readonly plans: readonly StudyPlanListItem[];
+}
+
+export async function loadTeacherPlansPageData(cookieHeader: string): Promise<LoadResult<TeacherPlansPageData>> {
+  const sessionResult = await requirePageSession(cookieHeader);
+  if (!sessionResult.ok) {
+    return sessionResult;
+  }
+  return attempt(async () => ({ plans: await listMyStudyPlans(sessionResult.value) }));
+}
+
+export interface TeacherAssistantPageData {
+  /** Планы преподавателя для выбора (свежие сверху). */
+  readonly plans: readonly StudyPlanListItem[];
+  readonly suggestions: readonly string[];
+}
+
+export async function loadTeacherAssistantPageData(
+  cookieHeader: string,
+): Promise<LoadResult<TeacherAssistantPageData>> {
+  const sessionResult = await requirePageSession(cookieHeader);
+  if (!sessionResult.ok) {
+    return sessionResult;
+  }
+  return attempt(async () => ({
+    plans: await listMyStudyPlans(sessionResult.value),
+    suggestions: TEACHER_ASSISTANT_STARTER_QUESTIONS,
+  }));
 }
 
 // ---------------------------------------------------------------------------
