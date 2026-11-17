@@ -675,6 +675,27 @@ export interface OfficeHourSeed {
   readonly note: string | null;
 }
 
+/**
+ * Демонстрационный учебный план преподавателя (BRIEF v2 §5, P2b):
+ * RAG-ассистент преподавателя отвечает по его разделам.
+ *
+ * Текст плана строится по РЕАЛЬНЫМ дисциплинам преподавателя из
+ * расписания сида (разделы называются предметами, которые он ведёт):
+ * сопоставление «долги студентов ↔ раздел плана» в ассистенте работает
+ * на настоящих данных, а не на выдуманных темах. Файл .md пишется в
+ * ПРИВАТНОЕ хранилище сидером (storage/study-plans/<teacherId>/),
+ * в базе остаётся строка StudyPlan с относительным путём.
+ */
+export interface StudyPlanSeed {
+  readonly teacherLogin: string;
+  readonly title: string;
+  /** Имя файла для показа в списке планов (в хранилище — uuid). */
+  readonly fileName: string;
+  readonly mime: string;
+  /** Текст плана в формате markdown. */
+  readonly text: string;
+}
+
 export interface SeedData {
   readonly users: readonly UserSeed[];
   readonly groups: readonly GroupSeed[];
@@ -694,6 +715,7 @@ export interface SeedData {
   readonly sickLeaves: readonly SickLeaveSeed[];
   readonly officeHours: readonly OfficeHourSeed[];
   readonly conversations: readonly ConversationSeed[];
+  readonly studyPlans: readonly StudyPlanSeed[];
 }
 
 function mulberry32(seed: number): () => number {
@@ -801,6 +823,135 @@ function academicYear(now: Date): number {
 /** Год поступления для группы заданного курса. */
 function admissionYear(now: Date, course: number): number {
   return academicYear(now) - (course - 1);
+}
+
+/**
+ * Темы модулей учебного плана по коду дисциплины.
+ *
+ * План демо-преподавателя строится по РЕАЛЬНЫМ дисциплинам его
+ * расписания (заголовки разделов — названия предметов: именно по ним
+ * ассистент сопоставляет долги студентов), а темы модулей — по программе
+ * института. Дисциплина без записи получает общую структуру модулей:
+ * сопоставление работает по заголовку раздела, а не по темам.
+ */
+const STUDY_PLAN_TOPICS: Readonly<Record<string, readonly string[]>> = {
+  'ПИ-101': [
+    'Модуль 1. Пределы и непрерывность функций одной переменной.',
+    'Модуль 2. Дифференциальное исчисление и его приложения.',
+    'Модуль 3. Интегралы, числовые и функциональные ряды.',
+  ],
+  'ПИ-102': [
+    'Модуль 1. Матрицы, определители, системы линейных уравнений.',
+    'Модуль 2. Векторная алгебра и аналитическая геометрия.',
+    'Модуль 3. Собственные значения, квадратичные формы.',
+  ],
+  'ПИ-103': [
+    'Модуль 1. Логика, множества, отношения и функции.',
+    'Модуль 2. Комбинаторика и теория графов.',
+    'Модуль 3. Булевы функции и алгоритмы на графах.',
+  ],
+  'ПИ-104': [
+    'Модуль 1. Сложность алгоритмов, массивы и связные списки.',
+    'Модуль 2. Сортировки, хеш-таблицы, деревья поиска.',
+    'Модуль 3. Графы и динамическое программирование.',
+  ],
+  'ПИ-105': [
+    'Модуль 1. Реляционная модель данных и запросы SQL.',
+    'Модуль 2. Проектирование схемы и нормальные формы.',
+    'Модуль 3. Индексы, транзакции, резервное копирование.',
+  ],
+  'ПИ-106': [
+    'Модуль 1. Процессы и потоки, планирование задач.',
+    'Модуль 2. Управление памятью и файловая система.',
+    'Модуль 3. Сети и безопасность операционной системы.',
+  ],
+  'ПИ-107': [
+    'Модуль 1. Разметка HTML и стили CSS, адаптивная вёрстка.',
+    'Модуль 2. JavaScript, DOM и обработка событий.',
+    'Модуль 3. Серверный рендеринг и работа с формами.',
+  ],
+  'ПИ-108': [
+    'Модуль 1. Типы данных, функции, организация модулей.',
+    'Модуль 2. Файлы, исключения, стандартная библиотека.',
+    'Модуль 3. Анализ данных и автоматизация задач.',
+  ],
+  'ПИ-109': [
+    'Модуль 1. Повседневная лексика и базовая грамматика.',
+    'Модуль 2. Чтение профессиональных текстов.',
+    'Модуль 3. Презентация проекта на иностранном языке.',
+  ],
+  'ПИ-110': [
+    'Модуль 1. Механика, колебания и волны.',
+    'Модуль 2. Электричество и магнетизм.',
+    'Модуль 3. Оптика и элементы квантовой физики.',
+  ],
+};
+
+/**
+ * Раздел плана по одной дисциплине: заголовок — НАЗВАНИЕ ПРЕДМЕТА
+ * (по нему ассистент сопоставляет долги студентов), далее темы модулей,
+ * работы и контрольные точки.
+ */
+function studyPlanSection(subjectCode: string, subjectName: string): readonly string[] {
+  const topics = STUDY_PLAN_TOPICS[subjectCode] ?? [
+    'Модуль 1. Основные понятия и определения курса.',
+    'Модуль 2. Практические задания и разбор задач.',
+    'Модуль 3. Итоговая работа по дисциплине.',
+  ];
+  return [
+    `## ${subjectName}`,
+    '',
+    ...topics,
+    'Лабораторные и практические работы: защита в течение двух недель после выдачи.',
+    'Контрольные точки: КР-1 (октябрь), КР-2 (декабрь), экзамен в январе.',
+    '',
+  ];
+}
+
+/**
+ * Учебный план преподавателя для демо RAG-ассистента (BRIEF v2 §5).
+ *
+ * Дисциплины берутся из РЕАЛЬНОГО расписания преподавателя: разделы
+ * плана называются предметами, которые он ведёт в сиде, поэтому
+ * сопоставление «долги студентов ↔ раздел плана» работает на настоящих
+ * данных. Заголовок плана — направление и курс его группы.
+ */
+function buildStudyPlanSeed(
+  teacherLogin: string,
+  scheduleEntries: readonly ScheduleEntrySeed[],
+  subjects: readonly SubjectSeed[],
+  groups: readonly GroupSeed[],
+): StudyPlanSeed {
+  const subjectNameByCode = new Map(subjects.map((subject) => [subject.code, subject.name]));
+  const subjectCodes = [
+    ...new Set(
+      scheduleEntries
+        .filter((entry) => entry.teacherLogin === teacherLogin)
+        .map((entry) => entry.subjectCode),
+    ),
+  ].sort((left, right) => left.localeCompare(right, 'ru'));
+
+  if (subjectCodes.length === 0) {
+    throw new Error(`Сидер: у преподавателя ${teacherLogin} нет дисциплин в расписании — план строить не из чего`);
+  }
+
+  const groupName = scheduleEntries.find((entry) => entry.teacherLogin === teacherLogin)?.groupName ?? '';
+  const group = groups.find((candidate) => candidate.name === groupName);
+  const directionName = (group?.direction ?? '').split(' ').slice(1).join(' ');
+  const title =
+    directionName === ''
+      ? 'Учебный план преподавателя'
+      : `Учебный план: ${directionName}, ${group?.course ?? 0} курс`;
+
+  const text = [
+    `# ${title}`,
+    '',
+    'Дисциплины института: модули, лабораторные работы и контрольные точки семестра.',
+    '',
+    ...subjectCodes.flatMap((code) => studyPlanSection(code, subjectNameByCode.get(code) ?? code)),
+  ].join('\n');
+
+  return { teacherLogin, title, fileName: 'study-plan.md', mime: 'text/markdown', text };
 }
 
 export interface BuildSeedDataOptions {
@@ -1711,6 +1862,12 @@ export async function buildSeedData(options: BuildSeedDataOptions = {}): Promise
     },
   ];
 
+  // ---- Учебный план преподавателя: демо RAG-ассистента (BRIEF v2 §5) ----
+  // План строится по реальным дисциплинам преподавателя из расписания
+  // выше: темы разделов совпадают с названиями предметов, поэтому
+  // сопоставление с долгами студентов работает на живых данных сида.
+  const studyPlans: StudyPlanSeed[] = [buildStudyPlanSeed('teacher1', scheduleEntries, subjects, groups)];
+
   return {
     users: allUsers,
     groups,
@@ -1730,6 +1887,7 @@ export async function buildSeedData(options: BuildSeedDataOptions = {}): Promise
     sickLeaves,
     officeHours,
     conversations,
+    studyPlans,
   };
 }
 
@@ -1742,4 +1900,5 @@ export const SEED_COUNTS = {
   identityRegistry: STUDENT_DEFS.length + 2,
   officeHourTeachers: 6,
   conversations: 3,
+  studyPlans: 1,
 };

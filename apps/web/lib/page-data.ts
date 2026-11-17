@@ -80,7 +80,7 @@ import {
   type TeacherListItem,
   type VerificationGate,
 } from '@udgu/core';
-import { getSessionFromCookieHeader } from './session';
+import { getSessionFromCookieHeader, isTeacherUser } from './session';
 
 // ---------------------------------------------------------------------------
 // Результат загрузки и ошибки страниц
@@ -96,6 +96,12 @@ export type PageErrorKind =
 export interface PageError {
   readonly kind: PageErrorKind;
   readonly message: string;
+  /**
+   * Преподаватель (профиль Teacher в сессии) в состоянии «раздел
+   * недоступен»: экран добавляет путь в кабинет преподавателя. Флаг
+   * выводит загрузчик из СЕССИИ, не из запроса.
+   */
+  readonly teacherCabinet?: boolean;
 }
 
 export type LoadResult<T> = { readonly ok: true; readonly value: T } | { readonly ok: false; readonly error: PageError };
@@ -599,6 +605,8 @@ export async function loadTeacherAssistantPageData(
  * Ошибки резолвятся в состояния страницы: преподаватель (STAFF без
  * faculty) и студент получают понятную карточку «раздел недоступен»
  * вместо падения (services/staff-scope.ts → STAFF_ONLY → 404).
+ * Преподавателю в этом состоянии дополнительно предлагается кабинет
+ * преподавателя: признак берётся из сессии (isTeacherUser).
  */
 
 /** Горизонт расписания сотрудника по умолчанию — две недели от сегодня. */
@@ -624,6 +632,12 @@ function normalizeDateKey(raw: string | undefined): string | undefined {
 
 export interface StaffDashboardPageData {
   readonly dashboard: StaffDashboard;
+  /**
+   * Пользователь сессии — преподаватель (профиль Teacher): сводка
+   * показывает путь в кабинет преподавателя. Флаг из сессии, не из
+   * запроса.
+   */
+  readonly isTeacher: boolean;
 }
 
 export async function loadStaffDashboardPageData(cookieHeader: string): Promise<LoadResult<StaffDashboardPageData>> {
@@ -631,7 +645,19 @@ export async function loadStaffDashboardPageData(cookieHeader: string): Promise<
   if (!sessionResult.ok) {
     return sessionResult;
   }
-  return attempt(async () => ({ dashboard: await getStaffDashboard(sessionResult.value) }));
+  const isTeacher = isTeacherUser(sessionResult.value.user);
+  const result = await attempt(async () => ({
+    dashboard: await getStaffDashboard(sessionResult.value),
+    isTeacher,
+  }));
+  // Преподаватель (STAFF без факультета) в очереди деканата не работает
+  // (requireStaffScope → STAFF_ONLY → forbidden). /staff он может открыть
+  // напрямую — в этом состоянии добавляем путь в ЕГО кабинет, иначе
+  // раздел преподавателя ненаходим (discoverability, BRIEF v4).
+  if (!result.ok && result.error.kind === 'forbidden' && isTeacher) {
+    return { ok: false, error: { ...result.error, teacherCabinet: true } };
+  }
+  return result;
 }
 
 export interface StaffRequestsPageData {

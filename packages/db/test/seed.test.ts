@@ -50,6 +50,8 @@ test('сидер создаёт заявленный набор сущносте
   assert.equal(data.groups.length, 8);
   assert.equal(data.subjects.length, 80);
   assert.equal(data.teachers.length, 16);
+  assert.equal(data.studyPlans.length, SEED_COUNTS.studyPlans);
+  assert.equal(SEED_COUNTS.studyPlans, 1);
   assert.equal(SEED_COUNTS.institutes, 8);
 });
 
@@ -669,4 +671,56 @@ test('переписка: диалоги только у верифициров�
     conversation.messages.some((message) => !message.read),
   );
   assert.ok(withUnread.length >= 1, 'есть диалог с непрочитанными сообщениями');
+});
+
+// ---------------------------------------------------------------------------
+// Учебный план преподавателя (демо RAG-ассистента, BRIEF v2 §5)
+// ---------------------------------------------------------------------------
+
+test('учебный план: один план teacher1, разделы — его реальные дисциплины', () => {
+  assert.equal(data.studyPlans.length, 1);
+  const plan = data.studyPlans[0];
+  assert.ok(plan);
+  assert.equal(plan.teacherLogin, 'teacher1');
+  assert.equal(plan.mime, 'text/markdown');
+  assert.ok(plan.title.length > 0, 'у плана есть название');
+  assert.ok(plan.fileName.length > 0, 'у плана есть имя файла');
+  assert.match(plan.text, /^# /, 'текст плана — markdown с заголовком');
+  assert.ok(Buffer.byteLength(plan.text, 'utf8') > 0);
+
+  // Разделы плана называются РЕАЛЬНЫМИ предметами преподавателя из
+  // расписания сида: по названиям дисциплин ассистент сопоставляет долги.
+  const teacherSubjectCodes = new Set(
+    data.scheduleEntries
+      .filter((entry) => entry.teacherLogin === 'teacher1')
+      .map((entry) => entry.subjectCode),
+  );
+  assert.ok(teacherSubjectCodes.size > 0, 'у teacher1 есть дисциплины в расписании');
+
+  const subjectNameByCode = new Map(data.subjects.map((subject) => [subject.code, subject.name]));
+  const sections = plan.text
+    .split('\n')
+    .filter((line) => line.startsWith('## '))
+    .map((line) => line.slice(3));
+  assert.equal(sections.length, teacherSubjectCodes.size, 'раздел плана на каждую дисциплину преподавателя');
+  for (const section of sections) {
+    assert.ok(
+      [...teacherSubjectCodes].some((code) => subjectNameByCode.get(code) === section),
+      `раздел «${section}» — дисциплина teacher1 из расписания`,
+    );
+  }
+
+  // Единственный долг системы (student1) покрыт разделом плана: без этого
+  // сопоставление «долги ↔ раздел плана» в ассистенте не сработало бы.
+  const debt = data.grades.find((grade) => grade.passed === false);
+  assert.ok(debt, 'в сиде есть незачёт student1');
+  assert.ok(
+    sections.includes(subjectNameByCode.get(debt.subjectCode) ?? ''),
+    `дисциплина долга «${subjectNameByCode.get(debt.subjectCode ?? '')}» есть в плане`,
+  );
+
+  // Текста хватает для ответов ассистента: модули, работы, контрольные точки.
+  assert.match(plan.text, /Модуль 3/, 'в плане есть темы третьего модуля');
+  assert.match(plan.text, /Лабораторные/, 'в плане есть лабораторные работы');
+  assert.match(plan.text, /Контрольные точки/, 'в плане есть контрольные точки');
 });

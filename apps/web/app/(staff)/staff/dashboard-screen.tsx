@@ -9,6 +9,13 @@
  *
  * Очереди пусты — это не ошибка: отдельная карточка объясняет, что всё
  * обработано, и предлагает проверить объявления и расписание.
+ *
+ * Пользователь с профилем преподавателя (isTeacher из сессии) дополнительно
+ * видит ссылку на кабинет преподавателя: discoverability BRIEF v4 — свой
+ * раздел находится из любого места. Преподаватель без факультета в сводку
+ * не попадает (requireStaffScope → STAFF_ONLY): его /staff показывает
+ * честное «раздел недоступен» с путём в кабинет преподавателя
+ * (StaffPageResult, флаг teacherCabinet из сессии).
  */
 import { cookies } from 'next/headers';
 import Link from 'next/link';
@@ -166,6 +173,13 @@ export function StaffDashboardView({ result }: { result: LoadResult<StaffDashboa
                 Разделы кабинета
               </h2>
               <ul className="space-y-2">
+                {data.isTeacher ? (
+                  <SectionLink
+                    href="/teacher/plans"
+                    title="Кабинет преподавателя"
+                    description="Учебные планы и ассистент"
+                  />
+                ) : null}
                 <SectionLink
                   href="/staff/requests"
                   title="Заявки и справки"

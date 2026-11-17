@@ -110,6 +110,7 @@ let staffCookie: string;
 let otherStaffCookie: string;
 let adminCookie: string;
 let teacherCookie: string;
+let staffTeacherCookie: string;
 let studentCookie: string;
 let unverifiedCookie: string;
 let otherStudentCookie: string;
@@ -151,6 +152,11 @@ test.before(async () => {
   const teacher = await createTeacher('teacher1');
   teacherUserId = teacher.userId;
   studentUserId = ownStudent.userId;
+
+  // Сотрудник деканата, который ещё и преподаёт: сводка показывает ему
+  // путь в кабинет преподавателя (флаг isTeacher — из сессии).
+  const staffTeacher = await createTeacher('staff-teacher');
+  await getPrisma().user.update({ where: { id: staffTeacher.userId }, data: { faculty: FACULTY_A } });
 
   // Гейт верификации: student1 и student3 — верифицированы, student2 — нет.
   await createVerification(ownStudent.studentId, 'VERIFIED');
@@ -311,6 +317,7 @@ test.before(async () => {
   otherStaffCookie = `udgu_session=${(await createSession(otherStaff.id)).token}`;
   adminCookie = `udgu_session=${(await createSession(admin.id)).token}`;
   teacherCookie = `udgu_session=${(await createSession(teacher.userId)).token}`;
+  staffTeacherCookie = `udgu_session=${(await createSession(staffTeacher.userId)).token}`;
   studentCookie = `udgu_session=${(await createSession(ownStudent.userId)).token}`;
   unverifiedCookie = `udgu_session=${(await createSession(unverified.userId)).token}`;
   otherStudentCookie = `udgu_session=${(await createSession(otherStudent.userId)).token}`;
@@ -361,6 +368,7 @@ test('сводка сотрудника: счётчики очередей ин�
   const result = await loadStaffDashboardPageData(staffCookie);
   assert.equal(result.ok, true);
   if (!result.ok) return;
+  assert.equal(result.value.isTeacher, false, 'сотрудник деканата без профиля преподавателя');
   const html = render(<StaffDashboardView result={result} />);
 
   assert.match(html, /Кабинет деканата/, 'заголовок экрана');
@@ -371,6 +379,7 @@ test('сводка сотрудника: счётчики очередей ин�
   assert.match(html, /1 в очереди/, 'счётчик очереди посчитан');
   assert.match(html, /href="\/staff\/requests"/, 'быстрая ссылка на очередь заявок');
   assert.match(html, /href="\/staff\/schedule"/, 'быстрая ссылка на расписание');
+  assert.equal(html.includes('/teacher/plans'), false, 'без профиля преподавателя ссылки на его кабинет нет');
 });
 
 test('администратор видит все институты в сводке', async () => {
@@ -378,8 +387,19 @@ test('администратор видит все институты в сво�
   assert.equal(result.ok, true);
   if (!result.ok) return;
   assert.equal(result.value.dashboard.faculty, null);
+  assert.equal(result.value.isTeacher, false);
   const html = render(<StaffDashboardView result={result} />);
   assert.match(html, /Все институты университета/);
+});
+
+test('сотрудник-преподаватель: сводка ведёт в кабинет преподавателя', async () => {
+  const result = await loadStaffDashboardPageData(staffTeacherCookie);
+  assert.equal(result.ok, true, 'сотрудник со факультетом видит сводку');
+  if (!result.ok) return;
+  assert.equal(result.value.isTeacher, true, 'флаг преподавателя выведен из сессии');
+  const html = render(<StaffDashboardView result={result} />);
+  assert.match(html, /Кабинет преподавателя/, 'карточка-ссылка названа разделом');
+  assert.match(html, /href="\/teacher\/plans"/, 'карточка ведёт в планы преподавателя');
 });
 
 test('преподаватель (STAFF без факультета) видит честное «раздел недоступен»', async () => {
@@ -387,10 +407,12 @@ test('преподаватель (STAFF без факультета) видит 
   assert.equal(result.ok, false);
   if (result.ok) return;
   assert.equal(result.error.kind, 'forbidden', 'кабинет деканата преподавателю закрыт');
+  assert.equal(result.error.teacherCabinet, true, 'преподавателю предложен его кабинет');
 
   const html = render(<StaffDashboardView result={result} />);
   assert.match(html, /data-testid="staff-forbidden"/, 'объяснение вместо падения');
   assert.match(html, /Переписка со студентами/, 'преподавателю предложен его раздел');
+  assert.match(html, /href="\/teacher\/plans"/, 'и путь в кабинет преподавателя');
 });
 
 // ---------------------------------------------------------------------------
@@ -677,6 +699,13 @@ test('оболочка переписки: у студента и препода
   );
   assert.match(teacherShell, /href="\/teachers\/teacher-id"/, 'преподавателю доступно его расписание');
   assert.match(teacherShell, /Моё расписание/);
+  assert.match(teacherShell, /href="\/teacher\/plans"/, 'из переписки виден путь к планам');
+  assert.match(teacherShell, /href="\/teacher\/assistant"/, 'из переписки виден путь к ассистенту');
+  assert.ok(
+    (teacherShell.match(/<a [^>]*href="\/messages"[^>]*>/)?.[0] ?? '').includes('aria-current="page"'),
+    'переписка — активный раздел преподавателя',
+  );
+  assert.equal((teacherShell.match(/aria-current="page"/g) ?? []).length, 1, 'активен только один раздел');
   assert.match(teacherShell, /Перейти к содержимому/, 'skip-link есть у обеих оболочек');
 });
 
@@ -690,6 +719,12 @@ async function collectNewScreens(): Promise<readonly string[]> {
 
   const dashboard = await loadStaffDashboardPageData(staffCookie);
   if (dashboard.ok) screens.push(render(<StaffDashboardView result={dashboard} />));
+
+  const staffTeacherDashboard = await loadStaffDashboardPageData(staffTeacherCookie);
+  if (staffTeacherDashboard.ok) screens.push(render(<StaffDashboardView result={staffTeacherDashboard} />));
+
+  const teacherDashboard = await loadStaffDashboardPageData(teacherCookie);
+  screens.push(render(<StaffDashboardView result={teacherDashboard} />));
 
   const requests = await loadStaffRequestsPageData(staffCookie, undefined);
   if (requests.ok) screens.push(render(<StaffRequestsView result={requests} />));
@@ -714,6 +749,17 @@ async function collectNewScreens(): Promise<readonly string[]> {
 
   const messagesGate = await loadMessagesPageData(unverifiedCookie, undefined);
   screens.push(render(<MessagesView result={messagesGate} />));
+
+  // Оболочка переписки преподавателя: четыре раздела в нижней навигации.
+  screens.push(
+    render(
+      <PathnameContext.Provider value="/messages">
+        <MessagesShell mode="teacher" teacherId="teacher-id">
+          <p>контент</p>
+        </MessagesShell>
+      </PathnameContext.Provider>,
+    ),
+  );
 
   screens.push(renderShellAtPath('/staff', <p>контент</p>));
   screens.push(

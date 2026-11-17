@@ -4,14 +4,23 @@
  * Запуск: npm run db:seed (в packages/db) или npm run db:seed из корня.
  * Пишет все сущности из buildSeedData(); перед записью очищает таблицы
  * в порядке, безопасном для FK, поэтому сидер идемпотентен.
+ * Файлы приватного хранилища (фото студбилетов, учебные планы) тоже
+ * пересоздаются: старые чистятся, новые пишутся по путям из БД.
  * Все данные вымышленные.
  */
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
+import { randomUUID } from 'node:crypto';
 import { mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { buildSeedData, SYNTHETIC_ID_CARD_JPEG_BASE64 } from '../src/seed-data.js';
 import { getPrisma, Prisma } from '../src/client.js';
-import { idCardPhotoRelativePath, idCardRoot, storageRoot } from '@udgu/core';
+import {
+  idCardPhotoRelativePath,
+  idCardRoot,
+  storageRoot,
+  studyPlanRelativePath,
+  studyPlanRoot,
+} from '@udgu/core';
 
 const configDir = path.dirname(fileURLToPath(import.meta.url));
 
@@ -47,6 +56,8 @@ async function cleanDatabase(): Promise<void> {
   // поэтому чистим до удаления студентов, преподавателей и пользователей.
   await prisma.message.deleteMany();
   await prisma.conversation.deleteMany();
+  // Учебные планы ссылаются на преподавателя — чистим до преподавателей.
+  await prisma.studyPlan.deleteMany();
   await prisma.student.deleteMany();
   await prisma.teacher.deleteMany();
   await prisma.subject.deleteMany();
@@ -83,8 +94,11 @@ function writeIdCardPhoto(relativePath: string): void {
  *
  * Удаляются ТОЛЬКО подкаталоги студентов — служебный .gitkeep (он держит
  * каталог в репозитории) остаётся на месте, как и всё остальное хранилище.
+ * Каталог создаётся при отсутствии: на свежем хранилище (новый volume,
+ * тестовый STORAGE_DIR) readdirSync иначе упал бы на ENOENT.
  */
 function cleanIdCardStorage(): void {
+  mkdirSync(idCardRoot(), { recursive: true });
   for (const entry of readdirSync(idCardRoot(), { withFileTypes: true })) {
     if (entry.isDirectory()) {
       rmSync(path.join(idCardRoot(), entry.name), { recursive: true, force: true });
@@ -92,9 +106,41 @@ function cleanIdCardStorage(): void {
   }
 }
 
+/**
+ * Убирает прошлые учебные планы преподавателей — по той же причине, что
+ * и фото студбилетов: преподаватели при каждом сидере новые (UUID), и
+ * файлы прошлого плана стали бы мусором без ссылки из БД.
+ *
+ * Каталог study-plans может отсутствовать (первый сидер): создаём его,
+ * затем удаляем подкаталоги преподавателей. Служебный .gitkeep остаётся.
+ */
+function cleanStudyPlanStorage(): void {
+  mkdirSync(studyPlanRoot(), { recursive: true });
+  for (const entry of readdirSync(studyPlanRoot(), { withFileTypes: true })) {
+    if (entry.isDirectory()) {
+      rmSync(path.join(studyPlanRoot(), entry.name), { recursive: true, force: true });
+    }
+  }
+}
+
+/**
+ * Пишет учебный план преподавателя в ПРИВАТНОЕ хранилище
+ * (storage/study-plans/<teacherId>/, вне webroot) по относительному пути
+ * из БД — публичных ссылок на план не существует.
+ *
+ * Каталоги создаются при необходимости: повторный сидер пишет файл
+ * заново (идемпотентность), поэтому ошибку «каталог есть» не проверяем.
+ */
+function writeStudyPlanFile(relativePath: string, text: string): void {
+  const absolutePath = path.join(storageRoot(), relativePath);
+  mkdirSync(path.dirname(absolutePath), { recursive: true });
+  writeFileSync(absolutePath, Buffer.from(text, 'utf8'));
+}
+
 async function main(): Promise<void> {
   await cleanDatabase();
   cleanIdCardStorage();
+  cleanStudyPlanStorage();
 
   const data = await buildSeedData();
 
@@ -416,6 +462,26 @@ async function main(): Promise<void> {
     }),
   });
 
+  // ---- Учебные планы преподавателей (демо RAG-ассистента, BRIEF v2 §5) ----
+  // Каждому плану нужен файл в приватном хранилище: ассистент
+  // преподавателя читает текст по storagePath, публичных ссылок нет.
+  await prisma.studyPlan.createMany({
+    data: data.studyPlans.map((plan) => {
+      const teacherId = teacherIdByLogin.get(plan.teacherLogin);
+      if (!teacherId) throw new Error(`Сидер: не найден преподаватель ${plan.teacherLogin} для учебного плана`);
+      const storagePath = studyPlanRelativePath(teacherId, `${randomUUID()}.md`);
+      writeStudyPlanFile(storagePath, plan.text);
+      return {
+        teacherId,
+        title: plan.title,
+        fileName: plan.fileName,
+        mime: plan.mime,
+        sizeBytes: Buffer.byteLength(plan.text, 'utf8'),
+        storagePath,
+      };
+    }),
+  });
+
   // ---- Переписка студент ↔ преподаватель ----
   // Диалог создаётся парой (студент, преподаватель) — она уникальна,
   // поэтому повторный сидер не плодит копии. Сообщения пишутся по одному
@@ -478,6 +544,7 @@ async function main(): Promise<void> {
     officeHours: await prisma.officeHour.count(),
     conversations: await prisma.conversation.count(),
     messages: await prisma.message.count(),
+    studyPlans: await prisma.studyPlan.count(),
   };
 
   console.log('Сидер завершён. Записей в базе:');

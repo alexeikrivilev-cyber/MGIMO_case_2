@@ -62,6 +62,18 @@ export async function getSessionFromRequest(request: NextRequest): Promise<AuthS
 }
 
 /**
+ * Преподаватель ли пользователь сессии: профиль Teacher + роль не STUDENT.
+ *
+ * Единая проверка признака «преподаватель» для гейта кабинета
+ * преподавателя, подсказок на /staff и навигации переписки: источник —
+ * только сессия (teacherId приходит из БД при validateSession), никогда
+ * тело или query запроса.
+ */
+export function isTeacherUser(user: SessionUser): boolean {
+  return user.role !== 'STUDENT' && typeof user.teacherId === 'string' && user.teacherId !== '';
+}
+
+/**
  * Сессия для маршрута данных: бросает OwnershipError UNAUTHENTICATED
  * (→ 401), если пользователь не вошёл. Каждый маршрут данных вызывает
  * эту функцию — ни один не принимает studentId из query/body.

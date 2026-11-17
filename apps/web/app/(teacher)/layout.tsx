@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
-import { getSessionFromCookieHeader } from '../../lib/session';
+import { getSessionFromCookieHeader, isTeacherUser } from '../../lib/session';
 import { TeacherShell } from '../../components/TeacherShell';
 import { ConceptBanner } from '../../components/ConceptBanner';
 import { ConceptMark } from '../../components/ConceptMark';
@@ -27,7 +27,7 @@ export default async function TeacherLayout({ children }: { children: ReactNode 
   }
 
   const user = session.user;
-  const isTeacher = typeof user.teacherId === 'string' && user.teacherId !== '' && user.role !== 'STUDENT';
+  const isTeacher = isTeacherUser(user);
   if (!isTeacher) {
     const backHref = user.role === 'STUDENT' ? '/' : '/staff';
     const backLabel = user.role === 'STUDENT' ? 'В личный кабинет' : 'В кабинет деканата';
