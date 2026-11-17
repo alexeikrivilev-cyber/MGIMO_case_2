@@ -86,6 +86,19 @@ export function DashboardView({ result }: { result: LoadResult<DashboardData> })
               </Card>
             )}
 
+            {/* Ассистент: помощь по учёбе на данных студента (BRIEF v2 §5) */}
+            <section className="mb-4" aria-labelledby="assistant-link">
+              <SectionTitle>
+                <span id="assistant-link">Ассистент</span>
+              </SectionTitle>
+              <Card>
+                <p className="text-sm text-text-muted">Долги, план подготовки, средний балл — по вашим данным.</p>
+                <div className="mt-3">
+                  <LinkButton href="/assistant">Спросить</LinkButton>
+                </div>
+              </Card>
+            </section>
+
             {/* Ближайшая пара */}
             <Card className="mb-4">
               <SectionTitle>Ближайшая пара</SectionTitle>

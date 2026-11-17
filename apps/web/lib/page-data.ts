@@ -46,6 +46,7 @@ import {
   listTeachers,
   getConversation,
   requireStaffScope,
+  ASSISTANT_STARTER_QUESTIONS,
   OwnershipError,
   ValidationError,
   VerificationRequiredError,
@@ -443,6 +444,32 @@ export async function loadVerificationPageData(cookieHeader: string): Promise<Lo
     ]);
     return { profile, verification, gate };
   });
+}
+
+// ---------------------------------------------------------------------------
+// Ассистент студента (/assistant)
+// ---------------------------------------------------------------------------
+
+/**
+ * Ассистент (BRIEF v2 §5): помощь в учёбе и закрытие долгов по данным
+ * студента.
+ *
+ * Сервер отдаёт ТОЛЬКО стартовые подсказки-вопросы: сами ответы считает
+ * packages/core на POST /api/assistant из сессии запроса — на экране
+ * клиентский остров спрашивает через /api/* (CSRF-заголовок добавляет
+ * lib/api-client). Поэтому загрузчик не тянет оценки и расписание: они
+ * уйдут в ответ API только для владельца сессии.
+ */
+export interface AssistantPageData {
+  readonly suggestions: readonly string[];
+}
+
+export async function loadAssistantPageData(cookieHeader: string): Promise<LoadResult<AssistantPageData>> {
+  const sessionResult = await requirePageSession(cookieHeader);
+  if (!sessionResult.ok) {
+    return sessionResult;
+  }
+  return ok({ suggestions: ASSISTANT_STARTER_QUESTIONS });
 }
 
 // ---------------------------------------------------------------------------

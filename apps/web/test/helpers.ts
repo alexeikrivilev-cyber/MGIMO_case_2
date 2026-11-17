@@ -1,3 +1,4 @@
+import { before } from 'node:test';
 /**
  * Помощник тестов apps/web (node:test + tsx).
  *
@@ -22,6 +23,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { getPrisma } from '@udgu/db';
 import { hashPassword } from '@udgu/core';
 import { DEMO_PASSWORD } from '@udgu/ui';
+import { ensureTestDatabase } from '@udgu/db';
 
 const webDir = path.dirname(fileURLToPath(import.meta.url));
 
@@ -41,6 +43,31 @@ loadRootEnv();
 process.env.DATABASE_URL =
   process.env.DATABASE_URL_TEST ?? 'postgresql://postgres:postgres@localhost:5432/horizon_test?schema=public';
 
+/**
+ * Тестовая база готовится САМА (создание + миграции), поэтому `npm test`
+ * проходит на чистом клоне без ручных шагов — критерий приёмки PO.
+ * Хук корневого уровня: node:test выполняет его один раз перед всеми
+ * тестами процесса, поэтому отдельным файлам ничего добавлять не нужно.
+ */
+let testDatabaseReady = false;
+
+/**
+ * Гарантия «база существует и мигрирована» с мемоизацией: вызывается и из
+ * корневого хука, и из resetWebTestData — чтобы не зависеть от порядка
+ * хуков node:test. Идемпотентно.
+ */
+async function ensureTestDatabaseOnce(): Promise<void> {
+  if (testDatabaseReady) {
+    return;
+  }
+  await ensureTestDatabase(process.env.DATABASE_URL as string);
+  testDatabaseReady = true;
+}
+
+before(async () => {
+  await ensureTestDatabaseOnce();
+});
+
 // Приватное хранилище фото — во временный каталог этого прогона.
 const testStorageDir = mkdtempSync(path.join(os.tmpdir(), 'udgu-web-storage-'));
 process.env.STORAGE_DIR = testStorageDir;
@@ -53,6 +80,7 @@ export const TEST_PASSWORD = DEMO_PASSWORD;
 
 /** Очищает все таблицы в порядке, безопасном для FK. */
 export async function resetWebTestData(): Promise<void> {
+  await ensureTestDatabaseOnce();
   const prisma = getPrisma();
   await prisma.auditEvent.deleteMany();
   await prisma.notification.deleteMany();

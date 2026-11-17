@@ -198,6 +198,18 @@ export interface CreateRequestInput {
 }
 
 /**
+ * Ответ ассистента студента (POST /api/assistant, BRIEF v2 §5).
+ * mode: deterministic — ответ движка по данным кабинета; llm — ответ
+ * модели по той же сводке (ключ только в env сервера).
+ */
+export interface AssistantPayload {
+  readonly answer: string;
+  readonly intent: string;
+  readonly suggestions: readonly string[];
+  readonly mode: 'deterministic' | 'llm';
+}
+
+/**
  * Результат «левериджа» (POST /api/grades/leverage) — расчёт
  * packages/core calculateLeverage, сериализованный для браузера.
  */
@@ -430,6 +442,8 @@ export interface ApiClient {
   cancelRequest(id: string): Promise<{ request: RequestItem }>;
   /** POST /api/grades/leverage — расчёт баллов до целевого среднего (ядро). */
   getLeverage(targetGpa: number): Promise<{ result: LeverageResultPayload }>;
+  /** POST /api/assistant — вопрос ассистенту студента (ответ по его данным). */
+  askAssistant(question: string): Promise<AssistantPayload>;
   /** POST /api/sick-leave — отметить «болею» (multipart: период + необязательное фото справки). */
   createSickLeave(form: FormData): Promise<{ sickLeave: SickLeaveItem }>;
   // ---- Кабинет сотрудника деканата ----
@@ -723,6 +737,13 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
       return request<{ result: LeverageResultPayload }>('/api/grades/leverage', {
         method: 'POST',
         json: { targetGpa },
+      });
+    },
+
+    async askAssistant(question: string): Promise<AssistantPayload> {
+      return request<AssistantPayload>('/api/assistant', {
+        method: 'POST',
+        json: { question },
       });
     },
 

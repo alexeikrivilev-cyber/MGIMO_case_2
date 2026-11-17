@@ -300,3 +300,28 @@ export type {
   SubmitVerificationInput,
   VerificationGate,
 } from './services/verification';
+
+export {
+  askAssistant,
+  detectAssistantIntent,
+  ASSISTANT_STARTER_QUESTIONS,
+} from './services/assistant';
+
+// Константы ассистента, пригодные для браузерного кода (без ядра и БД):
+// их импортируют подпутем @udgu/core/assistant.
+export { ASSISTANT_VERIFICATION_SUGGESTION } from './assistantClient';
+export type {
+  AssistantAnswer,
+  AssistantIntent,
+  AssistantMode,
+  AskAssistantOptions,
+} from './services/assistant';
+
+export {
+  ASSISTANT_SYSTEM_PROMPT,
+  ASSISTANT_LLM_TIMEOUT_MS,
+  llmConfigFromEnv,
+  createLlmClient,
+  createLlmClientFromEnv,
+} from './llm';
+export type { LlmClient, LlmConfig, LlmRequest } from './llm';
