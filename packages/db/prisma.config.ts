@@ -21,12 +21,10 @@ function loadRootEnv(): void {
 loadRootEnv();
 
 const datasourceUrl = process.env.DATABASE_URL;
-if (!datasourceUrl) {
-  throw new Error(
-    'DATABASE_URL не задан. Скопируй .env.example в .env или экспортируй переменную окружения.',
-  );
-}
 
+// Prisma 7.10: конфиг CLI не поддерживает ключ adapter — migrate/deploy
+// подключаются к базе напрямую через datasource.url. Драйверный адаптер
+// PrismaPg используется рантайм-клиентом (src/client.ts).
 export default defineConfig({
   schema: path.join(configDir, 'prisma/schema.prisma'),
   migrations: {
@@ -35,9 +33,5 @@ export default defineConfig({
   },
   datasource: {
     url: datasourceUrl,
-  },
-  adapter: async () => {
-    const { PrismaPg } = await import('@prisma/adapter-pg');
-    return new PrismaPg({ connectionString: datasourceUrl });
   },
 });

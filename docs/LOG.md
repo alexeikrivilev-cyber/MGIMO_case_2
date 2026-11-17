@@ -14,6 +14,15 @@
   - `docs/PLAN.md` — PO-план по приоритетам
   - Роль агента proj-3311 зафиксирована: Product Owner, не исполнитель.
 - 14:10 — Первая задача поставлена Hermes через `hermes-lead`.
+- ~15:00 — Hermes отчитал о выполнении P1.1 «Фундамент» (исполнитель — OpenCode, ветка `feat/foundation`, без коммита — коммит за тимлидом):
+  - npm workspaces монорепо: `apps/web` (Next.js 15.5.29 — взят патч критической CVE-2025-66478 вместо 15.5.0), `packages/db` (Prisma 7.10.1 + pg-адаптер), `packages/ui` (токены), `packages/core` (барьер).
+  - Схема БД: 12 моделей, все индексы и FK-каскады по ARCHITECTURE.md §3; миграции `init` + `add_subject_faculty`.
+  - Сидер: 18 пользователей (4 студента + 12 преподавателей + staff1 + admin1), 8 групп, 40 предметов, 443 пар расписания на 2 недели (3 переноса MOVED, 4 отмены CANCELLED с причинами), 57 оценок за 2 семестра (у student1 один незачёт), 9 заявок, 6 объявлений, 27 уведомлений, 7 аудит-событий. Пароли — argon2id от `password123`.
+  - Тесты: 13 тестов инвариантов сидера на `node:test` + `tsx` — зелёные.
+  - Проверено: `npm install`, `db:migrate`, `db:seed`, `npm test`, `npm run build`, `tsc --noEmit` во всех пакетах, `docker compose config`, сборка и прогон Docker-образа web (редирект `/` → `/login`, health OK).
+  - Отклонение от ТЗ: в `prisma.config.ts` ключ `adapter` не поддерживается Prisma 7.10 (CLI подключается через `datasource.url`); адаптер PrismaPg применён в рантайм-клиенте `src/client.ts` (ленивый синглтон, чтобы `next build` не требовал DATABASE_URL).
+  - Дальше: P1.2 — домен в `packages/core` (GPA, владение данными); P1.3 — сессионная авторизация (роут `/api/auth/login` пока честный 501).
+
 
 ## Цепочка ответственности
 
