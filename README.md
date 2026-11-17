@@ -1,3 +1,45 @@
-# proj-3311
+# Цифровой деканат будущего (proj-3311)
 
-Project managed by OpenClaw agent `proj-3311`. See AGENTS.md for the brief.
+Прототип личного кабинета студента вымышленного Университета «Горизонт»: расписание, успеваемость, заявки/справки и уведомления в одном месте. Кейс — `docs/CASE.md`, архитектура — `docs/ARCHITECTURE.md`. Все данные в системе синтетические.
+
+## Структура
+
+- `apps/web` — кабинет студента (Next.js 15, App Router, Tailwind CSS 4)
+- `packages/db` — Prisma-схема, миграции и сидер (PostgreSQL 16)
+- `packages/core` — доменная логика (заготовка)
+- `docs/` — кейс, архитектура, план, лог процесса
+
+## Быстрый старт
+
+Нужны Node.js 24+ и Docker.
+
+```bash
+cp .env.example .env
+docker compose up -d db
+npm install
+npm run db:migrate
+npm run db:seed
+npm run dev
+```
+
+Приложение поднимется на http://localhost:3000
+
+## Скрипты
+
+| Скрипт | Что делает |
+| --- | --- |
+| `npm run dev` | запуск `apps/web` в режиме разработки |
+| `npm run build` | сборка всех пакетов (клиент Prisma + Next.js) |
+| `npm run db:migrate` | применить миграции Prisma к базе |
+| `npm run db:seed` | заполнить базу вымышленными данными |
+| `npm run db:reset` | сбросить базу, применить миграции и засеять заново |
+
+## Тестовые аккаунты (вымышленные)
+
+| Логин | Пароль | Кто |
+| --- | --- | --- |
+| `student1` | `password123` | Иванов А. Д., группа ИТ-21-1 |
+| `student2` | `password123` | Петрова М. А., группа ЭК-22-1 |
+| `student3` | `password123` | Смирнов Н. И., группа ИТ-21-2 |
+| `student4` | `password123` | Кузнецова А. С., группа ИН-20-1 |
+| `staff1` | `password123` | Сотрудник деканата |
