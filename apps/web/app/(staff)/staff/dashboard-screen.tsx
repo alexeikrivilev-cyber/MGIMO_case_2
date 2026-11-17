@@ -94,7 +94,7 @@ export function StaffDashboardView({ result }: { result: LoadResult<StaffDashboa
                 testId="queue-requests"
                 count={dashboard.newRequests}
                 label="Заявки и справки"
-                hint="Новые заявки студентов института ждут решения: взять в работу, отклонить или отметить готовой."
+                hint="Ждут вашего решения."
                 href="/staff/requests"
                 linkLabel="Открыть очередь заявок"
               />
@@ -102,7 +102,7 @@ export function StaffDashboardView({ result }: { result: LoadResult<StaffDashboa
                 testId="queue-verifications"
                 count={dashboard.pendingVerifications}
                 label="Верификация студбилетов"
-                hint="Заявки на проверку фото студенческого билета: распознанные поля, балл сверки и снимок карточки."
+                hint="Проверка фото против учётной записи."
                 href="/staff/verifications"
                 linkLabel="Открыть очередь верификаций"
                 tone="warning"
@@ -111,7 +111,7 @@ export function StaffDashboardView({ result }: { result: LoadResult<StaffDashboa
                 testId="queue-sick"
                 count={dashboard.sickNow}
                 label="Статусы «болею»"
-                hint="Кто из студентов отмечен болеющим прямо сейчас: отметки видят преподаватели и учитываются в посещаемости."
+                hint="Кто отмечен болеющим сейчас."
                 href="/staff/sick-leaves"
                 linkLabel="Смотреть, кто болеет"
                 tone="warning"
@@ -125,7 +125,6 @@ export function StaffDashboardView({ result }: { result: LoadResult<StaffDashboa
               {dashboard.todayScheduleChanges === 0 ? (
                 <EmptyState
                   title="На сегодня изменений нет"
-                  description="Ни одной пары групп института не перенесено и не отменено. Если нужно внести изменение — откройте расписание."
                   action={
                     <LinkButton href="/staff/schedule" variant="secondary">
                       Открыть расписание
@@ -140,9 +139,6 @@ export function StaffDashboardView({ result }: { result: LoadResult<StaffDashboa
                     </p>
                     <StatusBadge tone="warning">{dashboard.todayMovedIn} перенесено на сегодня</StatusBadge>
                   </div>
-                  <p className="mt-1.5 text-sm text-text-muted">
-                    Студенты групп уже получили уведомления. Проверьте, что новые даты и аудитории указаны верно.
-                  </p>
                   <div className="mt-3">
                     <LinkButton href="/staff/schedule" variant="secondary">
                       Открыть расписание
@@ -156,7 +152,6 @@ export function StaffDashboardView({ result }: { result: LoadResult<StaffDashboa
               <div className="mt-6">
                 <EmptyState
                   title="Очереди обработаны"
-                  description="Новых заявок и верификаций нет. Можно опубликовать объявление для института или группы, либо проверить расписание на ближайшие две недели."
                   action={
                     <LinkButton href="/staff/announcements">
                       Опубликовать объявление
@@ -174,27 +169,27 @@ export function StaffDashboardView({ result }: { result: LoadResult<StaffDashboa
                 <SectionLink
                   href="/staff/requests"
                   title="Заявки и справки"
-                  description="Очередь заявок студентов института: статус, комментарий студенту, уведомления."
+                  description="Очередь заявок института"
                 />
                 <SectionLink
                   href="/staff/verifications"
                   title="Верификация студбилетов"
-                  description="Очередь заявок на проверку: фото билета, распознанные поля, решение по заявке."
+                  description="Очередь проверки фото"
                 />
                 <SectionLink
                   href="/staff/sick-leaves"
                   title="Статусы «болею»"
-                  description="Кто из студентов болеет: период, причина, наличие справки."
+                  description="Период, причина, справка"
                 />
                 <SectionLink
                   href="/staff/announcements"
                   title="Объявления"
-                  description="Публикация для института или группы, закрепление важных сообщений."
+                  description="Публикация для института или группы"
                 />
                 <SectionLink
                   href="/staff/schedule"
                   title="Расписание групп"
-                  description="Пары групп института: перенос на новую дату и аудиторию, отмена с причиной."
+                  description="Перенос и отмена пар"
                 />
               </ul>
             </section>

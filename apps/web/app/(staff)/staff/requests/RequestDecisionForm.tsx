@@ -63,7 +63,7 @@ export function RequestDecisionForm({
       setError(
         submitError instanceof ApiClientError
           ? submitError.message
-          : 'Не удалось сохранить решение. Проверьте соединение и попробуйте снова.',
+          : 'Не удалось сохранить решение. Попробуйте снова.',
       );
       setPending(false);
     }
@@ -73,7 +73,7 @@ export function RequestDecisionForm({
     <Card className="mt-3">
       <h3 className="text-sm font-semibold text-text">Решение по заявке «{requestTitle}»</h3>
       <p className="mt-1 text-xs text-text-muted">
-        Текущий статус: {currentStatus}. Студент получит уведомление и увидит ваш комментарий в разделе «Заявки».
+        Текущий статус: {currentStatus}. Студент получит уведомление.
       </p>
       <form className="mt-3 space-y-3" onSubmit={handleSubmit} noValidate>
         <Select
@@ -90,7 +90,7 @@ export function RequestDecisionForm({
         </Select>
         <Textarea
           label="Комментарий студенту"
-          hint="Необязательно — кроме отказа: там причина обязательна. До 1000 символов."
+          hint="Обязательно при отказе. До 1000 символов."
           value={comment}
           maxLength={1000}
           disabled={pending}

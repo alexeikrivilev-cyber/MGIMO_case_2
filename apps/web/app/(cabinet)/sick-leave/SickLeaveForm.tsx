@@ -80,7 +80,7 @@ export function SickLeaveForm(): React.JSX.Element {
       setError(
         submitError instanceof ApiClientError
           ? submitError.message
-          : 'Не удалось сохранить отметку. Проверьте соединение и попробуйте снова.',
+          : 'Не удалось сохранить отметку. Попробуйте снова.',
       );
       setPending(false);
     }
@@ -108,7 +108,7 @@ export function SickLeaveForm(): React.JSX.Element {
         </div>
         <TextInput
           label="Причина"
-          hint="Необязательно. Например: ОРВИ, температура. Причину видят сотрудники деканата."
+          hint="Необязательно. Например: ОРВИ."
           value={reason}
           maxLength={500}
           disabled={pending}
@@ -120,8 +120,7 @@ export function SickLeaveForm(): React.JSX.Element {
             Фото справки (необязательно)
           </label>
           <p className="text-xs text-text-muted">
-            Если справка есть — прикрепите снимок: JPEG, PNG или WebP, до 5 МБ. Файл хранится в
-            приватном хранилище, по прямой ссылке его открыть нельзя.
+            JPEG, PNG или WebP, до 5 МБ. Файл хранится в приватном хранилище.
           </p>
           <input
             id="sick-certificate"

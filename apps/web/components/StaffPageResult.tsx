@@ -33,8 +33,7 @@ function StaffErrorView({ error }: { error: PageError }): React.JSX.Element {
         <Card data-testid="staff-forbidden">
           <h2 className="text-base font-semibold text-text">Раздел недоступен</h2>
           <p className="mt-1 text-sm text-text-muted">
-            Кабинет сотрудника деканата доступен только сотрудникам деканата и администратору: очереди
-            ограничены институтом из вашей учётной записи. Преподавателям доступна переписка со студентами.
+            Кабинет деканата доступен сотрудникам деканата и администратору.
           </p>
           <div className="mt-4 flex flex-wrap gap-2">
             <LinkButton href="/messages" variant="primary">

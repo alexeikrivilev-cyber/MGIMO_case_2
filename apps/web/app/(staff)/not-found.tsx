@@ -9,7 +9,7 @@ export default function StaffNotFound(): React.JSX.Element {
     <NotFoundCard
       homeHref="/staff"
       homeLabel="К сводке кабинета"
-      description="Возможно, ссылка устарела или запись удалена. Вернитесь к сводке кабинета — оттуда есть путь во все разделы."
+      description="Ссылка устарела или запись удалена."
     />
   );
 }

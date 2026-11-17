@@ -80,8 +80,6 @@ function ConversationPanel({
   detail: ConversationDetail;
   mode: 'student' | 'teacher';
 }): React.JSX.Element {
-  const peerLabel = mode === 'student' ? 'Преподаватель' : 'Студент';
-
   return (
     <Card className="mt-4" data-testid="conversation-panel">
       <div className="flex flex-wrap items-center gap-2">
@@ -104,9 +102,7 @@ function ConversationPanel({
       </div>
 
       {detail.messages.length === 0 ? (
-        <p className="mt-3 text-sm text-text-muted">
-          Сообщений пока нет. Напишите первое — {peerLabel.toLowerCase()} получит уведомление и ответит здесь.
-        </p>
+        <p className="mt-3 text-sm text-text-muted">Сообщений пока нет. Напишите первое.</p>
       ) : (
         <ul className="mt-3 space-y-2" data-testid="conversation-messages">
           {detail.messages.map((message) => (
@@ -142,9 +138,7 @@ export function MessagesView({ result }: { result: LoadResult<MessagesPageData> 
               <Card>
                 <h2 className="text-base font-semibold text-text">Раздел для студентов и преподавателей</h2>
                 <p className="mt-1 text-sm text-text-muted">
-                  Переписка связывает студента с преподавателем: преподаватель видит ФИО и группу автора,
-                  поэтому писать могут только верифицированные студенты. Учётной записи сотрудника деканата в
-                  переписке нет — ваши инструменты в кабинете деканата.
+                  Переписка связывает студента с преподавателем. Инструменты сотрудника — в кабинете деканата.
                 </p>
                 <div className="mt-4 flex flex-wrap gap-2">
                   <LinkButton href="/staff" variant="primary">
@@ -167,19 +161,14 @@ export function MessagesView({ result }: { result: LoadResult<MessagesPageData> 
           <>
             <PageHeader
               title="Переписка"
-              subtitle={
-                isStudent
-                  ? 'Диалоги с преподавателями — после верификации студбилета'
-                  : 'Диалоги со студентами: видно ФИО и группу автора'
-              }
+              subtitle={isStudent ? 'Диалоги с преподавателями' : 'Диалоги со студентами'}
             />
 
             {isStudent ? (
               <Card className="mb-4">
                 <h2 className="text-sm font-semibold text-text">Написать преподавателю</h2>
                 <p className="mt-1 text-xs text-text-muted">
-                  Выберите преподавателя из справочника: откроется диалог с историей переписки. Повторный выбор
-                  того же преподавателя вернёт тот же диалог.
+                  Выберите преподавателя — откроется диалог с историей переписки.
                 </p>
                 <div className="mt-3">
                   <NewConversationForm teachers={data.teachers} />
@@ -192,14 +181,7 @@ export function MessagesView({ result }: { result: LoadResult<MessagesPageData> 
                 {isStudent ? 'Мои диалоги' : 'Диалоги со студентами'}
               </h2>
               {data.conversations.length === 0 ? (
-                <EmptyState
-                  title={isStudent ? 'Диалогов пока нет' : 'Студенты ещё не писали'}
-                  description={
-                    isStudent
-                      ? 'Нажмите «Написать преподавателю» выше и выберите преподавателя: диалог появится здесь, а ответ придёт уведомлением.'
-                      : 'Когда верифицированный студент напишет вам, диалог появится здесь: с ФИО, группой и историей сообщений.'
-                  }
-                />
+                <EmptyState title={isStudent ? 'Диалогов нет' : 'Студенты ещё не писали'} />
               ) : (
                 <ul className="space-y-2">
                   {data.conversations.map((conversation) => (
@@ -218,8 +200,7 @@ export function MessagesView({ result }: { result: LoadResult<MessagesPageData> 
               <Card className="mt-4" data-testid="conversation-error">
                 <h2 className="text-base font-semibold text-text">Диалог недоступен</h2>
                 <p className="mt-1 text-sm text-text-muted">
-                  Этот диалог не принадлежит вашей учётной записи: переписка видна только её участникам.
-                  Выберите диалог из списка выше.
+                  Этот диалог не ваш. Выберите диалог из списка выше.
                 </p>
               </Card>
             )}

@@ -74,12 +74,9 @@ export function StaffAnnouncementsView({
             <h2 id="staff-announcements-list" className="mb-2 text-base font-semibold text-text">
               Опубликованные объявления
             </h2>
-            {data.announcements.length === 0 ? (
-              <EmptyState
-                title="Объявлений пока нет"
-                description="Опубликуйте первое объявление выше: оно появится в этом списке, а студенты выбранной аудитории получат уведомление и увидят его в разделе «Объявления»."
-              />
-            ) : (
+          {data.announcements.length === 0 ? (
+            <EmptyState title="Объявлений нет" />
+          ) : (
               <ul className="space-y-3">
                 {data.announcements.map((announcement) => (
                   <li key={announcement.id}>

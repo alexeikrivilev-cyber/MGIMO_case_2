@@ -57,7 +57,7 @@ export function RequestForm(): React.JSX.Element {
       setError(
         submitError instanceof ApiClientError
           ? submitError.message
-          : 'Не удалось отправить заявку. Проверьте соединение и попробуйте снова.',
+          : 'Не удалось отправить заявку. Попробуйте снова.',
       );
       setPending(false);
     }
@@ -81,7 +81,7 @@ export function RequestForm(): React.JSX.Element {
           <>
             <TextInput
               label="Цель справки"
-              hint="Например: по месту требования, в банк, для оформления скидки на проезд."
+              hint="Например: по месту требования, в банк."
               value={purpose}
               disabled={pending}
               onChange={(event) => setPurpose(event.target.value)}
@@ -100,7 +100,7 @@ export function RequestForm(): React.JSX.Element {
             </Select>
             <Select
               label="Семестр"
-              hint="За какой семестр нужна справка об обучении."
+              hint="За какой семестр нужна справка."
               value={semester}
               onChange={(event) => setSemester(event.target.value)}
               disabled={pending}
@@ -116,14 +116,14 @@ export function RequestForm(): React.JSX.Element {
           <>
             <TextInput
               label="Тема заявления"
-              hint="Кратко: что вы просите. Например: академический отпуск, материальная помощь."
+              hint="Например: академический отпуск, материальная помощь."
               value={topic}
               disabled={pending}
               onChange={(event) => setTopic(event.target.value)}
             />
             <Textarea
               label="Текст заявления"
-              hint="Опишите просьбу подробно: сотрудник деканата видит этот текст."
+              hint="Сотрудник деканата видит этот текст."
               value={body}
               disabled={pending}
               onChange={(event) => setBody(event.target.value)}

@@ -31,15 +31,6 @@ const FILTERS: readonly { status: StaffRequestStatusFilter | null; label: string
   { status: 'REJECTED', label: 'Отказы' },
 ];
 
-/** Подсказка под фильтром: что значит выбранный срез очереди. */
-const FILTER_HINTS: Readonly<Record<StaffRequestStatusFilter | 'ALL', string>> = {
-  ALL: 'Все заявки института: сначала новые, затем по дате подачи.',
-  NEW: 'Заявки, которые ещё никто не открыл: сверху — самые свежие.',
-  IN_PROGRESS: 'Заявки, взятые в работу: осталось подготовить результат или отказать.',
-  READY: 'Готовые заявки: студент может прийти за результатом.',
-  REJECTED: 'Отклонённые заявки: причина отправлена студенту.',
-};
-
 export function StaffRequestsView({
   result,
 }: {
@@ -71,17 +62,11 @@ export function StaffRequestsView({
                   active: (filter.status ?? 'ALL') === activeFilter,
                 }))}
               />
-              <p className="mt-2 text-xs text-text-muted">{FILTER_HINTS[activeFilter]}</p>
             </div>
 
             {data.requests.length === 0 ? (
               <EmptyState
                 title={activeFilter === 'ALL' ? 'В очереди нет заявок' : 'В этом статусе заявок нет'}
-                description={
-                  activeFilter === 'NEW'
-                    ? 'Новых заявок нет: все обращения студентов института уже взяты в работу или закрыты. Проверьте другие статусы — возможно, заявка ждёт вас в работе.'
-                    : 'Заявок с таким статусом нет. Переключите фильтр на «Все», чтобы увидеть всю очередь института.'
-                }
                 action={
                   activeFilter === 'ALL' ? undefined : (
                     <SegmentedLinks

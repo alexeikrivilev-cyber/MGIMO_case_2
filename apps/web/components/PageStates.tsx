@@ -36,9 +36,7 @@ export function VerificationGateCard(): React.JSX.Element {
         <div>
           <h2 className="text-base font-semibold text-text">Раздел открывается после верификации</h2>
           <p className="mt-1 text-sm text-text-muted">
-            Успеваемость и переписка с преподавателями доступны только после проверки студенческого
-            билета: так кабинет защищает ваши оценки от чужого доступа. Загрузите фото билета —
-            решение принимает сотрудник деканата.
+            Оценки и переписка — после проверки студбилета сотрудником деканата.
           </p>
           <div className="mt-4">
             <LinkButton href="/verification" variant="primary">

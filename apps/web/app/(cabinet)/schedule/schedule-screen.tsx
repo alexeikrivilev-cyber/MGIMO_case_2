@@ -85,10 +85,7 @@ export function ScheduleView({ result }: { result: LoadResult<SchedulePageData> 
                 <Card className="mb-4">
                   <SectionTitle>Пары на сегодня</SectionTitle>
                   {data.todayLessons.length === 0 ? (
-                    <EmptyState
-                      title="Сегодня пар нет"
-                      description="Занятий на сегодня нет. Переключитесь на «Неделю», чтобы посмотреть график целиком."
-                    />
+                    <EmptyState title="Сегодня пар нет" />
                   ) : (
                     <ul>
                       {data.todayLessons.map((lesson) => (
@@ -149,9 +146,9 @@ export function ScheduleView({ result }: { result: LoadResult<SchedulePageData> 
 
             <Card className="mt-4">
               <p className="text-sm text-text-muted">
-                Нужно знать, когда преподаватель свободен?{' '}
+                Когда преподаватель свободен?{' '}
                 <Link href="/teachers" className={TEXT_LINK_CLASS}>
-                  Расписание преподавателей и часы приёма
+                  Расписание преподавателей
                 </Link>
               </p>
             </Card>

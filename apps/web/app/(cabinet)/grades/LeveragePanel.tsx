@@ -83,8 +83,7 @@ export function LeveragePanel({
     <Card>
       <h3 className="text-base font-semibold text-text">Леверидж: сколько нужно до цели</h3>
       <p className="mt-1 text-sm text-text-muted">
-        Ползунок задаёт целевой средний балл. Сервер считает, сколько баллов нужно на оставшихся
-        работах, — по вашим реальным оценкам.
+        Ползунок — целевой средний балл. Расчёт по вашим оценкам.
       </p>
 
       <div className="mt-4">
@@ -125,13 +124,10 @@ export function LeveragePanel({
             </p>
 
             {result.currentAverage === null ? (
-              <p className="text-text-muted">
-                Оцененных работ пока нет: средний балл и требование появятся после первых оценок.
-              </p>
+              <p className="text-text-muted">Оценок пока нет.</p>
             ) : result.pendingCount === 0 ? (
               <p className="text-text-muted">
-                Все работы оценены — предстоящих нет. Средний балл изменится пересдачами и работами
-                следующего семестра.{' '}
+                Все работы оценены.{' '}
                 {result.alreadyAchieved
                   ? `Цель ${num(result.targetGpa)} уже достигнута.`
                   : `Цель ${num(result.targetGpa)} текущими оценками не достигается.`}
@@ -157,12 +153,17 @@ export function LeveragePanel({
             )}
 
             {result.neededSumOnPending === null ? null : (
-              <p className="rounded-md bg-surface-2 px-3 py-2 text-xs text-text-muted">
-                Формула: цель × (оценённых + предстоящих) − текущая сумма = {num(result.targetGpa)} × (
-                {result.gradedCount} + {result.pendingCount}) − {num(currentSum)} ={' '}
-                <span className="tabular-nums">{num(result.neededSumOnPending)}</span>. Максимально возможный
-                средний балл: {num(result.maxPossibleAverage)}.
-              </p>
+              <details className="mt-2 rounded-md border border-border bg-surface-2/40 px-3 py-2">
+                <summary className="min-h-11 cursor-pointer py-2 text-xs font-medium text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
+                  Как посчитано
+                </summary>
+                <p className="pb-1 text-xs text-text-muted">
+                  Формула: цель × (оценённых + предстоящих) − текущая сумма = {num(result.targetGpa)} × (
+                  {result.gradedCount} + {result.pendingCount}) − {num(currentSum)} ={' '}
+                  <span className="tabular-nums">{num(result.neededSumOnPending)}</span>. Максимально
+                  возможный средний балл: {num(result.maxPossibleAverage)}.
+                </p>
+              </details>
             )}
           </div>
         )}

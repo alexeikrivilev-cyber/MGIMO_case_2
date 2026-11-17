@@ -35,7 +35,7 @@ const OAUTH_PROVIDERS: readonly { readonly path: OAuthProviderPath; readonly lab
   { path: 'telegram', label: 'Telegram' },
 ];
 
-const NETWORK_ERROR = 'Не удалось связаться с сервером. Проверьте соединение и попробуйте снова.';
+const NETWORK_ERROR = 'Нет связи с сервером. Попробуйте снова.';
 
 /** Идентификатор текста ошибки: поля формы ссылаются на него через aria-describedby. */
 const LOGIN_ERROR_ID = 'login-form-error';
@@ -169,7 +169,7 @@ export default function LoginPage(): React.JSX.Element {
       </form>
 
       <div className="mt-6 space-y-2">
-        <p className="text-xs font-medium text-text-muted">Или через провайдера (эмуляция согласия)</p>
+        <p className="text-xs font-medium text-text-muted">Или войдите через</p>
         {OAUTH_PROVIDERS.map((provider) => (
           <Button
             key={provider.path}

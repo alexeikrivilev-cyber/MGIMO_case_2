@@ -32,7 +32,7 @@ export function ProfileView({ result }: { result: LoadResult<ProfilePageData> })
         const { profile } = data;
         return (
           <>
-            <PageHeader title="Профиль" subtitle="Данные студента в кабинете" />
+            <PageHeader title="Профиль" />
 
             <Card className="mb-4">
               <div className="flex items-center gap-4">
@@ -72,9 +72,9 @@ export function ProfileView({ result }: { result: LoadResult<ProfilePageData> })
               </dl>
               {profile.verificationStatus === 'VERIFIED' ? null : (
                 <p className="mt-3 text-sm text-text-muted">
-                  После верификации студенческого билета откроются оценки и переписка с преподавателями.{' '}
+                  Оценки и переписка откроются после верификации.{' '}
                   <Link href="/verification" className={TEXT_LINK_CLASS}>
-                    Перейти к верификации
+                    Верифицировать
                   </Link>
                 </p>
               )}

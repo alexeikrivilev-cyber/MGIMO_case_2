@@ -59,7 +59,7 @@ export function StaffRequestCard({ request }: { request: StaffRequestItem }): Re
 
       {request.status === 'READY' || request.status === 'REJECTED' ? (
         <p className="mt-2 text-xs text-text-muted">
-          Заявка закрыта: статус «{request.statusLabel}» изменить нельзя — студент уже получил решение.
+          Заявка закрыта: «{request.statusLabel}». Студент уже получил решение.
         </p>
       ) : (
         <details className="mt-3 rounded-md border border-border bg-surface-2/40 px-3 py-2">

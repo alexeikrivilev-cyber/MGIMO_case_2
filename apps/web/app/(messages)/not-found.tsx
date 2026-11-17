@@ -9,7 +9,7 @@ export default function MessagesNotFound(): React.JSX.Element {
     <NotFoundCard
       homeHref="/messages"
       homeLabel="К списку диалогов"
-      description="Возможно, диалог удалён или ссылка устарела. Вернитесь к списку диалогов — вся переписка на одном экране."
+      description="Диалог удалён или ссылка устарела."
     />
   );
 }

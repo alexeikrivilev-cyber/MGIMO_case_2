@@ -30,7 +30,7 @@ const OAUTH_PROVIDER_LABELS: Readonly<Record<OAuthProviderPath, string>> = {
   telegram: 'Telegram',
 };
 
-const NETWORK_ERROR = 'Не удалось связаться с сервером. Проверьте соединение и попробуйте снова.';
+const NETWORK_ERROR = 'Нет связи с сервером. Попробуйте снова.';
 
 /** Идентификатор общей ошибки формы: обязательные поля ссылаются на него. */
 const FORM_ERROR_ID = 'register-form-error';
@@ -57,7 +57,7 @@ function RegisterForm(): React.JSX.Element {
   /** Ссылка согласия непригодна: показываем сообщение и «Начать заново». */
   const [linkBroken, setLinkBroken] = useState<string | null>(
     state === null || state.length < MIN_STATE_LENGTH
-      ? 'Ссылка регистрации недействительна или устарела. Начните регистрацию заново.'
+      ? 'Ссылка регистрации устарела.'
       : null,
   );
 
@@ -103,7 +103,7 @@ function RegisterForm(): React.JSX.Element {
     <Card>
       <h1 className="text-2xl font-semibold tracking-tight text-text">Регистрация</h1>
       <p className="mt-1 text-sm text-text-muted">
-        {`Вы входите через ${OAUTH_PROVIDER_LABELS[provider]} (эмуляция согласия, реальных ключей нет)`}
+        {`Вход через ${OAUTH_PROVIDER_LABELS[provider]} (эмуляция согласия)`}
       </p>
 
       <form className="mt-6 space-y-4" onSubmit={handleSubmit} noValidate>
@@ -114,7 +114,7 @@ function RegisterForm(): React.JSX.Element {
           autoComplete="name"
           required
           disabled={pending}
-          hint="Как в студенческом: фамилия, имя и отчество."
+          hint="Как в студенческом."
           aria-invalid={error !== null}
           aria-describedby={error === null ? undefined : FORM_ERROR_ID}
           value={fullName}
@@ -127,7 +127,7 @@ function RegisterForm(): React.JSX.Element {
           type="text"
           required
           disabled={pending}
-          hint="Название группы показывает староста в расписании группы (например, ПИ-31)."
+          hint="Например, ПИ-31."
           aria-invalid={error !== null}
           aria-describedby={error === null ? undefined : FORM_ERROR_ID}
           value={groupName}
@@ -140,7 +140,7 @@ function RegisterForm(): React.JSX.Element {
           type="text"
           autoComplete="username"
           disabled={pending}
-          hint="Можно не указывать: вход выполнен через провайдера. Если оставить пустым, логин создастся автоматически."
+          hint="Если оставить пустым, логин создастся автоматически."
           error={loginError}
           value={login}
           onChange={(event) => setLogin(event.target.value)}
@@ -177,9 +177,8 @@ function RegisterForm(): React.JSX.Element {
       </div>
 
       <p className="mt-4 text-xs text-text-muted">
-        В прототипе согласие провайдера эмулируется: реальных ключей нет, данные не покидают учебный
-        стенд. После регистрации откроется профиль, расписание группы и общедоступные разделы;
-        успеваемость — после верификации студенческого билета.
+        Прототип: согласие провайдера эмулируется. Оценки и переписка откроются после верификации
+        студбилета.
       </p>
     </Card>
   );

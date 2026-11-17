@@ -66,8 +66,8 @@ function SickLeaveCard({
 
       <p className="mt-3 text-xs text-text-muted">
         {active
-          ? 'Статус действует: преподаватели видят отметку и учитывают её в посещаемости.'
-          : 'Отметка завершилась: посещаемость снова считается по расписанию.'}
+          ? 'Преподаватели учитывают отметку в посещаемости.'
+          : 'Отметка завершилась.'}
       </p>
     </Card>
   );
@@ -90,7 +90,7 @@ export function StaffSickLeavesView({
           <>
             <PageHeader
               title="Статусы «болею»"
-              subtitle="Отметки студентов института — их видят преподаватели"
+              subtitle="Отметки студентов института"
               action={
                 <span className="text-sm text-text-muted">
                   {data.onlyActive ? `${data.sickLeaves.length} болеют` : `${data.sickLeaves.length} отметок`}
@@ -106,23 +106,12 @@ export function StaffSickLeavesView({
                   { href: '/staff/sick-leaves', label: 'Все отметки', active: !data.onlyActive },
                 ]}
               />
-              <p className="mt-2 text-xs text-text-muted">
-                {data.onlyActive
-                  ? 'Только те, чей период болезни покрывает сегодня: утренняя сводка для преподавателей.'
-                  : 'Все отметки института, включая завершившиеся: удобно проверить историю за период.'}
-              </p>
             </div>
 
             {data.onlyActive && data.sickLeaves.length === 0 ? (
-              <EmptyState
-                title="Сейчас никто не болеет"
-                description="Активных отметок о болезни нет. Переключитесь на «Все отметки», чтобы посмотреть историю, или откройте расписание групп."
-              />
+              <EmptyState title="Сейчас никто не болеет" />
             ) : data.sickLeaves.length === 0 ? (
-              <EmptyState
-                title="Отметок о болезни нет"
-                description="Студенты института ещё не отмечали болезнь. Когда отметка появится, здесь будет видно: студент, группа, период, причина и наличие справки."
-              />
+              <EmptyState title="Отметок о болезни нет" />
             ) : (
               <ul className="space-y-3">
                 {data.sickLeaves.map((leave) => (

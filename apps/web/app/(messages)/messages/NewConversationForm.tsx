@@ -25,7 +25,7 @@ export function NewConversationForm({ teachers }: { teachers: readonly TeacherLi
     event.preventDefault();
     setError(null);
     if (teacherId === '') {
-      setError('Выберите преподавателя из списка.');
+      setError('Выберите преподавателя.');
       return;
     }
     setPending(true);
@@ -37,7 +37,7 @@ export function NewConversationForm({ teachers }: { teachers: readonly TeacherLi
       setError(
         submitError instanceof ApiClientError
           ? submitError.message
-          : 'Не удалось создать диалог. Проверьте соединение и попробуйте снова.',
+          : 'Не удалось открыть диалог. Попробуйте снова.',
       );
       setPending(false);
     }

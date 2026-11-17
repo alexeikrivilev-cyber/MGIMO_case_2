@@ -51,16 +51,23 @@ export function SickLeaveView({ result }: { result: LoadResult<SickLeavePageData
             <Card className="mb-4">
               <h2 className="text-base font-semibold text-text">Кто видит статус</h2>
               <p className="mt-1 text-sm text-text-muted">
-                Отметку видят преподаватели ваших пар и сотрудники деканата: статус учитывается в
-                посещаемости, поэтому отмечайте болезнь с первого дня. Если прикрепить фото справки,
-                его тоже увидит только проверяющий сотрудник — файл лежит в приватном хранилище.
+                Преподаватели ваших пар и сотрудники деканата: отметка учитывается в посещаемости.
               </p>
+              <details className="mt-2 rounded-md border border-border bg-surface-2/40 px-3 py-2">
+                <summary className="min-h-11 cursor-pointer py-2 text-sm font-medium text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
+                  Про фото справки
+                </summary>
+                <p className="pb-1 text-sm text-text-muted">
+                  Файл лежит в приватном хранилище: его открывает только проверяющий сотрудник, публичных
+                  ссылок нет.
+                </p>
+              </details>
             </Card>
 
             {data.sickNow === true ? (
               <Card className="mb-4 border-info/40" data-testid="sick-now">
                 <p className="text-sm font-medium text-text">
-                  Сейчас вы отмечены как болеющий — преподаватели и деканат видят этот статус.
+                  Сейчас вы болеющий — статус видят преподаватели и деканат.
                 </p>
               </Card>
             ) : null}
@@ -74,10 +81,7 @@ export function SickLeaveView({ result }: { result: LoadResult<SickLeavePageData
                 История отметок
               </h2>
               {data.items.length === 0 ? (
-                <EmptyState
-                  title="Отметок пока нет"
-                  description="Когда вы заболеете, отметьте болезнь выше: период, причина и по желанию фото справки. Преподаватели и деканат увидят статус."
-                />
+                <EmptyState title="Отметок нет" />
               ) : (
                 <ul className="space-y-3">
                   {data.items.map((leave) => (

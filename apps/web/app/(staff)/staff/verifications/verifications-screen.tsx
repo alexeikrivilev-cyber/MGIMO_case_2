@@ -34,26 +34,18 @@ const FILTERS: readonly { status: StaffVerificationStatusFilter | null; label: s
   { status: 'REJECTED', label: 'Отказы' },
 ];
 
-/** Подсказка под фильтром. */
-const FILTER_HINTS: Readonly<Record<StaffVerificationStatusFilter | 'ALL', string>> = {
-  ALL: 'Все заявки института: сначала ожидающие решения, затем решённые.',
-  PENDING: 'Заявки, ждущие вашего решения: старые — выше, чтобы очередь не зависала.',
-  VERIFIED: 'Одобренные заявки: студентам открыты успеваемость и переписка.',
-  REJECTED: 'Отклонённые заявки: студенты получили причину и могут подать фото заново.',
-};
-
 /** Текст балла сверки: сотруднику важнее не число, а что оно значит. */
 function matchScoreHint(score: number | null): string {
   if (score === null) {
     return 'Балл сверки не рассчитан — сверьте фото с данными студента вручную.';
   }
   if (score >= 0.9) {
-    return `Балл сверки ${formatScore(score)} — данные на фото совпадают с учётной записью.`;
+    return `Сверка ${formatScore(score)}: данные на фото совпадают.`;
   }
   if (score >= 0.7) {
-    return `Балл сверки ${formatScore(score)} — частичное совпадение: проверьте группу и номер билета.`;
+    return `Сверка ${formatScore(score)}: частичное совпадение — проверьте группу и номер билета.`;
   }
-  return `Балл сверки ${formatScore(score)} — совпадение слабое: вероятно, фото чужого билета или устаревших данных.`;
+  return `Сверка ${formatScore(score)}: совпадение слабое — возможно, фото чужого билета.`;
 }
 
 /** Карточка заявки на верификацию (серверная; фото и решение — острова). */
@@ -122,7 +114,7 @@ export function StaffVerificationsView({
           <>
             <PageHeader
               title="Верификация студбилетов"
-              subtitle="Заявки студентов института на проверку фото"
+              subtitle="Проверка фото студбилетов"
               action={
                 <span className="text-sm text-text-muted">
                   {data.verifications.length === 0 ? '0 заявок' : `${data.verifications.length} в выборке`}
@@ -143,18 +135,12 @@ export function StaffVerificationsView({
                   active: (filter.status ?? 'ALL') === activeFilter,
                 }))}
               />
-              <p className="mt-2 text-xs text-text-muted">{FILTER_HINTS[activeFilter]}</p>
             </div>
 
             {data.verifications.length === 0 ? (
               <EmptyState
                 title={
                   activeFilter === 'PENDING' ? 'Очередь верификаций пуста' : 'В этом статусе заявок нет'
-                }
-                description={
-                  activeFilter === 'PENDING'
-                    ? 'Все заявки на проверку разобраны. Новые появятся здесь, когда студенты загрузят фото студенческого билета.'
-                    : 'Заявок с таким статусом нет. Переключите фильтр на «На проверке», чтобы увидеть очередь.'
                 }
                 action={
                   activeFilter === 'PENDING' ? undefined : (

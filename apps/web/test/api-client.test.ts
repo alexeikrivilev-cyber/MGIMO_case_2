@@ -200,7 +200,7 @@ test('ответ без единого формата ошибки → обоб�
       assert.ok(error instanceof ApiClientError);
       assert.equal(error.code, 'INTERNAL');
       assert.equal(error.status, 500);
-      assert.match(error.message, /500/);
+      assert.match(error.message, /Попробуйте позже/, 'обобщённое сообщение без технических деталей');
       return true;
     },
   );
