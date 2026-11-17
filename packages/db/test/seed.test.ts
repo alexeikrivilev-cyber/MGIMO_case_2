@@ -605,3 +605,54 @@ test('часы приёма: 2-3 на преподавателя у 6 препо
     weekdayKeys.add(key);
   }
 });
+
+// ---------------------------------------------------------------------------
+// Переписка студент ↔ преподаватель
+// ---------------------------------------------------------------------------
+
+test('переписка: диалоги только у верифицированных студентов, сообщения по порядку', () => {
+  assert.equal(data.conversations.length, SEED_COUNTS.conversations);
+
+  const studentLogins = new Set(data.students.map((student) => student.login));
+  const teacherLogins = new Set(data.teachers.map((teacher) => teacher.login));
+  // Переписка закрыта гейтом верификации (BRIEF v2 §4): диалог
+  // неверифицированного студента сломал бы демо-сценарий гейта.
+  const verifiedLogins = new Set(
+    data.studentVerifications
+      .filter((verification) => verification.status === 'VERIFIED')
+      .map((verification) => verification.studentLogin),
+  );
+
+  for (const conversation of data.conversations) {
+    assert.ok(studentLogins.has(conversation.studentLogin), `студент ${conversation.studentLogin} существует`);
+    assert.ok(teacherLogins.has(conversation.teacherLogin), `преподаватель ${conversation.teacherLogin} существует`);
+    assert.ok(
+      verifiedLogins.has(conversation.studentLogin),
+      `диалог ${conversation.studentLogin}↔${conversation.teacherLogin} — только после верификации`,
+    );
+    assert.ok(conversation.messages.length >= 1, 'в диалоге есть сообщения');
+
+    let previousMinutesAgo = Number.POSITIVE_INFINITY;
+    for (const message of conversation.messages) {
+      assert.ok(message.body.length > 0, 'текст сообщения заполнен');
+      assert.ok(
+        message.authorLogin === conversation.studentLogin || message.authorLogin === conversation.teacherLogin,
+        'автор — участник диалога',
+      );
+      assert.ok(message.minutesAgo < previousMinutesAgo, 'сообщения идут от старых к новым');
+      previousMinutesAgo = message.minutesAgo;
+    }
+  }
+
+  // Пара «студент + преподаватель» не повторяется: диалог с тем же
+  // преподавателем открывает существующую историю, а не создаёт вторую.
+  const pairs = data.conversations.map((conversation) => `${conversation.studentLogin}|${conversation.teacherLogin}`);
+  assert.equal(new Set(pairs).size, pairs.length, 'пары диалогов уникальны');
+
+  // Хотя бы один диалог с непрочитанным сообщением — иначе счётчик
+  // непрочитанных на экране переписки всегда был бы нулевым.
+  const withUnread = data.conversations.filter((conversation) =>
+    conversation.messages.some((message) => !message.read),
+  );
+  assert.ok(withUnread.length >= 1, 'есть диалог с непрочитанными сообщениями');
+});

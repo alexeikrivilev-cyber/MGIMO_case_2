@@ -59,6 +59,10 @@ const CABINET_PAGES = [
   '/sick-leave',
   '/verification',
   '/teachers',
+  // Переписка общая для студента и преподавателя (BRIEF v2 §4): своя
+  // оболочка и свой лэйаут (route group (messages)), но гейт тот же —
+  // только для вошедших.
+  '/messages',
 ] as const;
 
 /** Страницы сотрудника деканата (роль STUDENT получает 404). */

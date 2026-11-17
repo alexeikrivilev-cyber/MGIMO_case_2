@@ -16,6 +16,118 @@ import { hash as argon2Hash } from 'argon2';
 
 export const TEST_PASSWORD = 'password123';
 
+/**
+ * Синтетическое фото студенческого билета (JPEG, base64).
+ *
+ * Зачем константой в коде: фото нужны сидеру, чтобы очередь верификаций
+ * в кабинете сотрудника показывала реальное изображение, а НЕ зависимости
+ * sharp/Pillow в packages/db. Изображение рисует «карточку» с вымышленными
+ * данными и подписью, что это концепт: настоящих персональных данных в
+ * репозитории нет и быть не должно (требование кейса).
+ *
+ * Файл пишется в ПРИВАТНОЕ хранилище (storage/, вне webroot) тем же
+ * сидером — прямых публичных ссылок на него не существует.
+ */
+export const SYNTHETIC_ID_CARD_JPEG_BASE64 =
+  '/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAwICQsJCAwLCgsODQwOEh4UEhEREiUbHBYeLCcuLisnKyoxN0Y7MTRCNCorPVM+QkhK' +
+  'Tk9OLztWXFVMW0ZNTkv/2wBDAQ0ODhIQEiQUFCRLMisyS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tL' +
+  'S0tLS0tLS0v/wAARCAEsAeADASIAAhEBAxEB/8QAGwABAQEBAQEBAQAAAAAAAAAAAAQFBgMCAQf/xABHEAACAQMCAQgEDAUCAwkA' +
+  'AAAAAQIDBBEFEiETFRcxVJLR0iJBUZMUIzI1NlVhdIOkssJCcYGRoQYzUmLhFkNTgqKxwfDx/8QAGAEBAQEBAQAAAAAAAAAAAAAA' +
+  'AAIBBQP/xAAdEQEAAwEBAQEBAQAAAAAAAAAAAhFREwESMSFh/9oADAMBAAIRAxEAPwDjwAdlAAAAAAAAAAAAB+pOTSSbb4JID8AA' +
+  'AAAAfqTfUm/XwPwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAaOkQlWo6lRpRc6tW2ShCKy5NVacm' +
+  'kvXwTf8AQzgZ75Y6mt8OVteQ0/4Ry9N2NOoqGdy20JqSePZJY/metJSqVp06ClThKouVr0GpU1Pk4Kaqx6nDduafVxljJyII5job' +
+  'qElbXty4tUK2nW1KnU/hlNcjmKftWyX9meOiWNteuvFW86zxTSlNtRg2nuzteUs9UmmljiuJiA35/lWOi1GwV5SlK2s0q6pWbgqe' +
+  '7jB0Xvlhvq3KKb9WPbnNj06jZ3l6rW03Uo0r6LrbpPkXFVYqHXj5KT45fpHIgz49/LG3WsbFVLLOKVK+rQkpbn8VS4KXX/zOSy/+' +
+  'Av03Rqd1dQjdaU7dOpCnKCnNtRlJrftzlYw/Sb29XBnM17ipcOLqNPZFQilFJJL1JL/7xPM359r9G7b2VtO0tdlmq1zKznXUN081' +
+  'p8tKGMJ+qKb4cfRPW6io/wCpYp0+TlGzg4QznbNWy2r+ksHOn7CcoTjOEnGUXlNPDTHz/o6C302hJUE7LfRlRjONxyjjytRwcuT6' +
+  '8P0vRwsNYPy4tbSzsJ3NWwh8IzRUqE5zSpOXK5XXnioRfF8MnPgfPujp62jWlG7dBW7na8vUp1bp1GnQxVcUs/J+Sk8NZe7gfnNl' +
+  'o7+3pfAasZSp3EnRmnT37abcHjfJ/KXXlJ4/mcyelCvUt5udKW2ThKDeM8JRcWv7NmfPujq7C2o0qUF8ChSnKvbyuoek3Qg+VU+t' +
+  '8E4pPj/x/wAscgfsZyg8wk4tprKeODWH/g/Coxr30AAUAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADr' +
+  'ejzVe0WXfn5R0ear2iy78/KefWGjkgdb0ear2iy78/KOjzVe0WXfn5R1ho5IHW9Hmq9osu/Pyjo81XtFl35+UdYaOSB1vR5qvaLL' +
+  'vz8o6PNV7RZd+flHWGjkgdb0ear2iy78/KOjzVe0WXfn5R1ho5IHW9Hmq9osu/Pyjo81XtFl35+UdYaOSB1vR5qvaLLvz8o6PNV7' +
+  'RZd+flHWGjkgdb0ear2iy78/KOjzVe0WXfn5R1ho5IHW9Hmq9osu/Pyjo81XtFl35+UdYaOSB1vR5qvaLLvz8o6PNV7RZd+flHWG' +
+  'jkgdb0ear2iy78/KOjzVe0WXfn5R1ho5IHW9Hmq9osu/Pyjo81XtFl35+UdYaOSB1vR5qvaLLvz8o6PNV7RZd+flHWGjkgdb0ear' +
+  '2iy78/KOjzVe0WXfn5R1ho5IHW9Hmq9osu/Pyjo81XtFl35+UdYaOSB1vR5qvaLLvz8o6PNV7RZd+flHWGjkgdb0ear2iy78/KOj' +
+  'zVe0WXfn5R1ho5IHW9Hmq9osu/Pyjo81XtFl35+UdYaOSB1vR5qvaLLvz8o6PNV7RZd+flHWGjkgdb0ear2iy78/KOjzVe0WXfn5' +
+  'R1ho5IHW9Hmq9osu/Pyjo81XtFl35+UdYaOSB1vR5qvaLLvz8o6PNV7RZd+flHWGjkgdb0ear2iy78/KOjzVe0WXfn5R1ho5IHW9' +
+  'Hmq9osu/Pyjo81XtFl35+UdYaOSB1vR5qvaLLvz8o6PNV7RZd+flHWGjkgdb0ear2iy78/KOjzVe0WXfn5R1ho5IHW9Hmq9osu/P' +
+  'yjo81XtFl35+UdYaOSB1vR5qvaLLvz8o6PNV7RZd+flHWGjkgdb0ear2iy78/KOjzVe0WXfn5R1ho5IHW9Hmq9osu/Pyjo81XtFl' +
+  '35+UdYaP6WAZ+oTuZX9la21xyHL8pulsUupJ9TOa1oAk5r1L63/Kx8RzXqX1v+Vj4i/BWCTmvUvrf8rHxHNepfW/5WPiL8FYJOa9' +
+  'S+t/ysfEc16l9b/lY+IvwVgk5r1L63/Kx8RzXqX1v+Vj4i/BWCTmvUvrf8rHxHNepfW/5WPiL8FYJOa9S+t/ysfEc16l9b/lY+Iv' +
+  'wVgk5r1L63/Kx8RzXqX1v+Vj4i/BWCTmvUvrf8rHxHNepfW/5WPiL8FYJOa9S+t/ysfEc16l9b/lY+IvwVgk5r1L63/Kx8RzXqX1' +
+  'v+Vj4i/BWDNofC7fV3aXF38Ig7flU+TUMPdj1GkAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAILj590r8b9Je' +
+  'QXHz7pX436QNwAEKAAAAAAAAAAAAAAAAAAAAAAAAYtx9Jl9y/eWkVx9Jl9y/eWlpAR61XqWuj39xRltq0repOEsJ4kotp8Tx1vVu' +
+  'aaCq8kquIynJb8PbFZeEk23/AI9rQGkDBvNbuozq0qFtThUhcU6aVSq05RdWMM7dvU0+DWVh+3gesdcqJ76tpGFCVetQhPlllunv' +
+  'eWmkkmqb454f5A2QYlLXa1enBUrOEq87r4NsdZqOeSdXO5xzjGF1f9fOn/qVzpU5OzanXhSqUIKUp7o1FOSzti2mlTllJP1Ab4Me' +
+  '91KtLQ43cFVtakq9OnJKnunFOtGEsRccvKzj0c8VwPmvqjsKMp7ri5UbSvc/HxVKT5PZ6ONiazu68f3A2gc/qeuXlrRvIfBadKvS' +
+  't51IOdbrahuyk4+kl1cHnK6scSl6xXhcVoVLOCpULilb1Jqtl7qihjC28UnUS444cfsA1wYcf9QynTruFrGU6cqCglV4TVWo4J7t' +
+  'uODTfDK+0+f+0c6cW7iz2Z5SMFCo5uU4VY0msKOcbpLDWW16vUBvAx6+qV6mg6ldQpTtri2pVNu6LxuUNykt0U2uK611pktLVLur' +
+  'faTb8rjLnTvMRXpTUaiWOHD0qUnw+wDogc6tcubqxtq1tRUIOraQq1JVE5RdR020ltw/Rmlnh18FwPi81u9lQncUYxoUZ6ZcXVBq' +
+  'Sm5OOzZJprg0pdXFcfsA6UGVb6y7jUPg8LWpyTqzpKrtnhShnOfR24zFrhJvq4eyeh/qCrO1oV61nCl8JtvhFFcvnKzBYk9qx/uR' +
+  '6s59meAG6DAq/wCo5wtIV4WSlilcVaqdVx2qjNRljMeLeeGcfbj1elTXqtOpK3lZZu41JRcISnOOFGEs5jBv/vI+rrzx9obYPK1r' +
+  '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';  'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAH//2Q==';
+
 /** Полное наименование вуза. */
 export const UNIVERSITY_NAME = 'Удмуртский государственный университет';
 /** Короткое наименование вуза. */
@@ -275,10 +387,19 @@ interface StudentDef {
   readonly middleName: string;
 }
 
+/**
+ * Студенты прототипа.
+ *
+ * Трое из них — в институте сотрудника деканата (staff1): его очереди
+ * заявок, верификаций и болезней должны быть непустыми, иначе кабинет
+ * сотрудника на демо показывает только пустые состояния. student4
+ * остаётся в другом институте — на нём видно ограничение области
+ * видимости (ARCHITECTURE §4): сотрудник не видит чужие факультеты.
+ */
 const STUDENT_DEFS: readonly StudentDef[] = [
   { login: 'student1', instituteIndex: 0, lastName: 'Иванов', firstName: 'Александр', middleName: 'Дмитриевич' },
-  { login: 'student2', instituteIndex: 4, lastName: 'Петрова', firstName: 'Мария', middleName: 'Андреевна' },
-  { login: 'student3', instituteIndex: 3, lastName: 'Смирнов', firstName: 'Никита', middleName: 'Иванович' },
+  { login: 'student2', instituteIndex: 0, lastName: 'Петрова', firstName: 'Мария', middleName: 'Андреевна' },
+  { login: 'student3', instituteIndex: 0, lastName: 'Смирнов', firstName: 'Никита', middleName: 'Иванович' },
   { login: 'student4', instituteIndex: 7, lastName: 'Кузнецова', firstName: 'Анна', middleName: 'Сергеевна' },
 ];
 
@@ -512,6 +633,30 @@ export interface SickLeaveSeed {
   readonly attachmentPath: string | null;
 }
 
+/** Сообщение в диалоге переписки (сидер: автор + смещение от «сейчас»). */
+export interface ConversationMessageSeed {
+  /** Логин автора: студент или преподаватель диалога. */
+  readonly authorLogin: string;
+  readonly body: string;
+  /** Сколько минут назад отправлено (относительно момента сборки сида). */
+  readonly minutesAgo: number;
+  /** Прочитано получателем? */
+  readonly read: boolean;
+}
+
+/**
+ * Диалог переписки студент ↔ преподаватель (BRIEF v2 §4, P2a).
+ *
+ * В сидере — только верифицированные студенты: переписка закрыта гейтом
+ * верификации, и диалог неверифицированного student2 сломал бы демо-сценарий
+ * «до верификации переписка недоступна».
+ */
+export interface ConversationSeed {
+  readonly studentLogin: string;
+  readonly teacherLogin: string;
+  readonly messages: readonly ConversationMessageSeed[];
+}
+
 /** Консультация или час приёма преподавателя. */
 export interface OfficeHourSeed {
   readonly teacherLogin: string;
@@ -541,6 +686,7 @@ export interface SeedData {
   readonly oauthIntents: readonly OAuthIntentSeed[];
   readonly sickLeaves: readonly SickLeaveSeed[];
   readonly officeHours: readonly OfficeHourSeed[];
+  readonly conversations: readonly ConversationSeed[];
 }
 
 function mulberry32(seed: number): () => number {
@@ -1493,6 +1639,71 @@ export async function buildSeedData(options: BuildSeedDataOptions = {}): Promise
     })),
   );
 
+  // ---- Переписка студент ↔ преподаватель (только верифицированные студенты) ----
+  // Три диалога покрывают состояния экрана: диалог с непрочитанным ответом
+  // преподавателя, полностью прочитанный диалог и диалог без ответа
+  // (преподаватель видит необработанное обращение).
+  const conversations: ConversationSeed[] = [
+    {
+      studentLogin: 'student1',
+      teacherLogin: 'teacher1',
+      messages: [
+        {
+          authorLogin: 'student1',
+          body:
+            'Добрый день! По курсовой работе по базам данных: можно уточнить, нужно ли описывать индексы в разделе «Проектирование»?',
+          minutesAgo: 3 * 24 * 60,
+          read: true,
+        },
+        {
+          authorLogin: 'teacher1',
+          body:
+            'Добрый день, Александр. Да, индексы обязательны: опишите, по каким полям и почему. Приходите на часы приёма в четверг — разберём на вашем примере.',
+          minutesAgo: 3 * 24 * 60 - 90,
+          read: false,
+        },
+      ],
+    },
+    {
+      studentLogin: 'student4',
+      teacherLogin: 'teacher15',
+      messages: [
+        {
+          authorLogin: 'student4',
+          body: 'Подскажите, пожалуйста, до какого числа можно сдать задание по педагогической практике?',
+          minutesAgo: 6 * 24 * 60,
+          read: true,
+        },
+        {
+          authorLogin: 'teacher15',
+          body: 'До 25 ноября включительно. Отчёт пришлите на кафедру, я проверю в течение двух рабочих дней.',
+          minutesAgo: 6 * 24 * 60 - 200,
+          read: true,
+        },
+        {
+          authorLogin: 'student4',
+          body: 'Поняла, спасибо! Отправлю сегодня.',
+          minutesAgo: 6 * 24 * 60 - 260,
+          read: true,
+        },
+      ],
+    },
+    {
+      // Диалог без ответа: преподаватель видит необработанное обращение.
+      studentLogin: 'student1',
+      teacherLogin: 'teacher2',
+      messages: [
+        {
+          authorLogin: 'student1',
+          body:
+            'Здравствуйте. Болел на прошлой неделе и пропустил лабораторную по базам данных. Можно ли отработать её на этой неделе?',
+          minutesAgo: 2 * 24 * 60 + 45,
+          read: false,
+        },
+      ],
+    },
+  ];
+
   return {
     users: allUsers,
     groups,
@@ -1511,6 +1722,7 @@ export async function buildSeedData(options: BuildSeedDataOptions = {}): Promise
     oauthIntents,
     sickLeaves,
     officeHours,
+    conversations,
   };
 }
 
@@ -1522,4 +1734,5 @@ export const SEED_COUNTS = {
   teachers: TEACHER_DEFS.reduce((sum, list) => sum + list.length, 0),
   identityRegistry: STUDENT_DEFS.length + 2,
   officeHourTeachers: 6,
+  conversations: 3,
 };

@@ -202,6 +202,26 @@ async function notifyAudience(
 }
 
 /**
+ * Группы, в которые сотрудник может опубликовать объявление аудитории
+ * «Группа»: группы ЕГО института (у ADMIN — все, у него faculty = null).
+ *
+ * Нужен форме публикации: без справочника пришлось бы вводить
+ * идентификатор группы руками, а сотрудник не должен знать (и не может
+ * подобрать) идентификаторы групп другого института.
+ */
+export async function listStaffGroups(
+  session: AuthSession,
+): Promise<readonly { id: string; name: string }[]> {
+  const scope = requireStaffScope(session);
+  const groups = await prisma().group.findMany({
+    where: scope.allFaculties ? {} : { faculty: scope.faculty as string },
+    select: { id: true, name: true },
+    orderBy: { name: 'asc' },
+  });
+  return groups.map((group) => ({ id: group.id, name: group.name }));
+}
+
+/**
  * Объявления, видимые сотруднику: весь университет (ALL), его институт
  * и группы его института. Закреплённые — сверху.
  */

@@ -87,8 +87,11 @@ function parseRetryAfter(value: string | null): number | null {
   return Math.max(0, Math.round((date - Date.now()) / 1000));
 }
 
-/** Лимит фото студбилета, байт (MAX_ID_CARD_SIZE_BYTES в packages/core). */
+/** Лимит размера фото студбилета, байт (MAX_ID_CARD_SIZE_BYTES в packages/core). */
 const MAX_ID_CARD_PHOTO_BYTES = 5 * 1024 * 1024;
+
+/** Лимит длины сообщения в переписке (MAX_MESSAGE_LENGTH в packages/core). */
+const MAX_MESSAGE_LENGTH_CLIENT = 4000;
 
 /** Форматы фото студбилета (ID_CARD_ALLOWED_MIME в packages/core). */
 const ID_CARD_PHOTO_MIME = ['image/jpeg', 'image/png', 'image/webp'] as const;
@@ -225,6 +228,176 @@ export interface SickLeavePayload {
   readonly sickNow: boolean;
 }
 
+// ---------------------------------------------------------------------------
+// Контракты кабинета сотрудника деканата (/api/staff/*)
+// ---------------------------------------------------------------------------
+
+/** Сводка кабинета сотрудника: счётчики очередей его института. */
+export interface StaffDashboardPayload {
+  readonly faculty: string | null;
+  readonly newRequests: number;
+  readonly pendingVerifications: number;
+  readonly sickNow: number;
+  readonly todayScheduleChanges: number;
+  readonly todayMovedIn: number;
+}
+
+/** Студент в очереди сотрудника: ФИО, группа, институт. */
+export interface StaffStudentPayload {
+  readonly id: string;
+  readonly fullName: string;
+  readonly groupName: string;
+  readonly faculty: string;
+}
+
+/** Заявка в очереди сотрудника (GET /api/staff/requests). */
+export interface StaffRequestItemPayload {
+  readonly id: string;
+  readonly type: 'REFERENCE' | 'APPLICATION';
+  readonly typeLabel: string;
+  readonly status: 'NEW' | 'IN_PROGRESS' | 'READY' | 'REJECTED';
+  readonly statusLabel: string;
+  readonly formData: Record<string, string>;
+  readonly staffComment: string | null;
+  readonly createdAt: string;
+  readonly updatedAt: string;
+  readonly student: StaffStudentPayload;
+}
+
+/** Решение сотрудника по заявке (POST /api/staff/requests/[id]/decide). */
+export interface StaffRequestDecisionInput {
+  readonly status: 'IN_PROGRESS' | 'READY' | 'REJECTED';
+  readonly staffComment?: string;
+}
+
+/** Заявка на верификацию в очереди (GET /api/staff/verifications). */
+export interface StaffVerificationItemPayload {
+  readonly id: string;
+  readonly status: 'PENDING' | 'VERIFIED' | 'REJECTED';
+  readonly student: StaffStudentPayload;
+  readonly recognizedLastName: string;
+  readonly recognizedFirstName: string;
+  readonly recognizedGroupName: string;
+  readonly recognizedCardNumber: string;
+  readonly matchScore: number | null;
+  readonly submittedAt: string;
+}
+
+/** Решение по верификации (POST /api/staff/verifications/[id]/decide). */
+export interface StaffVerificationDecisionInput {
+  readonly status: 'VERIFIED' | 'REJECTED';
+  readonly comment?: string;
+}
+
+/** Отметка «болею» в списке сотрудника (GET /api/staff/sick-leaves). */
+export interface StaffSickLeaveItemPayload {
+  readonly id: string;
+  readonly studentId: string;
+  readonly fullName: string;
+  readonly groupName: string;
+  readonly faculty: string;
+  readonly dateFrom: string;
+  readonly dateTo: string;
+  readonly reason: string | null;
+  readonly hasAttachment: boolean;
+}
+
+/** Пара в расписании групп института (GET /api/staff/schedule). */
+export interface StaffLessonItemPayload {
+  readonly id: string;
+  readonly date: string;
+  readonly startTime: string;
+  readonly endTime: string;
+  readonly room: string;
+  readonly type: 'LECTURE' | 'SEMINAR' | 'LAB';
+  readonly typeLabel: string;
+  readonly status: 'SCHEDULED' | 'MOVED' | 'CANCELLED';
+  readonly statusLabel: string;
+  readonly note: string | null;
+  readonly movedToDate: string | null;
+  readonly movedToRoom: string | null;
+  readonly subjectName: string;
+  readonly subjectCode: string;
+  readonly groupId: string;
+  readonly groupName: string;
+  readonly teacherName: string;
+}
+
+/** Перенос пары (POST /api/staff/schedule/[id]/move). */
+export interface StaffLessonMoveInput {
+  readonly date: string;
+  readonly room?: string;
+  readonly note?: string;
+}
+
+/** Объявление в списке сотрудника (GET /api/staff/announcements). */
+export interface StaffAnnouncementItemPayload {
+  readonly id: string;
+  readonly title: string;
+  readonly body: string;
+  readonly audience: 'ALL' | 'FACULTY' | 'GROUP';
+  readonly audienceLabel: string;
+  readonly faculty: string | null;
+  readonly groupName: string | null;
+  readonly pinned: boolean;
+  readonly publishedAt: string;
+}
+
+/** Публикация объявления (POST /api/staff/announcements). */
+export interface StaffAnnouncementInput {
+  readonly title: string;
+  readonly body: string;
+  readonly audience: 'ALL' | 'FACULTY' | 'GROUP';
+  readonly groupId?: string;
+  readonly pinned?: boolean;
+  readonly faculty?: string;
+}
+
+// ---------------------------------------------------------------------------
+// Контракты переписки (/api/conversations/*)
+// ---------------------------------------------------------------------------
+
+/** Собеседник диалога: преподаватель (для студента) или студент (для преподавателя). */
+export interface ConversationPeerPayload {
+  readonly id: string;
+  readonly fullName: string;
+  /** Группа студента — её видит преподаватель (требование BRIEF v2). */
+  readonly groupName: string | null;
+  readonly department: string | null;
+  readonly position: string | null;
+}
+
+/** Диалог в списке переписки. */
+export interface ConversationListItemPayload {
+  readonly id: string;
+  readonly peer: ConversationPeerPayload;
+  readonly lastMessage: {
+    readonly body: string;
+    readonly createdAt: string;
+    readonly mine: boolean;
+  } | null;
+  readonly unreadCount: number;
+  readonly updatedAt: string;
+}
+
+/** Сообщение диалога. */
+export interface ConversationMessagePayload {
+  readonly id: string;
+  readonly body: string;
+  readonly createdAt: string;
+  readonly authorUserId: string;
+  readonly mine: boolean;
+  readonly readAt: string | null;
+}
+
+/** Диалог с сообщениями (GET /api/conversations/[id]). */
+export interface ConversationDetailPayload {
+  readonly id: string;
+  readonly peer: ConversationPeerPayload;
+  readonly messages: readonly ConversationMessagePayload[];
+  readonly unreadCount: number;
+}
+
 export interface ApiClient {
   /** POST /api/auth/login — вход по логину/паролю университетской УЗ. */
   login(input: LoginInput): Promise<LoginResult>;
@@ -259,6 +432,47 @@ export interface ApiClient {
   getLeverage(targetGpa: number): Promise<{ result: LeverageResultPayload }>;
   /** POST /api/sick-leave — отметить «болею» (multipart: период + необязательное фото справки). */
   createSickLeave(form: FormData): Promise<{ sickLeave: SickLeaveItem }>;
+  // ---- Кабинет сотрудника деканата ----
+  /** GET /api/staff/dashboard — счётчики очередей института сотрудника. */
+  getStaffDashboard(): Promise<{ dashboard: StaffDashboardPayload }>;
+  /** GET /api/staff/requests — очередь заявок (необязательный фильтр по статусу). */
+  getStaffRequests(status?: 'NEW' | 'IN_PROGRESS' | 'READY' | 'REJECTED'): Promise<{
+    requests: readonly StaffRequestItemPayload[];
+  }>;
+  /** POST /api/staff/requests/[id]/decide — решение по заявке + комментарий студенту. */
+  decideStaffRequest(id: string, input: StaffRequestDecisionInput): Promise<{ request: StaffRequestItemPayload }>;
+  /** GET /api/staff/verifications — очередь верификаций студбилетов. */
+  getStaffVerifications(status?: 'PENDING' | 'VERIFIED' | 'REJECTED'): Promise<{
+    verifications: readonly StaffVerificationItemPayload[];
+  }>;
+  /** POST /api/staff/verifications/[id]/decide — одобрить/отклонить верификацию. */
+  decideStaffVerification(
+    id: string,
+    input: StaffVerificationDecisionInput,
+  ): Promise<{ verification: StaffVerificationItemPayload }>;
+  /** GET /api/staff/sick-leaves — кто из студентов института болеет. */
+  getStaffSickLeaves(onlyActive?: boolean): Promise<{ sickLeaves: readonly StaffSickLeaveItemPayload[] }>;
+  /** GET /api/staff/schedule?from&to — пары групп института за период. */
+  getStaffSchedule(from: string, to: string): Promise<{ lessons: readonly StaffLessonItemPayload[] }>;
+  /** POST /api/staff/schedule/[id]/move — перенос пары на новую дату (и аудиторию). */
+  moveStaffLesson(id: string, input: StaffLessonMoveInput): Promise<{ lesson: StaffLessonItemPayload }>;
+  /** POST /api/staff/schedule/[id]/cancel — отмена пары с причиной. */
+  cancelStaffLesson(id: string, reason: string): Promise<{ lesson: StaffLessonItemPayload }>;
+  /** GET /api/staff/announcements — объявления, видимые сотруднику. */
+  getStaffAnnouncements(): Promise<{ announcements: readonly StaffAnnouncementItemPayload[] }>;
+  /** POST /api/staff/announcements — публикация объявления. */
+  createStaffAnnouncement(input: StaffAnnouncementInput): Promise<{ announcement: StaffAnnouncementItemPayload }>;
+  // ---- Переписка ----
+  /** GET /api/conversations — диалоги владельца сессии (студент или преподаватель). */
+  getConversations(): Promise<{ conversations: readonly ConversationListItemPayload[] }>;
+  /** POST /api/conversations — студент начинает диалог с преподавателем. */
+  createConversation(teacherId: string): Promise<{ conversation: ConversationDetailPayload }>;
+  /** GET /api/conversations/[id] — диалог с сообщениями. */
+  getConversation(id: string): Promise<{ conversation: ConversationDetailPayload }>;
+  /** POST /api/conversations/[id]/messages — сообщение в диалог. */
+  sendConversationMessage(id: string, body: string): Promise<{ message: ConversationMessagePayload }>;
+  /** POST /api/conversations/[id]/read — отметить диалог прочитанным. */
+  markConversationRead(id: string): Promise<{ ok: boolean; updated: number }>;
 }
 
 // ---------------------------------------------------------------------------
@@ -518,6 +732,128 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
         form,
       });
     },
+
+    // ---- Кабинет сотрудника деканата ----
+
+    async getStaffDashboard(): Promise<{ dashboard: StaffDashboardPayload }> {
+      return request<{ dashboard: StaffDashboardPayload }>('/api/staff/dashboard', { method: 'GET' });
+    },
+
+    async getStaffRequests(status?: 'NEW' | 'IN_PROGRESS' | 'READY' | 'REJECTED'): Promise<{
+      requests: readonly StaffRequestItemPayload[];
+    }> {
+      const query = status === undefined ? '' : `?status=${encodeURIComponent(status)}`;
+      return request<{ requests: readonly StaffRequestItemPayload[] }>(`/api/staff/requests${query}`, {
+        method: 'GET',
+      });
+    },
+
+    async decideStaffRequest(
+      id: string,
+      input: StaffRequestDecisionInput,
+    ): Promise<{ request: StaffRequestItemPayload }> {
+      return request<{ request: StaffRequestItemPayload }>(
+        `/api/staff/requests/${encodeURIComponent(id)}/decide`,
+        { method: 'POST', json: input },
+      );
+    },
+
+    async getStaffVerifications(status?: 'PENDING' | 'VERIFIED' | 'REJECTED'): Promise<{
+      verifications: readonly StaffVerificationItemPayload[];
+    }> {
+      const query = status === undefined ? '' : `?status=${encodeURIComponent(status)}`;
+      return request<{ verifications: readonly StaffVerificationItemPayload[] }>(
+        `/api/staff/verifications${query}`,
+        { method: 'GET' },
+      );
+    },
+
+    async decideStaffVerification(
+      id: string,
+      input: StaffVerificationDecisionInput,
+    ): Promise<{ verification: StaffVerificationItemPayload }> {
+      return request<{ verification: StaffVerificationItemPayload }>(
+        `/api/staff/verifications/${encodeURIComponent(id)}/decide`,
+        { method: 'POST', json: input },
+      );
+    },
+
+    async getStaffSickLeaves(onlyActive = false): Promise<{ sickLeaves: readonly StaffSickLeaveItemPayload[] }> {
+      return request<{ sickLeaves: readonly StaffSickLeaveItemPayload[] }>(
+        `/api/staff/sick-leaves?onlyActive=${onlyActive ? 'true' : 'false'}`,
+        { method: 'GET' },
+      );
+    },
+
+    async getStaffSchedule(from: string, to: string): Promise<{ lessons: readonly StaffLessonItemPayload[] }> {
+      const query = `?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`;
+      return request<{ lessons: readonly StaffLessonItemPayload[] }>(`/api/staff/schedule${query}`, {
+        method: 'GET',
+      });
+    },
+
+    async moveStaffLesson(id: string, input: StaffLessonMoveInput): Promise<{ lesson: StaffLessonItemPayload }> {
+      return request<{ lesson: StaffLessonItemPayload }>(
+        `/api/staff/schedule/${encodeURIComponent(id)}/move`,
+        { method: 'POST', json: input },
+      );
+    },
+
+    async cancelStaffLesson(id: string, reason: string): Promise<{ lesson: StaffLessonItemPayload }> {
+      return request<{ lesson: StaffLessonItemPayload }>(
+        `/api/staff/schedule/${encodeURIComponent(id)}/cancel`,
+        { method: 'POST', json: { reason } },
+      );
+    },
+
+    async getStaffAnnouncements(): Promise<{ announcements: readonly StaffAnnouncementItemPayload[] }> {
+      return request<{ announcements: readonly StaffAnnouncementItemPayload[] }>('/api/staff/announcements', {
+        method: 'GET',
+      });
+    },
+
+    async createStaffAnnouncement(input: StaffAnnouncementInput): Promise<{ announcement: StaffAnnouncementItemPayload }> {
+      return request<{ announcement: StaffAnnouncementItemPayload }>('/api/staff/announcements', {
+        method: 'POST',
+        json: input,
+      });
+    },
+
+    // ---- Переписка ----
+
+    async getConversations(): Promise<{ conversations: readonly ConversationListItemPayload[] }> {
+      return request<{ conversations: readonly ConversationListItemPayload[] }>('/api/conversations', {
+        method: 'GET',
+      });
+    },
+
+    async createConversation(teacherId: string): Promise<{ conversation: ConversationDetailPayload }> {
+      return request<{ conversation: ConversationDetailPayload }>('/api/conversations', {
+        method: 'POST',
+        json: { teacherId },
+      });
+    },
+
+    async getConversation(id: string): Promise<{ conversation: ConversationDetailPayload }> {
+      return request<{ conversation: ConversationDetailPayload }>(
+        `/api/conversations/${encodeURIComponent(id)}`,
+        { method: 'GET' },
+      );
+    },
+
+    async sendConversationMessage(id: string, body: string): Promise<{ message: ConversationMessagePayload }> {
+      return request<{ message: ConversationMessagePayload }>(
+        `/api/conversations/${encodeURIComponent(id)}/messages`,
+        { method: 'POST', json: { body } },
+      );
+    },
+
+    async markConversationRead(id: string): Promise<{ ok: boolean; updated: number }> {
+      return request<{ ok: boolean; updated: number }>(
+        `/api/conversations/${encodeURIComponent(id)}/read`,
+        { method: 'POST', json: {} },
+      );
+    },
   };
 }
 
@@ -529,6 +865,9 @@ export const api: ApiClient = createApiClient();
 
 /** Лимит размера фото студбилета, байт (дублирует MAX_ID_CARD_SIZE_BYTES core для клиента). */
 export const ID_CARD_PHOTO_MAX_BYTES = MAX_ID_CARD_PHOTO_BYTES;
+
+/** Лимит длины сообщения в переписке (дублирует MAX_MESSAGE_LENGTH core для клиента). */
+export const MAX_MESSAGE_LENGTH = MAX_MESSAGE_LENGTH_CLIENT;
 
 /** Допустимые MIME фото студбилета (дублирует ID_CARD_ALLOWED_MIME core для клиента). */
 export const ID_CARD_PHOTO_ALLOWED_MIME: readonly string[] = ID_CARD_PHOTO_MIME;

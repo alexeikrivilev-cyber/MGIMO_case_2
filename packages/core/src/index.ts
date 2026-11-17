@@ -130,6 +130,7 @@ export type {
 export {
   listStaffAnnouncements,
   createStaffAnnouncement,
+  listStaffGroups,
   staffAnnouncementSchema,
 } from './services/staffAnnouncements';
 export type { StaffAnnouncementInput, StaffAnnouncementItem } from './services/staffAnnouncements';
@@ -163,6 +164,27 @@ export {
   staffVerificationsFilterSchema,
 } from './services/staffVerifications';
 export type { StaffVerificationsFilter, StaffVerificationItem } from './services/staffVerifications';
+
+export {
+  listMyConversations,
+  getConversation,
+  startConversationWithTeacher,
+  sendMessage,
+  markConversationRead,
+  messagingRole,
+  messageBodySchema,
+  conversationStartSchema,
+  MAX_MESSAGE_LENGTH,
+} from './services/messaging';
+export type {
+  ConversationDetail,
+  ConversationListItem,
+  ConversationMessageItem,
+  ConversationPeer,
+  ConversationStartInput,
+  MessageInput,
+  MessagingRole,
+} from './services/messaging';
 
 export { writeAuditEvent, getAuditTrail } from './audit';
 export type { AuditMetaValue, WriteAuditEventInput } from './audit';

@@ -54,6 +54,10 @@ export async function resetTestData(): Promise<void> {
   await prisma().sickLeave.deleteMany();
   await prisma().officeHour.deleteMany();
   await prisma().identityRegistry.deleteMany();
+  // Переписка: сообщения ссылаются на диалог И на автора (User) —
+  // чистим до студентов, преподавателей и пользователей.
+  await prisma().message.deleteMany();
+  await prisma().conversation.deleteMany();
   await prisma().student.deleteMany();
   await prisma().teacher.deleteMany();
   await prisma().subject.deleteMany();
