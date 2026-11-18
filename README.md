@@ -22,6 +22,7 @@ apps/web          # кабинет студента (Next.js 15.5, App Router, T
 packages/db       # Prisma 7.10 + PostgreSQL 16: схема, миграции, сидер
 packages/ui       # дизайн-токены (tokens.css + tokens.ts)
 packages/core     # доменная логика: приватное хранилище фото студбилетов, авторизация, сервисы кабинета, ядро ботов каналов
+packages/mcp      # MCP-сервер для агентов деканата (JSON-RPC 2.0 поверх stdio, без SDK)
 storage/          # приватное хранилище фото студбилетов (ВНЕ webroot, в git только .gitkeep)
 docs/             # кейс, бриф, архитектура, PRD, роадмап, план, лог процесса
 ```
@@ -44,14 +45,15 @@ npm run dev                  # http://localhost:3000
 | Скрипт | Что делает |
 | --- | --- |
 | `npm run dev` | запуск `apps/web` в режиме разработки |
-| `npm run build` | сборка всего: Prisma Client + Next.js |
+| `npm run build` | сборка всего: Prisma Client + MCP-сервер + Next.js |
 | `npm start` | прод-запуск собранного `apps/web` |
+| `npm run mcp:serve` | MCP-сервер деканата на stdio (нужен `MCP_SESSION_TOKEN` — токен сессии сотрудника) |
 | `npm run db:generate` | сгенерировать Prisma Client |
 | `npm run db:migrate` | создать и применить миграцию (`prisma migrate dev`); имя: `npm run db:migrate --name=<slug>` |
 | `npm run db:deploy` | применить существующие миграции |
 | `npm run db:seed` | заполнить базу вымышленными данными |
 | `npm run db:reset` | SQL-очистка схемы через docker exec + migrate deploy + seed (без `prisma migrate reset`) |
-| `npm test` | тесты `@udgu/db`, `@udgu/core` и `@udgu/web` (роуты, IDOR, страницы, контраст, паритет токенов, PWA), node:test + tsx |
+| `npm test` | тесты `@udgu/db`, `@udgu/core`, `@udgu/mcp` и `@udgu/web` (роуты, IDOR, страницы, контраст, паритет токенов, PWA, MCP-протокол), node:test + tsx |
 | `npm run typecheck` | `tsc --noEmit` во всех воркспейсах |
 | `python3 apps/web/scripts/generate-icons.py` | перегенерировать PNG-иконки знака концепта из `apps/web/public/icon.svg` (нужен Python 3 + Pillow) |
 
@@ -198,7 +200,20 @@ VK / MAX как тонкие адаптеры над теми же сервис�
 преподавателя, решение по заявке, объявление, перенос/отмена пары)
 копией уходят в его каналы (`enqueueChannelDeliveriesSafely`: сбой
 канала не отменяет уведомление на сайте — оно источник истины).
-Дальше — P2: MCP-сервер для агентов деканата.
+Готово (P2-C «MCP-сервер для агентов деканата»): `packages/mcp` —
+JSON-RPC 2.0 поверх stdio своим кодом (без SDK, новых зависимостей
+нет), авторизация СУЩЕСТВУЮЩИМ токеном сессии кабинета
+(`MCP_SESSION_TOKEN` или `params.sessionToken` в `initialize`,
+валидация боевым `validateSession`), 11 инструментов `deanery_*`
+(очередь заявок, решения, объявления, статусы «болею», расписание
+института с переносами и отменами, справочник преподавателей,
+успеваемость студента по логину). Прав у сервера нет: каждый
+инструмент вызывает сервис кабинета, поэтому сотрудник видит свой
+институт, администратор — все, чужой институт даёт тот же отказ, что
+и «не найдено». Новый сервис ядра `listStudentGradesForStaff`
+(`packages/core/src/services/staffGrades.ts`). Пример клиента —
+`packages/mcp/examples/agent-client.mjs`, документация —
+`packages/mcp/README.md`.
 
 Экраны сотрудника деканата — `/staff`, `/staff/requests`,
 `/staff/verifications`, `/staff/sick-leaves`, `/staff/announcements`,

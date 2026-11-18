@@ -168,6 +168,25 @@ export {
 } from './services/staffSickLeaves';
 export type { StaffSickLeavesFilter, StaffSickLeaveItem } from './services/staffSickLeaves';
 
+// Успеваемость студента по логину для сотрудника деканата (BRIEF v2 §7,
+// MCP-сервер): отдельный сервис, потому что владение проверяется через
+// область видимости института, а не через владельца сессии.
+export {
+  listStudentGradesForStaff,
+  staffStudentLoginSchema,
+} from './services/staffGrades';
+export type { StaffStudentGrades, StaffStudentCard, StaffStudentLoginInput } from './services/staffGrades';
+
+// Чистые помощники успеваемости: их переиспользует сервис сотрудника
+// (staffGrades), поэтому они публичны — арифметика одна на кабинет
+// студента и на кабинет деканата.
+export {
+  toGradeEntry,
+  groupGradesBySemester,
+  summarizeGrades,
+} from './services/grades';
+export type { GradeRow } from './services/grades';
+
 export {
   listStaffVerifications,
   getStaffVerificationPhoto,
