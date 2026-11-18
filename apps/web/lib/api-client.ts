@@ -447,6 +447,48 @@ export interface ConversationDetailPayload {
   readonly unreadCount: number;
 }
 
+// ---------------------------------------------------------------------------
+// Контракты каналов доступа (/api/bot/*, BRIEF v3)
+// ---------------------------------------------------------------------------
+
+/** Канал доступа: telegram | vk | max (BOT_CHANNELS в packages/core). */
+export type BotChannelName = 'telegram' | 'vk' | 'max';
+
+/** Статус канала для интерфейса: live — токен в env, demo — демо-режим. */
+export type BotChannelMode = 'live' | 'demo';
+
+/** POST /api/bot/link-code → код привязки канала к учётной записи. */
+export interface BotLinkCodePayload {
+  readonly channel: BotChannelName;
+  readonly code: string;
+  readonly expiresAt: string;
+}
+
+/** POST /api/bot/message → ответы бота на команду (по одному на сообщение). */
+export interface BotMessagePayload {
+  readonly channel: BotChannelName;
+  readonly replies: readonly string[];
+}
+
+/**
+ * Запись outbox в inbox кабинета (GET /api/bot/inbox).
+ *
+ * status: PENDING — ждёт адаптера канала; SENT — доставлено живым
+ * адаптером; DEMO — канал в демо-режиме (токен бота не задан); FAILED —
+ * сбой доставки, причина в error.
+ */
+export interface ChannelInboxItem {
+  readonly id: string;
+  readonly channel: BotChannelName | null;
+  readonly provider: 'VK_ID' | 'MAX' | 'TELEGRAM';
+  readonly title: string;
+  readonly body: string;
+  readonly status: 'PENDING' | 'SENT' | 'DEMO' | 'FAILED';
+  readonly error: string | null;
+  readonly createdAt: string;
+  readonly sentAt: string | null;
+}
+
 export interface ApiClient {
   /** POST /api/auth/login — вход по логину/паролю университетской УЗ. */
   login(input: LoginInput): Promise<LoginResult>;
@@ -533,6 +575,20 @@ export interface ApiClient {
   sendConversationMessage(id: string, body: string): Promise<{ message: ConversationMessagePayload }>;
   /** POST /api/conversations/[id]/read — отметить диалог прочитанным. */
   markConversationRead(id: string): Promise<{ ok: boolean; updated: number }>;
+  // ---- Каналы доступа (боты Telegram / VK / MAX) ----
+  /**
+   * POST /api/bot/link-code — код привязки канала к учётной записи.
+   * Канал обязателен: код, выданный для Telegram, не привяжет VK.
+   */
+  createBotLinkCode(channel: BotChannelName): Promise<BotLinkCodePayload>;
+  /**
+   * POST /api/bot/message — команда боту из симулятора каналов.
+   * Идентификатор аккаунта канала сервер выводит из сессии: поле
+   * channelUserId телом не принимается (иначе чужой кабинет).
+   */
+  sendBotMessage(channel: BotChannelName, text: string): Promise<BotMessagePayload>;
+  /** GET /api/bot/inbox — уведомления, доставленные в каналы пользователя. */
+  getBotInbox(): Promise<{ deliveries: readonly ChannelInboxItem[] }>;
 }
 
 // ---------------------------------------------------------------------------
@@ -951,6 +1007,26 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
         `/api/conversations/${encodeURIComponent(id)}/read`,
         { method: 'POST', json: {} },
       );
+    },
+
+    // ---- Каналы доступа ----
+
+    async createBotLinkCode(channel: BotChannelName): Promise<BotLinkCodePayload> {
+      return request<BotLinkCodePayload>('/api/bot/link-code', {
+        method: 'POST',
+        json: { channel },
+      });
+    },
+
+    async sendBotMessage(channel: BotChannelName, text: string): Promise<BotMessagePayload> {
+      return request<BotMessagePayload>('/api/bot/message', {
+        method: 'POST',
+        json: { channel, text },
+      });
+    },
+
+    async getBotInbox(): Promise<{ deliveries: readonly ChannelInboxItem[] }> {
+      return request<{ deliveries: readonly ChannelInboxItem[] }>('/api/bot/inbox', { method: 'GET' });
     },
   };
 }

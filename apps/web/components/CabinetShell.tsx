@@ -6,14 +6,16 @@
  * Состав (требования P1.4b):
  * - шапка: знак концепта + название раздела + выход + переключатель
  *   темы + кнопка профиля; под ней — постоянно видимый баннер концепта;
- * - нижняя навигация: 6 разделов (Сегодня / Расписание / Успеваемость /
- *   Заявки / Уведомления / Ассистент), цели ≥ 44 px, активный раздел
- *   отмечен aria-current="page" (не только цветом), на «Уведомлениях» —
+ * - нижняя навигация: 7 разделов (Сегодня / Расписание / Успеваемость /
+ *   Заявки / Уведомления / Ассистент / Каналы), цели ≥ 44 px, активный
+ *   раздел отмечен aria-current="page" (не только цветом), на «Уведомлениях» —
  *   бейдж непрочитанных (UnreadBadge, данные из /api/notifications);
  * - мобильный first: всё в flex-колонке с min-w-0, корневой
  *   overflow-x-hidden — на 360 px горизонтального скролла нет. Подписи
- *   шести пунктов на 360 px набираются в 9 px (до sm — 10 px): «Успеваемость»
- *   и «Уведомления» не переносятся и не вылезают за экран;
+ *   пунктов короткие (как в кабинете деканата, StaffShell): семь пунктов
+ *   на 360 px дают ~51 px на подпись, и «Успеваемость»/«Уведомления»
+ *   целиком в неё не помещаются. Полное название несёт aria-label ссылки
+ *   и заголовок раздела в шапке — скринридер и глаз видят его целиком;
  * - тема: тёмная по умолчанию (решение Council), переключение —
  *   ThemeToggle, выбор remembered в cookie.
  *
@@ -28,23 +30,38 @@ import { ConceptMark } from './ConceptMark';
 import { LogoutButton } from './LogoutButton';
 import { ThemeToggle } from './ThemeToggle';
 import { UnreadBadge } from './UnreadBadge';
-import { IconAssistant, IconBell, IconCalendar, IconGrades, IconRequests, IconToday, IconProfile } from './icons';
+import {
+  IconAssistant,
+  IconBell,
+  IconCalendar,
+  IconChannels,
+  IconGrades,
+  IconRequests,
+  IconToday,
+  IconProfile,
+} from './icons';
+import { FOCUS_RING } from '../lib/ui';
 
-/** Разделы нижней навигации: путь → подпись и иконка. */
+/**
+ * Разделы нижней навигации: путь → короткая подпись (таб), полное
+ * название (aria-label и заголовок в шапке) и иконка.
+ */
 const NAV_ITEMS: readonly {
   readonly href: string;
   readonly label: string;
+  readonly fullLabel: string;
   readonly Icon: (props: { className?: string }) => React.JSX.Element;
 }[] = [
-  { href: '/', label: 'Сегодня', Icon: IconToday },
-  { href: '/schedule', label: 'Расписание', Icon: IconCalendar },
-  { href: '/grades', label: 'Успеваемость', Icon: IconGrades },
-  { href: '/requests', label: 'Заявки', Icon: IconRequests },
-  { href: '/notifications', label: 'Уведомления', Icon: IconBell },
-  { href: '/assistant', label: 'Ассистент', Icon: IconAssistant },
+  { href: '/', label: 'Сегодня', fullLabel: 'Сегодня', Icon: IconToday },
+  { href: '/schedule', label: 'Пары', fullLabel: 'Расписание', Icon: IconCalendar },
+  { href: '/grades', label: 'Оценки', fullLabel: 'Успеваемость', Icon: IconGrades },
+  { href: '/requests', label: 'Заявки', fullLabel: 'Заявки и справки', Icon: IconRequests },
+  { href: '/notifications', label: 'Входящие', fullLabel: 'Уведомления', Icon: IconBell },
+  { href: '/assistant', label: 'Ассистент', fullLabel: 'Ассистент', Icon: IconAssistant },
+  { href: '/channels', label: 'Каналы', fullLabel: 'Каналы доступа', Icon: IconChannels },
 ];
 
-/** Название раздела для шапки по текущему пути. */
+/** Название раздела для шапки по текущему пути (полное, не подпись таба). */
 function sectionTitle(pathname: string | null): string {
   if (pathname === null) {
     return 'Кабинет';
@@ -57,13 +74,12 @@ function sectionTitle(pathname: string | null): string {
   }
   const item = NAV_ITEMS.find((candidate) => pathname === candidate.href || pathname.startsWith(`${candidate.href}/`));
   if (item !== undefined) {
-    return item.label;
+    return item.fullLabel;
   }
   if (pathname === '/announcements') return 'Объявления';
   if (pathname === '/profile') return 'Профиль';
   if (pathname === '/verification') return 'Верификация';
   if (pathname === '/sick-leave') return 'Я болею';
-  if (pathname === '/assistant') return 'Ассистент';
   return 'Кабинет';
 }
 
@@ -74,9 +90,6 @@ function isActive(pathname: string | null, href: string): boolean {
   // «Сегодня» — корневой путь: активен только при точном совпадении.
   return href === '/' ? pathname === '/' : pathname === href || pathname.startsWith(`${href}/`);
 }
-
-const FOCUS_RING =
-  'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary';
 
 export function CabinetShell({ children }: { children: ReactNode }): React.JSX.Element {
   const pathname = usePathname();
@@ -122,7 +135,7 @@ export function CabinetShell({ children }: { children: ReactNode }): React.JSX.E
         className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-surface pb-[env(safe-area-inset-bottom)]"
       >
         <ul className="mx-auto flex w-full max-w-2xl">
-          {NAV_ITEMS.map(({ href, label, Icon }) => {
+          {NAV_ITEMS.map(({ href, label, fullLabel, Icon }) => {
             const active = isActive(pathname, href);
             const badge = href === '/notifications' ? <UnreadBadge /> : null;
             return (
@@ -130,7 +143,7 @@ export function CabinetShell({ children }: { children: ReactNode }): React.JSX.E
                 <Link
                   href={href}
                   aria-current={active ? 'page' : undefined}
-                  aria-label={href === '/notifications' ? 'Уведомления' : undefined}
+                  aria-label={fullLabel}
                   className={`relative flex min-h-14 flex-col items-center justify-center gap-0.5 px-0.5 py-1.5 text-center text-[10px] leading-4 transition-colors ${FOCUS_RING} ${
                     active ? 'font-semibold text-primary' : 'font-medium text-text-muted hover:text-text'
                   }`}
@@ -139,9 +152,9 @@ export function CabinetShell({ children }: { children: ReactNode }): React.JSX.E
                     <Icon />
                     {badge}
                   </span>
-                  {/* whitespace-nowrap + tracking-tight: на 360 px шесть пунктов
-                      дают ~60 px на подпись, и «Успеваемость»/«Уведомления»
-                      не должны переноситься пословно-внутри-слова. */}
+                  {/* whitespace-nowrap + tracking-tight: на 360 px семь пунктов
+                      дают ~51 px на подпись, поэтому подписи короткие (см.
+                      комментарий файла), а полное название — в aria-label. */}
                   <span className="max-w-full whitespace-nowrap text-[9px] leading-3 tracking-tight sm:text-[10px] sm:leading-4">
                     {label}
                   </span>

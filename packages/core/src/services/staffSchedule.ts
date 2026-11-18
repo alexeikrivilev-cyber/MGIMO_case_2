@@ -10,7 +10,8 @@
  * периода считаются в UTC (startOfUtcDay/addUtcDays из services/schedule).
  *
  * Каждая мутация: уведомление студентам группы (type SCHEDULE_CHANGE) +
- * аудит (actor = сотрудник сессии).
+ * аудит (actor = сотрудник сессии). Уведомление копией уходит в каналы
+ * студентов (BRIEF v3, outbox): Telegram / VK / MAX, если привязаны.
  */
 import { z } from 'zod';
 import { prisma } from '../db';
@@ -19,6 +20,7 @@ import { OwnershipError, ValidationError } from '../errors';
 import { writeAuditEvent } from '../audit';
 import { firstIssues } from '../validation';
 import { dateKey, addUtcDays, startOfUtcDay, SCHEDULE_TYPE_LABELS, SCHEDULE_STATUS_LABELS } from './schedule';
+import { enqueueChannelDeliveriesSafely } from '../bot/outbox';
 import type { AuthSession } from '../session';
 import type { ScheduleStatus, ScheduleType } from '@udgu/db';
 
@@ -186,6 +188,7 @@ async function notifyGroup(
   if (students.length === 0) {
     return;
   }
+
   await prisma().notification.createMany({
     data: students.map((student) => ({
       userId: student.userId,
@@ -195,6 +198,17 @@ async function notifyGroup(
       link: '/schedule',
     })),
   });
+
+  // Копия уведомления в каналы каждого студента группы (BRIEF v3): тот же
+  // заголовок и текст. Сбой outbox не отменяет уведомление на сайте — оно
+  // источник истины, поэтому вызов безопасный.
+  for (const student of students) {
+    await enqueueChannelDeliveriesSafely(
+      student.userId,
+      { title, body, link: '/schedule' },
+      'schedule.change',
+    );
+  }
 }
 
 /**

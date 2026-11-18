@@ -56,13 +56,16 @@ test.before(async () => {
   const teacher = await createTeacher('teacher1');
   teacherId = teacher.teacherId;
   const subject = await createSubject('T-301', 'Веб-технологии');
+  // Пара «сегодня» — в начале суток: она заведомо в прошлом в любое время
+  // прогона, поэтому «ближайшая пара» не зависит от часов пояса и времени
+  // суток (прежняя фикстура с 10:00 ломала тест в утренних прогонах).
   await createScheduleEntry({
     groupId: group.id,
     subjectId: subject,
     teacherId: teacher.teacherId,
     date: dateKey(new Date()),
-    startTime: '10:00',
-    endTime: '11:20',
+    startTime: '00:30',
+    endTime: '01:50',
   });
   // Пара на завтра: «ближайшая пара» не должна зависеть от времени суток
   // (сегодняшняя пара к вечеру уже в прошлом).
@@ -108,9 +111,21 @@ test('GET /api/schedule: today — занятия, ближайшая пара, 
   }>();
   assert.equal(body.view, 'today');
   assert.equal(body.lessons.length, 1);
-  assert.equal(body.lessons[0]?.startTime, '10:00');
-  // Ближайшая пара — завтрашняя (сегодняшняя к вечеру уже прошла).
-  assert.equal(body.nextLesson?.startTime, '08:30', 'ближайшая пара найдена');
+  assert.equal(body.lessons[0]?.startTime, '00:30');
+  // «Ближайшая пара» — первая пара, которая ещё не началась. Время занятий
+  // в БД считается в UTC (toOccurrence в services/schedule.ts), поэтому на
+  // утреннем прогоне сегодняшняя 00:30 ещё впереди, а днём — уже прошла и
+  // ближайшая становится завтрашняя. Ожидание считаем от текущего UTC,
+  // чтобы тест не зависел от часового пояса и времени суток.
+  const todayLessonUtc = Date.UTC(
+    new Date().getUTCFullYear(),
+    new Date().getUTCMonth(),
+    new Date().getUTCDate(),
+    0,
+    30,
+  );
+  const expectedNext = todayLessonUtc > Date.now() ? '00:30' : '08:30';
+  assert.equal(body.nextLesson?.startTime, expectedNext, 'ближайшая пара найдена');
   assert.ok(Array.isArray(body.freeGaps), 'свободные окна посчитаны');
 });
 

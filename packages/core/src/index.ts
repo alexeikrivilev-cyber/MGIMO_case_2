@@ -319,6 +319,55 @@ export {
   ASSISTANT_STARTER_QUESTIONS,
 } from './services/assistant';
 
+// Каналы доступа (BRIEF v3): ядро ботов Telegram / VK / MAX. Бот — тонкий
+// адаптер: он вызывает те же сервисы кабинета, что и сайт.
+export {
+  BOT_CHANNELS,
+  BOT_CHANNEL_LABELS,
+  botChannelForProvider,
+  botChannelProvider,
+  isBotChannel,
+  MAX_BOT_REPLIES,
+} from './bot/protocol';
+export type {
+  BotChannel,
+  BotReply,
+  BotUpdate,
+  ChannelProvider,
+} from './bot/protocol';
+
+export {
+  botSessionFor,
+  consumeBotLinkCode,
+  createBotLinkCode,
+  resolveChannelUser,
+  BOT_LINK_CODE_LENGTH,
+  BOT_LINK_CODE_TTL_MS,
+} from './bot/identity';
+export type {
+  ChannelLinkResult,
+  CreatedBotLinkCode,
+} from './bot/identity';
+
+export {
+  enqueueChannelDeliveries,
+  enqueueChannelDeliveriesSafely,
+  listChannelInbox,
+  dispatchPendingDeliveries,
+  CHANNEL_INBOX_LIMIT,
+  DISPATCH_BATCH_SIZE,
+  MAX_DELIVERY_ERROR_LENGTH,
+} from './bot/outbox';
+export type {
+  ChannelDeliveryInput,
+  ChannelDeliveryItem,
+  ChannelDeliverer,
+  ChannelDeliveryRecipient,
+  DispatchDeliveriesResult,
+} from './bot/outbox';
+
+export { handleBotCommand } from './bot/commands';
+
 // Ассистент преподавателя: RAG по учебному плану (BRIEF v2 §5, P2b).
 export {
   uploadStudyPlan,

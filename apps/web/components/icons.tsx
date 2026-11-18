@@ -163,3 +163,17 @@ export function IconChat({ className }: IconProps): React.JSX.Element {
     </svg>
   );
 }
+
+/**
+ * Каналы доступа (BRIEF v3): сообщение, уходящее в мессенджер.
+ * Отправленное сообщение — тот же смысл, что у ботов каналов: команда
+ * кабинета работает и на сайте, и в Telegram / VK / MAX.
+ */
+export function IconChannels({ className }: IconProps): React.JSX.Element {
+  return (
+    <svg viewBox="0 0 24 24" className={className ?? BASE} fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M20.5 3.5 3.8 10.1l6 2.6 2.6 6L20.5 3.5Z" />
+      <path d="M9.8 12.7 20.5 3.5" />
+    </svg>
+  );
+}

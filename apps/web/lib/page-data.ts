@@ -19,6 +19,7 @@
  */
 import {
   addUtcDays,
+  BOT_CHANNELS,
   getAnnouncementsFor,
   getFreeGaps,
   getMyAcademicSummary,
@@ -45,7 +46,9 @@ import {
   listStaffVerifications,
   listTeachers,
   getConversation,
+  listChannelInbox,
   listMyStudyPlans,
+  resolveChannelUser,
   TEACHER_ASSISTANT_STARTER_QUESTIONS,
   requireStaffScope,
   ASSISTANT_STARTER_QUESTIONS,
@@ -57,6 +60,8 @@ import {
   type AcademicSummary,
   type AnnouncementItem,
   type AuthSession,
+  type BotChannel,
+  type ChannelDeliveryItem,
   type ConversationDetail,
   type ConversationListItem,
   type FreeGap,
@@ -81,6 +86,8 @@ import {
   type VerificationGate,
 } from '@udgu/core';
 import { getSessionFromCookieHeader, isTeacherUser } from './session';
+import { getChannelAdapters } from './bot/adapters';
+import { demoChannelUserId } from './bot/demo-channel';
 
 // ---------------------------------------------------------------------------
 // Результат загрузки и ошибки страниц
@@ -892,4 +899,56 @@ export async function loadMessagesPageData(
       teacherId: null,
     },
   };
+}
+
+// ---------------------------------------------------------------------------
+// Каналы доступа (BRIEF v3): симулятор ботов и inbox уведомлений
+// ---------------------------------------------------------------------------
+
+/**
+ * Данные страницы «Каналы» (/channels).
+ *
+ * - statuses — режим каждого канала: 'live' (токен бота в env, адаптер
+ *   работает) или 'demo' (токена нет). Статус приходит из адаптеров
+ *   каналов и показывает честную пометку демо-режима;
+ * - linked — привязан ли канал к этой учётной записи: проверяем ту же
+ *   связь OAuthAccount, по которой работает живой бот (resolveChannelUser).
+ *   Поэтому после /link в симуляторе страница после перезагрузки показывает
+ *   «привязан», а не просит код снова;
+ * - inbox — уведомления, доставленные в каналы пользователя (outbox).
+ */
+export interface ChannelsPageData {
+  readonly statuses: Readonly<Record<BotChannel, 'live' | 'demo'>>;
+  readonly linked: Readonly<Record<BotChannel, boolean>>;
+  readonly inbox: readonly ChannelDeliveryItem[];
+}
+
+export async function loadChannelsPageData(cookieHeader: string): Promise<LoadResult<ChannelsPageData>> {
+  const sessionResult = await requirePageSession(cookieHeader);
+  if (!sessionResult.ok) {
+    return sessionResult;
+  }
+  const session = sessionResult.value;
+
+  return attempt(async () => {
+    const { statuses } = getChannelAdapters();
+
+    // Привязка канала проверяется демо-идентификатором сессии: он выводится
+    // из userId детерминированно (lib/bot/demo-channel.ts), поэтому ответ
+    // не зависит от того, откуда пришла команда — из симулятора или из чата.
+    const linkedEntries = await Promise.all(
+      BOT_CHANNELS.map(async (channel) => {
+        const userId = await resolveChannelUser(channel, demoChannelUserId(channel, session.user.id));
+        return [channel, userId !== null] as const;
+      }),
+    );
+
+    const inbox = await listChannelInbox(session);
+
+    return {
+      statuses,
+      linked: Object.fromEntries(linkedEntries) as Record<BotChannel, boolean>,
+      inbox,
+    };
+  });
 }
