@@ -21,6 +21,7 @@
       "@udgu/ui/tokens.css": ["../../packages/ui/tokens.css"],
       "@udgu/core": ["../../packages/core/src/index.ts"],
       "@udgu/core/assistant": ["../../packages/core/src/assistantClient.ts"],
+      "@udgu/core/bot": ["../../packages/core/src/botClient.ts"],
       "@udgu/db": ["../../packages/db/src/index.ts"]
     }
   },

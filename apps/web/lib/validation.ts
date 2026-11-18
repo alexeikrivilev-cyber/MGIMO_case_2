@@ -307,4 +307,58 @@ export const idParamSchema = z.string().trim().min(1, 'Идентификато�
  * (conversationStartSchema): диалог создаёт только верифицированный
  * студент, проверка живёт в сервисе, здесь — точка импорта для роута.
  */
+// ---------------------------------------------------------------------------
+// Каналы доступа (/api/bot/*, BRIEF v3)
+// ---------------------------------------------------------------------------
+
+/**
+ * Канал доступа: telegram | vk | max (BOT_CHANNELS packages/core).
+ *
+ * Одноимённость с core не случайна: канал определяет и провайдера OAuth
+ * (botChannelProvider), и адаптер, и демо-идентификатор аккаунта.
+ */
+export const botChannelSchema = z.enum(['telegram', 'vk', 'max']);
+
+/** Максимум символов команды из канала (ядро режет тексты заявок и вопросов). */
+export const BOT_MESSAGE_MAX_LENGTH = 1000;
+
+/**
+ * Тело POST /api/bot/link-code: для какого канала выдать код привязки.
+ *
+ * Канал обязателен: код, выданный на Telegram, не должен привязать VK
+ * (createBotLinkCode(session, provider) проверяет это на стороне ядра).
+ */
+export const botLinkCodeSchema = z.object({
+  channel: botChannelSchema,
+});
+
+/**
+ * Тело POST /api/bot/message: канал и текст команды.
+ *
+ * ВАЖНО (граница безопасности): поля channelUserId в схеме НЕТ, и это не
+ * невнимательность. Идентификатор аккаунта канала выводится из сессии
+ * (demo-<канал>-<userId>, lib/bot/demo-channel.ts): принять его из тела
+ * означало бы позволить клиенту назваться чужим аккаунтом мессенджера и
+ * работать с чужим кабинетом. Неизвестные поля zod отбрасывает.
+ */
+export const botMessageSchema = z.object({
+  channel: botChannelSchema,
+  text: z
+    .string()
+    .trim()
+    .min(1, 'Введите команду.')
+    .max(BOT_MESSAGE_MAX_LENGTH, `Команда длиннее ${BOT_MESSAGE_MAX_LENGTH} символов. Сократите её.`),
+});
+
+
+// ---------------------------------------------------------------------------
+// Переписка студент ↔ преподаватель (/api/conversations/*)
+// ---------------------------------------------------------------------------
+
+/**
+ * Начало диалога (POST /api/conversations) и текст сообщения
+ * (POST /api/conversations/[id]/messages). Канонические схемы — в
+ * packages/core: диалог создаёт только верифицированный студент, проверка
+ * живёт в сервисе, здесь — точка импорта для роута.
+ */
 export { conversationStartSchema, messageBodySchema } from '@udgu/core';

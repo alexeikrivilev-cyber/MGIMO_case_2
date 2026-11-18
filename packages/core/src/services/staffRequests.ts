@@ -14,7 +14,8 @@
  * иначе сотрудник плодил бы дублирующие уведомления студенту.
  *
  * Каждое решение: уведомление студенту (type REQUEST_STATUS) + запись
- * аудита с actor = сотрудник сессии.
+ * аудита с actor = сотрудник сессии. Уведомление копией уходит в каналы
+ * студента (BRIEF v3, outbox): Telegram / VK / MAX, если привязаны.
  */
 import { z } from 'zod';
 import { prisma } from '../db';
@@ -23,6 +24,7 @@ import { OwnershipError, ValidationError } from '../errors';
 import { writeAuditEvent } from '../audit';
 import { firstIssues } from '../validation';
 import { REQUEST_TYPE_LABELS, REQUEST_STATUS_LABELS } from './requests';
+import { enqueueChannelDeliveriesSafely } from '../bot/outbox';
 import type { AuthSession } from '../session';
 import type { Prisma, RequestStatus, RequestType } from '@udgu/db';
 
@@ -214,15 +216,26 @@ export async function decideStaffRequest(
     select: { userId: true },
   });
   if (studentUser !== null) {
+    const title = decisionTitle(status);
+    const body = decisionBody(request.type, status, staffComment?.trim());
     await prisma().notification.create({
       data: {
         userId: studentUser.userId,
         type: 'REQUEST_STATUS',
-        title: decisionTitle(status),
-        body: decisionBody(request.type, status, staffComment?.trim()),
+        title,
+        body,
         link: '/requests',
       },
     });
+
+    // Копия уведомления в каналы студента (BRIEF v3): тот же заголовок и
+    // текст. Сбой outbox не отменяет уведомление на сайте — оно источник
+    // истины, поэтому вызов безопасный.
+    await enqueueChannelDeliveriesSafely(
+      studentUser.userId,
+      { title, body, link: '/requests' },
+      'request.decide',
+    );
   }
 
   await writeAuditEvent({

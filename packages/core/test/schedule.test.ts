@@ -298,11 +298,15 @@ test('ближайшая пара: до первой пары, между пар
 
 test('ближайшая пара: отменённые пары пропускаются, дальше в окне пусто', async () => {
   const tomorrow = addUtcDays(startOfUtcDay(new Date()), 1);
-  // После 14:00 завтра остаётся только отменённая пара 15:00 — её не отдаём,
-  // а других пар в 14-дневном окне нет.
+  // После 14:00 завтра остаётся только отменённая пара 15:00 — её не отдаём.
   const afterTomorrowLessons = new Date(tomorrow.getTime() + 14 * 60 * 60 * 1000 + 30 * 60 * 1000);
   const next = await getMyNextLesson(studentSession, afterTomorrowLessons);
-  assert.equal(next, null);
+  assert.notEqual(next?.status, 'CANCELLED', 'отменённая пара не становится ближайшей');
+  // Дальше в 14-дневном окне от «сейчас» остаётся только среда недели +2.
+  // Попадает ли она в окно — зависит от дня недели прогона (окно считается
+  // от переданного «сейчас»), поэтому оба случая считаются корректными.
+  const farWednesday = addUtcDays(mondayOfUtcWeek(new Date(), 2), 2);
+  assert.ok(next === null || dateKey(next.date) === dateKey(farWednesday));
 });
 
 test('расписание преподавателя доступно студенту', async () => {

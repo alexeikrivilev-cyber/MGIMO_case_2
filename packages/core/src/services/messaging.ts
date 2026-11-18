@@ -19,7 +19,9 @@
  *
  * Модель уведомлений: каждое сообщение создаёт получателю уведомление
  * типа MESSAGE со ссылкой на /messages — переписка не должна зависеть
- * от того, открыт ли диалог прямо сейчас.
+ * от того, открыт ли диалог прямо сейчас. То же уведомление копией
+ * уходит в каналы получателя (BRIEF v3, outbox): Telegram / VK / MAX,
+ * если канал привязан.
  */
 import { z } from 'zod';
 import { prisma } from '../db';
@@ -28,6 +30,7 @@ import { OwnershipError, ValidationError } from '../errors';
 import { writeAuditEvent } from '../audit';
 import { firstIssues } from '../validation';
 import { requireVerifiedStudent } from './verification';
+import { enqueueChannelDeliveriesSafely } from '../bot/outbox';
 import type { AuthSession, SessionUser } from '../session';
 
 /** Максимальная длина сообщения (как у комментариев сотрудника). */
@@ -409,15 +412,27 @@ export async function sendMessage(
   // из связи: у студента и преподавателя всегда есть учётная запись,
   // иначе диалог не существовал бы).
   const recipientUserId = role === 'student' ? conversation.teacher.userId : conversation.student.userId;
+  const notificationTitle =
+    role === 'student' ? 'Новое сообщение от студента' : 'Новое сообщение от преподавателя';
+  const notificationBody = preview(parsed.data.body);
   await prisma().notification.create({
     data: {
       userId: recipientUserId,
       type: 'MESSAGE',
-      title: role === 'student' ? 'Новое сообщение от студента' : 'Новое сообщение от преподавателя',
-      body: preview(parsed.data.body),
+      title: notificationTitle,
+      body: notificationBody,
       link: '/messages',
     },
   });
+
+  // Копия уведомления в каналы получателя (BRIEF v3): те же заголовок и
+  // текст, что и на сайте. Сбой outbox не отменяет уведомление на сайте —
+  // оно источник истины, поэтому вызов безопасный.
+  await enqueueChannelDeliveriesSafely(
+    recipientUserId,
+    { title: notificationTitle, body: notificationBody, link: '/messages' },
+    'message.send',
+  );
 
   await writeAuditEvent({
     actorUserId: user.id,

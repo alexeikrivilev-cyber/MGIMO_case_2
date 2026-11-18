@@ -21,6 +21,8 @@ import {
   sendMessage,
   markConversationRead,
   messagingRole,
+  enqueueChannelDeliveries,
+  enqueueChannelDeliveriesSafely,
   ValidationError,
   VerificationRequiredError,
   OwnershipError,
@@ -291,6 +293,66 @@ test('отправка сообщения: создаётся запись, по
 
 test('пустое сообщение не отправляется', async () => {
   await assert.rejects(() => sendMessage(verifiedStudent, ownConversationId, { body: '   ' }), ValidationError);
+});
+
+test('уведомление копируется в каналы получателя (outbox BRIEF v3)', async () => {
+  // Отдельный диалог: тест не трогает непрочитанные в общей фикстуре.
+  const conversation = await startConversationWithTeacher(verifiedStudent, { teacherId: otherTeacherId });
+  const recipientUserId = (
+    await prisma().teacher.findUniqueOrThrow({ where: { id: otherTeacherId } })
+  ).userId;
+  // Преподаватель привязал Telegram: ответ должен уйти и на сайт, и в канал.
+  await prisma().oAuthAccount.create({
+    data: { userId: recipientUserId, provider: 'TELEGRAM', providerAccountId: 'tg-msg-teacher' },
+  });
+
+  const message = await sendMessage(verifiedStudent, conversation.id, { body: 'Перенесём на пятницу.' });
+  assert.equal(message.mine, true);
+
+  const deliveries = await prisma().channelDelivery.findMany({ where: { userId: recipientUserId } });
+  assert.equal(deliveries.length, 1, 'одна запись на привязанный канал');
+  assert.equal(deliveries[0]?.provider, 'TELEGRAM');
+  assert.equal(deliveries[0]?.status, 'PENDING');
+
+  // Текст канала = текст уведомления на сайте (источник истины); ссылка
+  // кабинета дописывается к телу (модель outbox не хранит её отдельно).
+  const notification = await prisma().notification.findFirst({
+    where: { userId: recipientUserId, type: 'MESSAGE' },
+    orderBy: { createdAt: 'desc' },
+  });
+  assert.equal(deliveries[0]?.title, notification?.title);
+  assert.ok(
+    (deliveries[0]?.body ?? '').startsWith(notification?.body ?? ''),
+    'тело доставки начинается с текста уведомления сайта',
+  );
+  assert.match(deliveries[0]?.body ?? '', /\/messages$/, 'ссылка кабинета уходит частью текста');
+});
+
+test('сбой outbox не отменяет уведомление на сайте (безопасная постановка)', async () => {
+  const ownUserId = (
+    await prisma().student.findUniqueOrThrow({ where: { id: ownStudentId }, select: { userId: true } })
+  ).userId;
+  // Пустой заголовок — отказ enqueue. Через безопасную обёртку сбой не
+  // бросается: уведомление на сайте остаётся источником истины, канал лишь
+  // копия. Прямой enqueue так не умеет — он бросает TypeError.
+  await assert.rejects(
+    () => enqueueChannelDeliveries(ownUserId, { title: '   ', body: 'текст' }),
+    TypeError,
+  );
+  await enqueueChannelDeliveriesSafely(ownUserId, { title: '   ', body: 'текст' }, 'test.outbox');
+  assert.equal(
+    await prisma().channelDelivery.count({ where: { userId: ownUserId } }),
+    0,
+    'некорректная запись в очередь не попадает',
+  );
+
+  // После сбоя очередь жива: корректная постановка проходит.
+  await prisma().oAuthAccount.create({
+    data: { userId: ownUserId, provider: 'VK_ID', providerAccountId: 'vk-msg-own' },
+  });
+  await enqueueChannelDeliveriesSafely(ownUserId, { title: 'Оценка', body: 'Экзамен сдан.' }, 'test.outbox');
+  const deliveries = await prisma().channelDelivery.findMany({ where: { userId: ownUserId } });
+  assert.equal(deliveries.length, 1, 'после сбоя очередь продолжает работать');
 });
 
 test('отметка о прочтении гасит только сообщения другого автора', async () => {

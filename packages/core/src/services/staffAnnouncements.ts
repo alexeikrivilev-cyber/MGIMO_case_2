@@ -25,6 +25,7 @@ import { OwnershipError, ValidationError } from '../errors';
 import { writeAuditEvent } from '../audit';
 import { firstIssues } from '../validation';
 import { ANNOUNCEMENT_AUDIENCE_LABELS } from './announcements';
+import { enqueueChannelDeliveriesSafely } from '../bot/outbox';
 import type { AuthSession } from '../session';
 import type { AnnouncementAudience } from '@udgu/db';
 
@@ -190,15 +191,28 @@ async function notifyAudience(
     return;
   }
 
+  const notificationTitle = `Объявление деканата: ${title}`;
   await prisma().notification.createMany({
     data: students.map((student) => ({
       userId: student.userId,
       type: 'ANNOUNCEMENT' as const,
-      title: `Объявление деканата: ${title}`,
+      title: notificationTitle,
       body,
       link: '/announcements',
     })),
   });
+
+  // Копия уведомления в каналы каждого студента аудитории (BRIEF v3):
+  // тот же заголовок и текст. Сбой outbox не отменяет уведомление на
+  // сайте — оно источник истины, поэтому вызов безопасный (и одна
+  // строка в лог, а не отказ всей публикации).
+  for (const student of students) {
+    await enqueueChannelDeliveriesSafely(
+      student.userId,
+      { title: notificationTitle, body, link: '/announcements' },
+      'announcement.create',
+    );
+  }
 }
 
 /**

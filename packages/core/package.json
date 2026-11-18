@@ -7,7 +7,8 @@
   "types": "./src/index.ts",
   "exports": {
     ".": "./src/index.ts",
-    "./assistant": "./src/assistantClient.ts"
+    "./assistant": "./src/assistantClient.ts",
+    "./bot": "./src/botClient.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",

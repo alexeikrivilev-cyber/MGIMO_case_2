@@ -591,3 +591,79 @@ test('решение по верификации: через существую�
   });
   assert.match(notification?.title ?? '', /Верификация пройдена/);
 });
+
+// ---------------------------------------------------------------------------
+// Уведомления кабинета уходят и в каналы доступа (BRIEF v3, outbox)
+// ---------------------------------------------------------------------------
+
+test('решение по заявке, объявление и перенос пары копируются в канал студента', async () => {
+  // Студент своего факультета с привязанным Telegram: уведомления должны
+  // появиться и на сайте, и в outbox канала.
+  const group = await createGroup('КАН-31-1', FACULTY, 3, '01.03.02 Прикладная математика и информатика');
+  const student = await createStudent('kanal-student', group.id, { lastName: 'Каналов' });
+  const studentUserId = (await prisma().student.findUniqueOrThrow({ where: { id: student.studentId } })).userId;
+  await prisma().oAuthAccount.create({
+    data: { userId: studentUserId, provider: 'TELEGRAM', providerAccountId: 'tg-kanal' },
+  });
+  const studentSession = await authSessionFor(studentUserId);
+  const today = dateKey(startOfUtcDay(new Date()));
+
+  // 1. Решение сотрудника по заявке.
+  const request = await createMyRequest(studentSession, { type: 'REFERENCE', formData: { purpose: 'в банк' } });
+  await decideStaffRequest(staffSession, request.id, { status: 'READY' });
+
+  // 2. Объявление деканата для группы.
+  await createStaffAnnouncement(staffSession, {
+    title: 'Сдача зачётов',
+    body: 'Зачёты в среду.',
+    audience: 'GROUP',
+    groupId: group.id,
+  });
+
+  // 3. Перенос пары группы.
+  const subject = await createSubject('КАН-101', 'Каналоведение');
+  // Преподаватель фикстуры (у него уже есть профиль Teacher).
+  const teacherProfile = await prisma().teacher.findFirstOrThrow({
+    where: { userId: (await prisma().user.findUniqueOrThrow({ where: { login: 'teacher-staff' } })).id },
+    select: { id: true },
+  });
+  const entryId = await createScheduleEntry({
+    groupId: group.id,
+    subjectId: subject,
+    teacherId: teacherProfile.id,
+    date: today,
+    startTime: '10:00',
+    endTime: '11:20',
+  });
+  await moveStaffLesson(staffSession, entryId, { date: today, room: 'У-777' });
+
+  // Outbox: три уведомления, по одному на действие, все в его канал.
+  const deliveries = await prisma().channelDelivery.findMany({
+    where: { userId: studentUserId },
+    orderBy: { createdAt: 'asc' },
+  });
+  assert.equal(deliveries.length, 3, 'решение + объявление + перенос пары');
+  assert.ok(
+    deliveries.every((item) => item.provider === 'TELEGRAM' && item.status === 'PENDING'),
+    'записи ждут отправки адаптером канала',
+  );
+
+  // Текст доставки = текст уведомления на сайте: канал не выдумывает свой.
+  // Ссылка кабинета в outbox дописывается к тексту (модель не хранит её
+  // отдельно), поэтому тело доставки НАЧИНАЕТСЯ телом уведомления.
+  const notifications = await prisma().notification.findMany({
+    where: { userId: studentUserId },
+    orderBy: { createdAt: 'asc' },
+    select: { title: true, body: true },
+  });
+  for (const delivery of deliveries) {
+    const source = notifications.find(
+      (notification) => notification.title === delivery.title && delivery.body.startsWith(notification.body),
+    );
+    assert.ok(source !== undefined, `доставка «${delivery.title}» повторяет уведомление сайта`);
+  }
+  assert.deepEqual(
+    deliveries.map((item) => item.title),
+    ['Заявка готова', 'Объявление деканата: Сдача зачётов', 'Пара перенесена'],
+  );
+});

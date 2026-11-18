@@ -70,10 +70,24 @@ enum VerificationStatus {
 }
 
 /// Провайдер OAuth-входа (в прототипе — эмуляция согласия, без реальных ключей).
+/// Одно и то же перечисление идентифицирует КАНАЛ доступа: Telegram-бот,
+/// VK-бот и MAX-бот работают с той же учётной записью через OAuthAccount
+/// (BRIEF v3 «Каналы доступа»), второй стороны идентичностей нет.
 enum OAuthProvider {
   VK_ID
   MAX
   TELEGRAM
+}
+
+/// Статус записи outbox доставки уведомления в канал (BRIEF v3).
+/// PENDING — ждёт отправки адаптером канала; SENT — доставлено живым
+/// адаптером; DEMO — канал в демо-режиме (адаптера нет, ключи бота не
+/// заданы); FAILED — адаптер отрапортовал сбой, текст ошибки в error.
+enum ChannelDeliveryStatus {
+  PENDING
+  SENT
+  DEMO
+  FAILED
 }
 
 /// Тип часа приёма преподавателя.
@@ -109,6 +123,8 @@ model User {
   oauthAccounts OAuthAccount[]
   reviewedVerifications StudentVerification[] @relation("VerificationReviewer")
   messages      Message[]
+  botLinkCodes BotLinkCode[]
+  channelDeliveries ChannelDelivery[]
 
   @@index([faculty])
   @@map("users")
@@ -392,6 +408,48 @@ model OAuthIntent {
 
   @@index([expiresAt])
   @@map("oauth_intents")
+}
+
+/// Одноразовый код привязки канала к учётной записи (BRIEF v3): студент
+/// берёт код в кабинете (раздел «Каналы») и отправляет его боту командой
+/// /link. Код — 6 символов без неоднозначных (0/O, 1/I), живёт 10 минут,
+/// гасится при использовании. provider = null — код принимается любым
+/// каналом; иначе только своим (код, выданный на Telegram, не привяжет VK).
+model BotLinkCode {
+  code       String        @id
+  userId     String
+  provider   OAuthProvider?
+  expiresAt  DateTime
+  consumedAt DateTime?
+  createdAt  DateTime      @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([expiresAt])
+  @@map("bot_link_codes")
+}
+
+/// Outbox доставки уведомлений в каналы пользователя (BRIEF v3): одна
+/// запись на канал. Уведомление создаётся в кабинете (как для сайта),
+/// а адаптеры каналов забирают PENDING-записи и отправляют их боту.
+/// Демо-режим (ключей бота нет) закрывается статусом DEMO — сценарии
+/// проходимы жюри end-to-end, но канал честно помечен как демо.
+model ChannelDelivery {
+  id       String                @id @default(uuid())
+  userId   String
+  provider OAuthProvider
+  title    String
+  body     String
+  status   ChannelDeliveryStatus @default(PENDING)
+  error    String?
+  createdAt DateTime             @default(now())
+  sentAt   DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([status])
+  @@map("channel_deliveries")
 }
 
 /// Статус «болею»: период заболевания студента. Виден преподавателям

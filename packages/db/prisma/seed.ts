@@ -49,6 +49,8 @@ async function cleanDatabase(): Promise<void> {
   await prisma.studentVerification.deleteMany();
   await prisma.oAuthAccount.deleteMany();
   await prisma.oAuthIntent.deleteMany();
+  await prisma.botLinkCode.deleteMany();
+  await prisma.channelDelivery.deleteMany();
   await prisma.sickLeave.deleteMany();
   await prisma.officeHour.deleteMany();
   await prisma.identityRegistry.deleteMany();
