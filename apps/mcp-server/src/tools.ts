@@ -2,8 +2,8 @@
  * Инструменты MCP-сервера деканата (BRIEF v2 §7).
  *
  * ГРАНИЦА (главное правило пакета): инструмент — тонкая обёртка над
- * сервисом кабинета. Он валидирует аргументы (zod) и вызывает ТОТ ЖЕ
- * сервис packages/core, который вызывает веб-кабинет, поэтому:
+ * сервисом кабинета. Он объявляет схему аргументов (zod) и вызывает ТОТ
+ * ЖЕ сервис packages/core, который вызывает веб-кабинет, поэтому:
  *   - своих прав у инструмента нет: их проверяет ядро (requireStaffScope,
  *     владение данными), сервер только отображает отказ;
  *   - данные наружу уходят в той же форме, что в кабинете: ни одного
@@ -14,6 +14,9 @@
  * кабинете: посмотреть очередь, решить заявку, опубликовать объявление,
  * перенести пару, посмотреть успеваемость студента. Ничего, чего
  * сотрудник не может сделать в кабинете, здесь тоже нельзя.
+ *
+ * Расположение: apps/mcp-server — единый пакет инструментов и
+ * транспортов (stdio + HTTP) на официальном MCP SDK.
  */
 import { z } from 'zod';
 import {
@@ -98,7 +101,7 @@ const dateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Дата в форм
 
 export const DEANERY_TOOLS: readonly DeaneryTool[] = [
   defineTool({
-    name: 'deanery_requests_list',
+    name: 'list_requests',
     title: 'Очередь заявок',
     description:
       'Список заявок и справок студентов института сотрудника (у администратора — всех институтов). ' +
@@ -110,7 +113,7 @@ export const DEANERY_TOOLS: readonly DeaneryTool[] = [
   }),
 
   defineTool({
-    name: 'deanery_request_decide',
+    name: 'decide_request',
     title: 'Решение по заявке',
     description:
       'Меняет статус заявки: IN_PROGRESS (в работе), READY (готова) или REJECTED (отклонена). ' +
@@ -126,7 +129,7 @@ export const DEANERY_TOOLS: readonly DeaneryTool[] = [
   }),
 
   defineTool({
-    name: 'deanery_announcements_list',
+    name: 'list_announcements',
     title: 'Объявления',
     description:
       'Объявления, видимые сотруднику: общие на весь университет, его института и группы его института. ' +
@@ -136,7 +139,7 @@ export const DEANERY_TOOLS: readonly DeaneryTool[] = [
   }),
 
   defineTool({
-    name: 'deanery_announcement_publish',
+    name: 'publish_announcement',
     title: 'Публикация объявления',
     description:
       'Публикует объявление и уведомляет студентов аудитории. Аудитория по умолчанию — институт ' +
@@ -162,7 +165,7 @@ export const DEANERY_TOOLS: readonly DeaneryTool[] = [
   }),
 
   defineTool({
-    name: 'deanery_sick_leaves',
+    name: 'sick_statuses',
     title: 'Статусы «болею»',
     description:
       'Студенты института сотрудника, отметившие болезнь. activeOnly=true — только те, кто болеет ' +
@@ -178,7 +181,7 @@ export const DEANERY_TOOLS: readonly DeaneryTool[] = [
   }),
 
   defineTool({
-    name: 'deanery_schedule',
+    name: 'get_schedule',
     title: 'Расписание института',
     description:
       'Пары групп института сотрудника за период (по умолчанию — две недели от сегодня). ' +
@@ -210,7 +213,7 @@ export const DEANERY_TOOLS: readonly DeaneryTool[] = [
   }),
 
   defineTool({
-    name: 'deanery_lesson_move',
+    name: 'move_lesson',
     title: 'Перенос пары',
     description:
       'Переносит занятие на новую дату (YYYY-MM-DD), опционально меняет аудиторию и добавляет ' +
@@ -226,7 +229,7 @@ export const DEANERY_TOOLS: readonly DeaneryTool[] = [
   }),
 
   defineTool({
-    name: 'deanery_lesson_cancel',
+    name: 'cancel_lesson',
     title: 'Отмена пары',
     description:
       'Отменяет занятие; причина обязательна — студенты увидят её в уведомлении. ' +
@@ -239,7 +242,7 @@ export const DEANERY_TOOLS: readonly DeaneryTool[] = [
   }),
 
   defineTool({
-    name: 'deanery_teachers_list',
+    name: 'list_teachers',
     title: 'Преподаватели',
     description: 'Справочник преподавателей университета: ФИО, кафедра, должность. Алфавитно по фамилии.',
     schema: z.object({}),
@@ -247,7 +250,7 @@ export const DEANERY_TOOLS: readonly DeaneryTool[] = [
   }),
 
   defineTool({
-    name: 'deanery_teacher_card',
+    name: 'get_teacher_card',
     title: 'Карточка преподавателя',
     description:
       'Расписание преподавателя и часы приёма. Период по умолчанию — две недели от сегодня; ' +
@@ -267,7 +270,7 @@ export const DEANERY_TOOLS: readonly DeaneryTool[] = [
   }),
 
   defineTool({
-    name: 'deanery_student_grades',
+    name: 'get_grades',
     title: 'Успеваемость студента',
     description:
       'Оценки и зачёты студента по его логину: семестры, оценки, средний балл, долги. ' +
@@ -279,21 +282,3 @@ export const DEANERY_TOOLS: readonly DeaneryTool[] = [
     handler: (session, args) => listStudentGradesForStaff(session, { login: args.login }),
   }),
 ];
-
-/** Инструмент по имени; undefined — имени нет в наборе. */
-export function findDeaneryTool(name: string): DeaneryTool | undefined {
-  return DEANERY_TOOLS.find((item) => item.name === name);
-}
-
-/**
- * JSON Schema инструмента для tools/list.
- *
- * z.toJSONSchema отдаёт черновик 2020-12; MCP ждёт «просто схему», поэтому
- * служебное поле $schema убираем. Описания полей остаются на стороне
- * инструмента (description), чтобы агент читал одно место, а не два.
- */
-export function inputSchemaOf(schema: DeaneryTool['schema']): Record<string, unknown> {
-  const jsonSchema = z.toJSONSchema(schema) as Record<string, unknown>;
-  const { $schema: _dropped, ...rest } = jsonSchema;
-  return rest;
-}

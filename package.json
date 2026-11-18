@@ -12,15 +12,16 @@
   },
   "scripts": {
     "dev": "npm run dev -w @udgu/web",
-    "build": "npm run build -w @udgu/db && npm run build -w @udgu/mcp && npm run build -w @udgu/web",
+    "build": "npm run build -w @udgu/db && npm run build -w @udgu/mcp-server && npm run build -w @udgu/web",
     "start": "npm run start -w @udgu/web",
-    "mcp:serve": "npm run mcp:serve -w @udgu/mcp",
+    "mcp:serve": "npm run mcp:serve -w @udgu/mcp-server",
+    "mcp:serve:http": "npm run mcp:serve:http -w @udgu/mcp-server",
     "db:generate": "npm run db:generate -w @udgu/db",
     "db:migrate": "npm run db:migrate -w @udgu/db",
     "db:deploy": "npm run db:deploy -w @udgu/db",
     "db:seed": "npm run db:seed -w @udgu/db",
     "db:reset": "npm run db:reset -w @udgu/db",
-    "test": "npm test -w @udgu/db && npm test -w @udgu/core && npm test -w @udgu/mcp && npm test -w @udgu/web",
+    "test": "npm test -w @udgu/db && npm test -w @udgu/core && npm test -w @udgu/mcp-server && npm test -w @udgu/web",
     "typecheck": "npm run typecheck --workspaces --if-present"
   },
   "devDependencies": {
