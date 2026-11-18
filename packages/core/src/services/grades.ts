@@ -52,6 +52,53 @@ export interface MyGradesResult {
   readonly semesters: readonly MyGradesBySemester[];
 }
 
+/**
+ * Строка оценки из БД (форма, в которой её отдают оба потребителя:
+ * кабинет студента и сотрудник деканата — services/staffGrades).
+ * Преобразование одно на весь пакет, поэтому «оценка 5 за экзамен»
+ * выглядит одинаково в кабинете и в отчёте сотрудника.
+ */
+export interface GradeRow {
+  readonly id: string;
+  readonly type: GradeType;
+  readonly value: number | null;
+  readonly passed: boolean | null;
+  readonly date: Date;
+  readonly semester: number;
+  readonly subject: { readonly name: string; readonly code: string };
+}
+
+/** Оценка/зачёт для отдачи наружу (с меткой типа — не только числом). */
+export function toGradeEntry(row: GradeRow): MyGradeEntry {
+  return {
+    id: row.id,
+    subjectName: row.subject.name,
+    subjectCode: row.subject.code,
+    type: row.type,
+    typeLabel: GRADE_TYPE_LABELS[row.type],
+    value: row.value,
+    passed: row.passed,
+    date: row.date,
+    semester: row.semester,
+  };
+}
+
+/** Группировка по семестрам, с сначала нового (детерминированный порядок). */
+export function groupGradesBySemester(
+  entries: readonly MyGradeEntry[],
+): readonly MyGradesBySemester[] {
+  const bySemester = new Map<number, MyGradeEntry[]>();
+  for (const entry of entries) {
+    const list = bySemester.get(entry.semester) ?? [];
+    list.push(entry);
+    bySemester.set(entry.semester, list);
+  }
+
+  return [...bySemester.entries()]
+    .sort((left, right) => right[0] - left[0])
+    .map(([semester, semesterEntries]) => ({ semester, entries: semesterEntries }));
+}
+
 /** Оценки и зачёты по дисциплинам, сгруппированные по семестрам (сначала новые). */
 export async function getMyGrades(session: AuthSession, semester?: number): Promise<MyGradesResult> {
   await requireVerifiedStudent(session);
@@ -63,29 +110,7 @@ export async function getMyGrades(session: AuthSession, semester?: number): Prom
     orderBy: [{ date: 'desc' }],
   });
 
-  const bySemester = new Map<number, MyGradeEntry[]>();
-  for (const grade of grades) {
-    const entry: MyGradeEntry = {
-      id: grade.id,
-      subjectName: grade.subject.name,
-      subjectCode: grade.subject.code,
-      type: grade.type,
-      typeLabel: GRADE_TYPE_LABELS[grade.type],
-      value: grade.value,
-      passed: grade.passed,
-      date: grade.date,
-      semester: grade.semester,
-    };
-    const list = bySemester.get(grade.semester) ?? [];
-    list.push(entry);
-    bySemester.set(grade.semester, list);
-  }
-
-  const semesters = [...bySemester.entries()]
-    .sort((left, right) => right[0] - left[0])
-    .map(([semesterNumber, entries]) => ({ semester: semesterNumber, entries }));
-
-  return { semesters };
+  return { semesters: groupGradesBySemester(grades.map(toGradeEntry)) };
 }
 
 export type TrendDirection = 'UP' | 'DOWN' | 'STABLE' | 'UNKNOWN';
@@ -132,7 +157,19 @@ export async function getMyAcademicSummary(session: AuthSession): Promise<Academ
     include: { subject: { select: { name: true, code: true } } },
   });
 
-  const graded = grades.filter(
+  return summarizeGrades(grades.map(toGradeEntry));
+}
+
+/**
+ * Сводка «как у студента дела»: средний балл, долги, тренд, что подтянуть.
+ *
+ * Чистая функция над уже загруженными оценками: её переиспользуют кабинет
+ * студента и кабинет сотрудника деканата (services/staffGrades), поэтому
+ * арифметика «среднего балла» и набор долгов не могут разойтись между
+ * тем, что видит студент, и тем, что видит сотрудник.
+ */
+export function summarizeGrades(entries: readonly MyGradeEntry[]): AcademicSummary {
+  const graded = entries.filter(
     (grade) => GRADED_TYPES.includes(grade.type) && grade.value !== null,
   );
   const averageScore =
@@ -140,11 +177,11 @@ export async function getMyAcademicSummary(session: AuthSession): Promise<Academ
       ? null
       : round2(graded.reduce((sum, grade) => sum + (grade.value ?? 0), 0) / graded.length);
 
-  const debts: AcademicDebt[] = grades
+  const debts: AcademicDebt[] = entries
     .filter((grade) => grade.type === 'CREDIT' && grade.passed === false)
     .map((grade) => ({
-      subjectName: grade.subject.name,
-      subjectCode: grade.subject.code,
+      subjectName: grade.subjectName,
+      subjectCode: grade.subjectCode,
       semester: grade.semester,
     }))
     .sort(
@@ -186,7 +223,7 @@ export async function getMyAcademicSummary(session: AuthSession): Promise<Academ
   // Порядок: семестр → сначала долги (срочнее), затем низкие оценки,
   // внутри группы — по алфавиту. Детерминированно, без опоры на порядок БД.
   const debtRank = (reason: 'DEBT' | 'LOW_GRADE'): number => (reason === 'DEBT' ? 0 : 1);
-  const toImprove: ImprovementHint[] = grades
+  const toImprove: ImprovementHint[] = entries
     .filter((grade) => {
       if (grade.type === 'CREDIT') {
         return grade.passed === false;
@@ -194,8 +231,8 @@ export async function getMyAcademicSummary(session: AuthSession): Promise<Academ
       return grade.value !== null && grade.value <= 3;
     })
     .map((grade) => ({
-      subjectName: grade.subject.name,
-      subjectCode: grade.subject.code,
+      subjectName: grade.subjectName,
+      subjectCode: grade.subjectCode,
       semester: grade.semester,
       value: grade.value,
       reason: grade.type === 'CREDIT' && grade.passed === false ? ('DEBT' as const) : ('LOW_GRADE' as const),
