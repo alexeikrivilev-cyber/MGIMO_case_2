@@ -114,6 +114,37 @@
 }
 
 /*
+ * Волна 3 «оживления интерфейса» (docs/design/ui-alive-wave-3.html, §1):
+ * индикатор активного раздела нижней навигации — полоска 2px × 24px
+ * цветом primary у верхней кромки пункта. Сам пункт уже relative
+ * (Tailwind-класс в оболочках), поэтому ::before позиционируется
+ * абсолютно внутри него. Рост из центра (scaleX 0 → 1) — только при
+ * prefers-reduced-motion: no-preference; при reduce индикатор сразу на
+ * месте, без движения (как столбцы диаграммы выше).
+ */
+.nav-indicator::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 1.5rem;
+  height: 2px;
+  margin-left: -0.75rem;
+  border-radius: 0 0 2px 2px;
+  background-color: var(--udgu-color-primary);
+  transform-origin: center;
+}
+
+@keyframes udgu-nav-in {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .nav-indicator::before { animation: udgu-nav-in var(--udgu-motion-duration-fast) var(--udgu-motion-ease-out) both; }
+}
+
+/*
  * prefers-reduced-motion (WCAG 2.3.3, 2.2.2): пользователь просил не
  * двигать интерфейс — гасим ВСЕ анимации и переходы, включая
  * animate-pulse (скелетоны) и animate-spin (спиннеры кнопок).

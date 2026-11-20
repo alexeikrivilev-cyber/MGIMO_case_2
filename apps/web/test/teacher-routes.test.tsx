@@ -450,3 +450,29 @@ test('оболочка: три раздела в нижней навигации
   assert.match(html, /aria-current="page"/);
   assert.match(html, /\/messages/);
 });
+
+// ---------------------------------------------------------------------------
+// Волна 3 «оживления интерфейса» (docs/design/ui-alive-wave-3.html):
+// чипы-вопросы ассистента преподавателя дают тот же отклик, что и <Button>
+// ---------------------------------------------------------------------------
+
+/** Характерная подстрока PRESS_FEEDBACK (apps/web/lib/ui.ts). */
+const PRESS_MARK = 'motion-safe:enabled:active:scale-[0.96]';
+
+test('ассистент преподавателя: волна 3 — чипы вопросов дают отклик на нажатие', async () => {
+  const assistant = await loadTeacherAssistantPageData(`udgu_session=${teacherToken}`);
+  assert.equal(assistant.ok, true);
+  if (!assistant.ok) {
+    return;
+  }
+  const html = render(<TeacherAssistantPanel plans={assistant.value.plans} suggestions={assistant.value.suggestions} />);
+
+  // Чипы — «сырые» <button> (не <Button> из components/ui): без
+  // PRESS_FEEDBACK они молчали бы при нажатии, в отличие от «Спросить».
+  const buttons = [...html.matchAll(/<button [^>]*>/g)].map((match) => match[0]);
+  assert.ok(buttons.length >= 2, `чипы вопросов и кнопка отправки (${buttons.length})`);
+  for (const button of buttons) {
+    assert.ok(button.includes(PRESS_MARK), `кнопка несёт отклик: ${button.slice(0, 60)}…`);
+    assert.ok(!button.includes('transition-colors'), 'transition-colors заменён PRESS_FEEDBACK');
+  }
+});

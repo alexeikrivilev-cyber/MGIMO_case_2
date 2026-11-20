@@ -22,7 +22,7 @@ import Link from 'next/link';
 import { Card, EmptyState, LinkButton, StatusBadge } from '../../../components/ui';
 import { PageHeader } from '../../../components/PageHeader';
 import { StaffPageResult } from '../../../components/StaffPageResult';
-import { FOCUS_RING } from '../../../lib/ui';
+import { FOCUS_RING, PRESS_FEEDBACK } from '../../../lib/ui';
 import { loadStaffDashboardPageData, type LoadResult, type StaffDashboardPageData } from '../../../lib/page-data';
 
 /** Плитка очереди: счётчик + подпись + куда ведёт. */
@@ -73,7 +73,7 @@ function SectionLink({
     <li>
       <Link
         href={href}
-        className={`flex min-h-11 items-center gap-3 rounded-xl border border-border bg-surface px-4 py-3 shadow-sm transition-colors hover:bg-surface-2 ${FOCUS_RING}`}
+        className={`flex min-h-11 items-center gap-3 rounded-xl border border-border bg-surface px-4 py-3 shadow-sm ${PRESS_FEEDBACK} hover:bg-surface-2 ${FOCUS_RING}`}
       >
         <span className="min-w-0 flex-1">
           <span className="block text-sm font-medium text-text">{title}</span>

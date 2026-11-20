@@ -9,6 +9,7 @@ import { EmptyState } from '../../../components/ui';
 import { PageHeader } from '../../../components/PageHeader';
 import { PageResult } from '../../../components/PageStates';
 import { IconChevronRight } from '../../../components/icons';
+import { PRESS_FEEDBACK } from '../../../lib/ui';
 import { loadTeachersPageData, type LoadResult, type TeachersPageData } from '../../../lib/page-data';
 
 const FOCUS_RING =
@@ -32,7 +33,7 @@ export function TeachersView({ result }: { result: LoadResult<TeachersPageData> 
                 <li key={teacher.id}>
                   <Link
                     href={`/teachers/${teacher.id}`}
-                    className={`flex min-h-11 items-center gap-3 rounded-xl border border-border bg-surface px-4 py-3 shadow-sm transition-colors hover:bg-surface-2 ${FOCUS_RING}`}
+                    className={`flex min-h-11 items-center gap-3 rounded-xl border border-border bg-surface px-4 py-3 shadow-sm ${PRESS_FEEDBACK} hover:bg-surface-2 ${FOCUS_RING}`}
                   >
                     <span className="min-w-0 flex-1">
                       <span className="block text-sm font-medium text-text">{teacher.fullName}</span>

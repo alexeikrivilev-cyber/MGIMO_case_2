@@ -25,7 +25,7 @@ import { ConceptBanner } from './ConceptBanner';
 import { ConceptMark } from './ConceptMark';
 import { LogoutButton } from './LogoutButton';
 import { ThemeToggle } from './ThemeToggle';
-import { FOCUS_RING } from '../lib/ui';
+import { FOCUS_RING, PRESS_FEEDBACK } from '../lib/ui';
 import { IconAssistant, IconCalendar, IconChat, IconRequests, IconToday } from './icons';
 
 interface NavItem {
@@ -102,8 +102,8 @@ export function MessagesShell({
                   href={href}
                   aria-current={active ? 'page' : undefined}
                   aria-label={fullLabel}
-                  className={`relative flex min-h-14 flex-col items-center justify-center gap-0.5 px-0.5 py-1.5 text-center text-[10px] leading-4 transition-colors ${FOCUS_RING} ${
-                    active ? 'font-semibold text-primary' : 'font-medium text-text-muted hover:text-text'
+                  className={`relative flex min-h-14 flex-col items-center justify-center gap-0.5 px-0.5 py-1.5 text-center text-[10px] leading-4 ${PRESS_FEEDBACK} ${FOCUS_RING} ${
+                    active ? 'nav-indicator font-semibold text-primary' : 'font-medium text-text-muted hover:text-text'
                   }`}
                 >
                   <span className="relative">

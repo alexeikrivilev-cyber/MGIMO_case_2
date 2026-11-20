@@ -710,6 +710,35 @@ test('оболочка переписки: у студента и препода
 });
 
 // ---------------------------------------------------------------------------
+// Волна 3 «оживления интерфейса» (docs/design/ui-alive-wave-3.html):
+// индикатор активного раздела и однородный отклик нижней навигации
+// ---------------------------------------------------------------------------
+
+/** Характерная подстрока PRESS_FEEDBACK (apps/web/lib/ui.ts). */
+const PRESS_MARK = 'motion-safe:enabled:active:scale-[0.96]';
+
+test('оболочка сотрудника: волна 3 — активный пункт несёт индикатор и отклик', () => {
+  const html = renderShellAtPath('/staff/requests', <p>контент</p>);
+  const nav = html.match(/<nav[^>]*>[\s\S]*<\/nav>/);
+  assert.ok(nav !== null, 'нижняя навигация есть в разметке');
+
+  const activeLink = /<a [^>]*href="\/staff\/requests"[^>]*>/.exec(html)?.[0] ?? '';
+  assert.ok(activeLink.includes('aria-current="page"'), 'активный раздел помечен aria-current');
+  assert.ok(activeLink.includes('nav-indicator'), 'у активного пункта есть индикатор раздела');
+
+  // Индикатор — только у активного пункта.
+  assert.equal((html.match(/nav-indicator/g) ?? []).length, 1, 'индикатор ровно на одном пункте');
+
+  // Отклик на нажатие — у всех пунктов, и без конфликта transition-утилит.
+  const links = [...(nav?.[0] ?? '').matchAll(/<a [^>]*>/g)].map((match) => match[0]);
+  assert.equal(links.length, 6, 'в нижней навигации шесть пунктов');
+  for (const link of links) {
+    assert.ok(link.includes(PRESS_MARK), `пункт навигации несёт отклик: ${link.slice(0, 60)}…`);
+  }
+  assert.ok(!(nav?.[0] ?? '').includes('transition-colors'), 'transition-colors заменён PRESS_FEEDBACK');
+});
+
+// ---------------------------------------------------------------------------
 // Мобильный вид 360 px и доступность новых экранов
 // ---------------------------------------------------------------------------
 
