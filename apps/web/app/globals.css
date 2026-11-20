@@ -75,6 +75,45 @@
 }
 
 /*
+ * Волна 1 «оживления интерфейса» (docs/design/ui-alive-wave-1.html):
+ * stagger первого экрана («Сегодня») и рост столбцов диаграммы тренда.
+ * Всё движение — только при prefers-reduced-motion: no-preference;
+ * при reduce интерфейс сразу на месте (глобальный блок ниже).
+ */
+@keyframes udgu-rise {
+  from { opacity: 0; transform: translateY(12px); filter: blur(4px); }
+  to { opacity: 1; transform: none; filter: blur(0); }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .stagger-in > * { animation: udgu-rise var(--udgu-motion-duration-slow) var(--udgu-motion-ease-out) both; }
+  .stagger-in > *:nth-child(2) { animation-delay: 80ms; }
+  .stagger-in > *:nth-child(3) { animation-delay: 160ms; }
+  .stagger-in > *:nth-child(4) { animation-delay: 240ms; }
+  .stagger-in > *:nth-child(5) { animation-delay: 320ms; }
+  .stagger-in > *:nth-child(6) { animation-delay: 400ms; }
+  /* Хвост (7+ секций) ждёт последним, но без «прыжка»: тот же кап 400ms. */
+  .stagger-in > *:nth-child(n+7) { animation-delay: 400ms; }
+}
+
+/*
+ * Столбцы диаграммы тренда (components/TrendChart.tsx): рост снизу
+ * вверх. transform-box: fill-box — иначе scaleY считается от угла
+ * всего SVG, а не столбца. Задержка на столбец — инлайновым
+ * animation-delay (60ms × индекс).
+ */
+.bar { transform-box: fill-box; transform-origin: bottom; }
+
+@keyframes udgu-bar-rise {
+  from { transform: scaleY(0); }
+  to { transform: scaleY(1); }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .bar { animation: udgu-bar-rise var(--udgu-motion-duration-slow) var(--udgu-motion-ease-out) both; }
+}
+
+/*
  * prefers-reduced-motion (WCAG 2.3.3, 2.2.2): пользователь просил не
  * двигать интерфейс — гасим ВСЕ анимации и переходы, включая
  * animate-pulse (скелетоны) и animate-spin (спиннеры кнопок).

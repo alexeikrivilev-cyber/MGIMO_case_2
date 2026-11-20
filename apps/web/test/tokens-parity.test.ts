@@ -88,6 +88,7 @@ const GROUP_TO_CSS_PREFIX: Readonly<Record<string, string>> = {
   fontWeight: 'font',
   breakpoint: 'breakpoint',
   transition: 'transition',
+  motion: 'motion',
   z: 'z',
 };
 
@@ -156,6 +157,28 @@ test('паритет: каждое значение tokens.ts есть в tokens
   }
 
   assert.deepEqual(mismatches, [], 'значения токенов разошлись между tokens.ts и tokens.css');
+});
+
+test('паритет motion-токенов: длительности и easing совпадают с tokens.css', () => {
+  // Волна 1 «оживления интерфейса»: длительности и easing — единственный
+  // источник движения. CSS-переменные (--udgu-motion-*) использует
+  // globals.css и Tailwind-классы, объект tokens.motion — расчёты и
+  // тесты; расхождение молча ломает контракт движения.
+  assert.equal(blocks.root.get('--udgu-motion-duration-fast'), tokens.motion.durationFast);
+  assert.equal(blocks.root.get('--udgu-motion-duration-base'), tokens.motion.durationBase);
+  assert.equal(blocks.root.get('--udgu-motion-duration-slow'), tokens.motion.durationSlow);
+  assert.equal(blocks.root.get('--udgu-motion-ease-out'), tokens.motion.easeOut);
+});
+
+test('паритет motion: токены движения из tokens.ts есть в tokens.css с теми же значениями', () => {
+  // Волна 1 «оживления»: длительности и easing живут в tokens.css
+  // (единственный источник), а пресс-отклик и stagger ссылаются на них
+  // через var(--udgu-motion-*). Тест паритета общий (выше), но движение
+  // проверяем явно — расхождение молча ломает отклик интерфейса.
+  for (const [key, value] of Object.entries(tokens.motion)) {
+    const name = cssVariableName('motion', key);
+    assert.equal(blocks.root.get(name), value, `${name} = ${value}`);
+  }
 });
 
 test('паритет цветов: в tokens.css нет цветовой переменной без пары в tokens.ts', () => {

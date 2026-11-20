@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>proj-3311 — Wave 1: motion-фундамент + тренд успеваемости</title>
+<!--
+  ДИЗАЙН-АРТЕФАКТ (тимлид, автором Hermes; генеративный агент Open Design
+  в этой среде неработоспособен — amr-runtime-unavailable; артефакт
+  проверяется настоящим lint-гейтом Open Design: od lint).
+
+  Волна 1 директивы «оживить интерфейс»: (1) motion-фундамент — токены,
+  отклик на нажатие, stagger первого экрана; (2) визуализация динамики
+  среднего балла по семестрам. Всё движение — за prefers-reduced-motion:
+  no-preference. Ноль новых зависимостей: SVG и CSS руками.
+-->
+<style>
+  :root {
+    --bg: #0b0e14; --surface: #131824; --surface-2: #1b2233; --border: #2a3348;
+    --text: #e8ebf2; --text-muted: #9aa4b8;
+    --primary: #818cf8; --primary-hover: #a5b4fc; --primary-soft: #1e2140; --on-primary: #0b0e14;
+    --success: #4ade80; --warning: #fbbf24; --danger: #f87171;
+    --radius-md: 0.5rem; --radius-lg: 0.75rem; --radius-xl: 1rem;
+    --motion-fast: 150ms; --motion-slow: 300ms;
+    --ease-out: cubic-bezier(0.2, 0, 0, 1);
+  }
+  body { background: var(--bg); color: var(--text); font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; margin: 0; }
+  .wrap { max-width: 360px; margin: 0 auto; padding: 16px; }
+  .spec { border: 1px solid var(--border); border-radius: var(--radius-xl); background: var(--surface); padding: 16px; margin-bottom: 16px; }
+  .spec h2 { font-size: 0.875rem; font-weight: 600; margin: 0 0 4px; }
+  .spec .why { font-size: 0.75rem; color: var(--text-muted); margin: 0 0 12px; }
+  table { border-collapse: collapse; width: 100%; font-size: 0.75rem; }
+  th, td { border: 1px solid var(--border); padding: 6px 8px; text-align: left; vertical-align: top; }
+  th { color: var(--text-muted); font-weight: 500; }
+  code { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 0.7rem; color: var(--primary-hover); }
+  pre { background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 10px; font-size: 0.7rem; overflow-x: auto; margin: 8px 0 0; }
+  .btn { display: inline-flex; min-height: 44px; align-items: center; justify-content: center; gap: 8px; border-radius: var(--radius-md); padding: 0 16px; font-size: 0.875rem; font-weight: 500; border: 1px solid transparent; cursor: pointer; }
+  .btn-primary { background: var(--primary); color: var(--on-primary); }
+  .btn-secondary { background: var(--surface); border-color: var(--border); color: var(--text); }
+  .btn-danger { background: var(--danger); color: var(--on-primary); }
+  .btn:disabled { opacity: 0.6; cursor: not-allowed; }
+  .btn:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+  .press { transition: transform var(--motion-fast) var(--ease-out), background-color var(--motion-fast) var(--ease-out); }
+  @media (prefers-reduced-motion: no-preference) { .press:active { transform: scale(0.96); } }
+  .card { border: 1px solid var(--border); border-radius: var(--radius-xl); background: var(--surface); padding: 16px; margin-bottom: 12px; }
+  @keyframes rise { from { opacity: 0; transform: translateY(12px); filter: blur(4px); } to { opacity: 1; transform: none; filter: blur(0); } }
+  @media (prefers-reduced-motion: no-preference) {
+    .stagger-in > * { animation: rise var(--motion-slow) var(--ease-out) both; }
+    .stagger-in > *:nth-child(1) { animation-delay: 0ms; }
+    .stagger-in > *:nth-child(2) { animation-delay: 80ms; }
+    .stagger-in > *:nth-child(3) { animation-delay: 160ms; }
+    .stagger-in > *:nth-child(4) { animation-delay: 240ms; }
+    .stagger-in > *:nth-child(5) { animation-delay: 320ms; }
+    .stagger-in > *:nth-child(6) { animation-delay: 400ms; }
+  }
+  .bar { transform-box: fill-box; transform-origin: bottom; }
+  @keyframes bar-rise { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+  @media (prefers-reduced-motion: no-preference) { .bar { animation: bar-rise var(--motion-slow) var(--ease-out) both; } }
+  .num { font-variant-numeric: tabular-nums; }
+  .muted { color: var(--text-muted); }
+  .chip { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--border); border-radius: 9999px; padding: 2px 10px; font-size: 0.75rem; font-weight: 500; }
+  .chip-up { color: var(--success); border-color: color-mix(in oklab, var(--success) 30%, transparent); background: color-mix(in oklab, var(--success) 12%, transparent); }
+  .dead { color: var(--text-muted); font-size: 0.75rem; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="spec">
+    <h2>Wave 1. Что это</h2>
+    <p class="why">Директива владельца: интерфейс «мертвый». Волна 1 — фундамент отклика и самая ценная визуализация (динамика оценок). Рамки: thinking-via-negativa (добавляем только то, что несёт информацию или отклик) и thinking-pre-mortem (контрмеры: 360 px, reduced-motion, SSR, ноль зависимостей).</p>
+  </div>
+
+  <!-- ================= MOTION FOUNDATION ================= -->
+  <div class="spec">
+    <h2>1. Motion-токены (единственный источник — tokens.css)</h2>
+    <p class="why">Длительности из доктрины better-ui: высокочастотное взаимодействие — 150ms; входная хореография — 300ms. Easing — точное значение доктрины, не приближение.</p>
+    <table>
+      <tr><th>Токен</th><th>Значение</th><th>Где</th><th>Почему</th></tr>
+      <tr><td><code>--udgu-motion-duration-fast</code></td><td><code>150ms</code></td><td>нажатие, hover, смена состояния</td><td>better-ui: высокочастотные взаимодействия отвечают мгновенно или ≤150ms</td></tr>
+      <tr><td><code>--udgu-motion-duration-base</code></td><td><code>220ms</code></td><td>переходы между состояниями (было transition-base)</td><td>уже был в токенах, сохраняем</td></tr>
+      <tr><td><code>--udgu-motion-duration-slow</code></td><td><code>300ms</code></td><td>входная анимация секций и столбцов</td><td>better-ui: stagger-вход 300ms ease-out</td></tr>
+      <tr><td><code>--udgu-motion-ease-out</code></td><td><code>cubic-bezier(0.2, 0, 0, 1)</code></td><td>все переходы и ключевые кадры</td><td>точное значение доктрины; встроенный <code>ease-out</code> Tailwind — другое</td></tr>
+    </table>
+    <p class="why" style="margin-top:10px">Зеркало в <code>packages/ui/src/tokens.ts</code> (тест паритета): <code>motion: { durationFast: '150ms', durationBase: '220ms', durationSlow: '300ms', easeOut: 'cubic-bezier(0.2, 0, 0, 1)' }</code>.</p>
+  </div>
+
+  <div class="spec">
+    <h2>2. Отклик на нажатие (press feedback)</h2>
+    <p class="why">better-ui: нажатие масштабирует до 0.96 за 150ms ease-out; disabled никогда не масштабируется; переход — только именованные свойства, никогда all. Под reduced-motion масштаба нет (глобальное правило уже гасит длительности), остаётся смена цвета.</p>
+    <pre>const PRESS_FEEDBACK =
+  'transition-[transform,background-color,border-color,color] ' +
+  'duration-[var(--udgu-motion-duration-fast)] ' +
+  'ease-[var(--udgu-motion-ease-out)] ' +
+  'motion-safe:enabled:active:scale-[0.96]';</pre>
+    <p class="why" style="margin-top:10px">Применяется в <code>components/ui.tsx</code> к <code>Button</code> и <code>LinkButton</code> (вместо <code>transition-colors</code>), к <code>SegmentedLinks</code> и к кнопкам-стрелкам <code>WeekArrow</code>. Остальным интерактивным элементам (поля, ссылки в тексте) — только существующие цветовые переходы.</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
+      <button class="btn btn-primary press">Primary</button>
+      <button class="btn btn-secondary press">Secondary</button>
+      <button class="btn btn-danger press">Danger</button>
+      <button class="btn btn-primary press" disabled>Disabled</button>
+    </div>
+  </div>
+
+  <div class="spec">
+    <h2>3. Stagger первого экрана (только «Сегодня»)</h2>
+    <p class="why">better-ui: stagger 100ms доктрины применён как 80ms с капом 6 элементов — 8 секций дашборда ждали бы 800ms, это шум. Один экран получает хореографию входа: первый экран после входа. Остальные экраны — без stagger (у них свои моменты: столбцы на успеваемости). При reduced-motion анимации нет, элементы сразу на месте.</p>
+    <pre>/* globals.css */
+@keyframes udgu-rise { from { opacity: 0; transform: translateY(12px); filter: blur(4px); } to { opacity: 1; transform: none; filter: blur(0); } }
+@media (prefers-reduced-motion: no-preference) {
+  .stagger-in > * { animation: udgu-rise var(--udgu-motion-duration-slow) var(--udgu-motion-ease-out) both; }
+  .stagger-in > *:nth-child(2) { animation-delay: 80ms; }
+  /* …nth-child(3..6): 160/240/320/400ms */
+  .stagger-in > *:nth-child(n+7) { animation-delay: 400ms; } /* хвост ждёт последним, но не «прыгает» без анимации */
+}</pre>
+    <div class="stagger-in" style="margin-top:12px">
+      <div class="card"><strong class="num">Ближайшая пара</strong><p class="muted" style="font-size:0.8rem;margin:4px 0 0">Базы данных, 10:05, ауд. II-314</p></div>
+      <div class="card"><strong>Расписание на сегодня</strong><p class="muted" style="font-size:0.8rem;margin:4px 0 0">3 пары, окно 14:00–16:00</p></div>
+      <div class="card"><strong>Заявки</strong><p class="muted" style="font-size:0.8rem;margin:4px 0 0">1 в работе — ваш ход</p></div>
+    </div>
+  </div>
+
+  <!-- ================= GRADES TREND ================= -->
+  <div class="spec">
+    <h2>4. Тренд успеваемости — данные (packages/core)</h2>
+    <p class="why">Формула живёт в ядре (как и средний балл), страница только рисует. Чистая функция <code>summarizeGrades</code> дополняется серией; тренд-текст и диаграмма считают из одних данных.</p>
+    <pre>export interface AcademicTrend {
+  …
+  /** Средний балл по КАЖДОМУ семестру с оценками (по возрастанию семестра). */
+  readonly semesterAverages: readonly { readonly semester: number; readonly average: number }[];
+}</pre>
+  </div>
+
+  <div class="spec">
+    <h2>5. Диаграмма — геометрия (SVG, серверный рендер, без JS)</h2>
+    <p class="why">Столбцы, а не спарклайн: 2–4 точки с подписями чисел и семестров читаются на 360 px лучше; линия без точек выглядела бы «загадкой». Шкала 2..5 (оценки УдГУ), baseline подписан. Ось без тиков — только baseline: минимум чернил. ПРОШЛЫЕ семестры — приглушённый primary, последний — полный: новость ведёт глаз. Никаких дополнительных линий: общий средний балл уже есть числом-героем в сводке выше.</p>
+    <ul class="why" style="margin:0 0 10px 16px;padding:0">
+      <li>viewBox <code>0 0 320 150</code>, ширина 100% (резином до 360 px)</li>
+      <li>baseline <code>y=130</code>, вершина шкалы (5.0) <code>y=10</code>: <code>y = 130 − (avg − 2) / 3 × 120</code></li>
+      <li>столбец: ширина 40, rx 4, центрирован в своей полосе; полоса = 288 / n, центр полосы <code>x = 24 + (i + 0.5) × (288 / n)</code>, левый край <code>x − 20</code></li>
+      <li>подпись значения: <code>y = barY − 6</code>, text-anchor middle, 12px, tabular-nums, цвет text</li>
+      <li>подпись семестра: <code>y = 146</code>, «1 сем», 10px, muted</li>
+    </ul>
+    <svg viewBox="0 0 320 150" width="100%" role="img" aria-label="Средний балл по семестрам: 1 семестр — 3,78; 2 семестр — 4,12" style="display:block">
+      <line x1="16" y1="130" x2="312" y2="130" stroke="#2a3348" stroke-width="1"/>
+      <rect class="bar" x="79" y="58.8" width="40" height="71.2" rx="4" fill="#818cf8" fill-opacity="0.45" style="animation-delay:0ms"/>
+      <rect class="bar" x="197" y="45.2" width="40" height="84.8" rx="4" fill="#818cf8" style="animation-delay:60ms"/>
+      <text x="99" y="52.8" text-anchor="middle" font-size="12" fill="#e8ebf2" class="num">3,78</text>
+      <text x="217" y="39.2" text-anchor="middle" font-size="12" fill="#e8ebf2" class="num">4,12</text>
+      <text x="99" y="146" text-anchor="middle" font-size="10" fill="#9aa4b8">1 сем</text>
+      <text x="217" y="146" text-anchor="middle" font-size="10" fill="#9aa4b8">2 сем</text>
+    </svg>
+    <p class="why" style="margin-top:8px">Координаты сверены с формулой исполнением (не на глаз). Столбцы растут снизу (<code>scaleY 0→1</code>, origin bottom, transform-box fill-box) с задержкой 60ms на столбец — только под <code>prefers-reduced-motion: no-preference</code>. Под reduce столбцы сразу на месте. aria-label несёт все числа (дублирование текстом под графиком не нужно — записи семестров уже есть списком ниже). Никакого JS и тултипов: диаграмма — чистый серверный SVG.</p>
+  </div>
+
+  <div class="spec">
+    <h2>6. Размещение и развилки</h2>
+    <p class="why">В <code>SummaryCard</code> («Как у меня дела») под сеткой «Средний балл / Тренд»: заголовок секции «Динамика по семестрам» + диаграмма. Чип тренда (стрелка + текст + цвет) остаётся в сетке — он текстовый носитель для скринридера, диаграмма — визуальный.</p>
+    <table>
+      <tr><th>Ситуация</th><th>Поведение</th></tr>
+      <tr><td>2+ семестра с оценками</td><td>диаграмма + существующий текст тренда</td></tr>
+      <tr><td>1 семестр</td><td>диаграммы нет (сравнивать нечего), текст тренда говорит «недостаточно данных»</td></tr>
+      <tr><td>0 оценок</td><td>диаграммы нет; экран и так за гейтом верификации и с пустым состоянием</td></tr>
+      <tr><td>фильтр семестра выбран</td><td>диаграмма остаётся по ВСЕМ семестрам (это динамика), список ниже фильтруется</td></tr>
+    </table>
+  </div>
+
+  <div class="spec">
+    <h2>7. Чего в волне 1 НЕ добавлено (via negativa)</h2>
+    <p class="why">
+      Спарклайн/линия (худше читается с подписями на 360 px) · тики осей и сетка (шум) · градиентные заливки · интерактивные тултипы (нужен JS, ломает серверный рендер) · счётчики-анимации чисел · stagger на всех экранах (только «Сегодня») · подъём карточек на hover · chart-библиотеки и framer-motion (вес без отдачи) · motion на строках списков (высокая частота — мгновенный отклик цветом).
+    </p>
+  </div>
+
+  <div class="spec">
+    <h2>8. Что проверяет QA-гейт волны 1</h2>
+    <p class="why">
+      typecheck 5/5 · npm test (473 + новые: паритет motion-токенов, серия semesterAverages в summarizeGrades, aria-label диаграммы, guard 360 px) · чистая сборка · next start :3100: /grades при 360 px без горизонтального скролла, столбцы рисуются, фильтр семестра не ломает диаграмму · prefers-reduced-motion: reduce — столбцы на месте, stagger выключен · скриншоты до/после в docs/screenshots/wave-1/.
+    </p>
+  </div>
+
+</div>
+</body>
+</html>

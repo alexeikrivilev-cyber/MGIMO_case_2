@@ -1,6 +1,7 @@
 /**
- * Тесты успеваемости: GPA на фиксированном наборе, долги, тренд,
- * «что подтянуть», леверидж до целевого балла и гейт верификации.
+ * Тесты успеваемости: GPA на фиксированном наборе, долги, тренд
+ * (включая серию semesterAverages для диаграммы), «что подтянуть»,
+ * леверидж до целевого балла и гейт верификации.
  *
  * Числа средних посчитаны вручную и зашиты в ожидания — тест ловит
  * расхождения формулы, а не «подгонку под реализацию».
@@ -14,9 +15,12 @@ import {
   getMyVerification,
   submitVerification,
   reviewVerification,
+  summarizeGrades,
+  GRADE_TYPE_LABELS,
   VerificationRequiredError,
   ValidationError,
   type AuthSession,
+  type MyGradeEntry,
 } from '../src/index.js';
 import {
   resetTestData,
@@ -179,6 +183,84 @@ test('тренд: последний семестр выше предыдуще�
   assert.equal(summary.trend.previousSemesterAverage, 4);
   assert.equal(summary.trend.delta, 0.67);
   assert.equal(summary.trend.direction, 'UP');
+});
+
+// ---------------------------------------------------------------------------
+// Тренд: серия средних по семестрам (диаграмма «Динамика по семестрам»)
+// ---------------------------------------------------------------------------
+
+test('тренд: semesterAverages — серия по возрастанию семестра (4.0 → 4.67)', async () => {
+  const summary = await getMyAcademicSummary(studentSession);
+
+  assert.deepEqual(summary.trend.semesterAverages, [
+    { semester: 1, average: 4 },
+    { semester: 2, average: 4.67 },
+  ]);
+});
+
+/** Запись оценки для чистых тестов summarizeGrades (без БД). */
+function gradeEntry(
+  semester: number,
+  type: 'EXAM' | 'CREDIT' | 'COURSEWORK',
+  value: number | null,
+  passed: boolean | null = null,
+): MyGradeEntry {
+  return {
+    id: `grade-${semester}-${type}-${String(value)}`,
+    subjectName: 'Предмет',
+    subjectCode: 'ТЕСТ-001',
+    type,
+    typeLabel: GRADE_TYPE_LABELS[type],
+    value,
+    passed,
+    date: new Date('2026-06-01T00:00:00.000Z'),
+    semester,
+  };
+}
+
+test('semesterAverages: несколько семестров — значения и порядок по возрастанию', () => {
+  const summary = summarizeGrades([
+    gradeEntry(2, 'EXAM', 5),
+    gradeEntry(1, 'EXAM', 5),
+    gradeEntry(1, 'EXAM', 4),
+    gradeEntry(2, 'COURSEWORK', 3),
+    gradeEntry(2, 'EXAM', 4),
+    gradeEntry(3, 'CREDIT', null, true),
+  ]);
+
+  assert.deepEqual(summary.trend.semesterAverages, [
+    { semester: 1, average: 4.5 }, // (5+4)/2
+    { semester: 2, average: 4 }, // (5+3+4)/3
+  ], 'зачёт 3 семестра точку не даёт');
+});
+
+test('semesterAverages: семестр только с зачётами точки не даёт', () => {
+  const summary = summarizeGrades([
+    gradeEntry(1, 'EXAM', 5),
+    gradeEntry(2, 'CREDIT', null, true),
+    gradeEntry(2, 'CREDIT', null, false),
+  ]);
+
+  assert.deepEqual(summary.trend.semesterAverages, [{ semester: 1, average: 5 }]);
+});
+
+test('semesterAverages: без оценок — пустая серия', () => {
+  assert.deepEqual(summarizeGrades([]).trend.semesterAverages, []);
+  assert.deepEqual(
+    summarizeGrades([gradeEntry(1, 'CREDIT', null, true)]).trend.semesterAverages,
+    [],
+    'одни зачёты — тоже пусто',
+  );
+});
+
+test('semesterAverages: округление до 2 знаков (13/3 = 4.33)', () => {
+  const summary = summarizeGrades([
+    gradeEntry(1, 'EXAM', 5),
+    gradeEntry(1, 'EXAM', 4),
+    gradeEntry(1, 'EXAM', 4),
+  ]);
+
+  assert.deepEqual(summary.trend.semesterAverages, [{ semester: 1, average: 4.33 }]);
 });
 
 test('что подтянуть: низкие оценки и долги', async () => {

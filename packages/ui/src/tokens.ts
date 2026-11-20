@@ -99,6 +99,12 @@ export const tokens = {
     fast: '150ms ease',
     base: '220ms ease',
   },
+  motion: {
+    durationFast: '150ms',
+    durationBase: '220ms',
+    durationSlow: '300ms',
+    easeOut: 'cubic-bezier(0.2, 0, 0, 1)',
+  },
   z: {
     dropdown: 100,
     modal: 200,

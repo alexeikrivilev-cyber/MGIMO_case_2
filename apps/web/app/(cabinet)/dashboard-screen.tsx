@@ -58,7 +58,11 @@ export function DashboardView({ result }: { result: LoadResult<DashboardData> })
         const verified = profile.verificationStatus === 'VERIFIED';
 
         return (
-          <>
+          /* Единственное место stagger'а в проекте (артефакт волны 1, §3):
+             первый экран после входа «раскрывается» по секциям. Хореография
+             живёт в globals.css (.stagger-in, keyframes udgu-rise) и только
+             при prefers-reduced-motion: no-preference. */
+          <div className="stagger-in">
             <PageHeader
               title={`${greeting(new Date())}, ${profile.firstName}!`}
               subtitle={`${profile.groupName} · ${formatDate(new Date(`${data.date}T00:00:00.000Z`))}`}
@@ -270,7 +274,7 @@ export function DashboardView({ result }: { result: LoadResult<DashboardData> })
                 <VerificationGateCard />
               </section>
             )}
-          </>
+          </div>
         );
       }}
     </PageResult>

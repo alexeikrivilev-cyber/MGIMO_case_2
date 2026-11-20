@@ -123,6 +123,13 @@ export interface AcademicTrend {
   readonly previousSemesterAverage: number | null;
   /** Разница среднего последнего семестра с предыдущим (округление 2 знака). */
   readonly delta: number | null;
+  /**
+   * Средний балл по КАЖДОМУ семестру с оценками (по возрастанию семестра).
+   * Серия для диаграммы динамики: считается из тех же оценок, что и
+   * averageScore, — текст тренда и график не могут разойтись. Зачёты
+   * не входят: семестр без численных оценок точки не даёт.
+   */
+  readonly semesterAverages: readonly { readonly semester: number; readonly average: number }[];
 }
 
 export interface AcademicDebt {
@@ -208,6 +215,12 @@ export function summarizeGrades(entries: readonly MyGradeEntry[]): AcademicSumma
     }
   }
 
+  // Серия для диаграммы: семестры уже отсортированы по возрастанию,
+  // averageOfSemester даёт round2 — ту же арифметику, что и средний балл.
+  const semesterAverages = semesters
+    .map((semester) => ({ semester, average: averageOfSemester(graded, semester) }))
+    .filter((point): point is { semester: number; average: number } => point.average !== null);
+
   const trend: AcademicTrend = {
     direction,
     lastSemester,
@@ -218,6 +231,7 @@ export function summarizeGrades(entries: readonly MyGradeEntry[]): AcademicSumma
       lastSemesterAverage !== null && previousSemesterAverage !== null
         ? round2(lastSemesterAverage - previousSemesterAverage)
         : null,
+    semesterAverages,
   };
 
   // Порядок: семестр → сначала долги (срочнее), затем низкие оценки,

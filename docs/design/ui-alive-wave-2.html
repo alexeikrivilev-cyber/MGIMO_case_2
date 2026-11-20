@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>proj-3311 — Wave 2: таймлайн заявки + рельс дня</title>
+<!--
+  ДИЗАЙН-АРТЕФАКТ волны 2 (тимлид Hermes; генеративный агент Open Design
+  в этой среде неработоспособен, артефакт проходит lint-гейт Open Design).
+  Оба элемента — чистый серверный рендер, ноль JS, ноль зависимостей.
+  Доктрина: минимальные чернила, статус = форма + текст (не только цвет),
+  никакого декоративного motion.
+-->
+<style>
+  :root {
+    --bg: #0b0e14; --surface: #131824; --surface-2: #1b2233; --border: #2a3348;
+    --text: #e8ebf2; --text-muted: #9aa4b8;
+    --primary: #818cf8; --primary-soft: #1e2140; --on-primary: #0b0e14;
+    --success: #4ade80; --warning: #fbbf24; --danger: #f87171;
+    --radius-md: 0.5rem; --radius-xl: 1rem;
+  }
+  body { background: var(--bg); color: var(--text); font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; margin: 0; }
+  .wrap { max-width: 360px; margin: 0 auto; padding: 16px; }
+  .spec { border: 1px solid var(--border); border-radius: var(--radius-xl); background: var(--surface); padding: 16px; margin-bottom: 16px; }
+  .spec h2 { font-size: 0.875rem; font-weight: 600; margin: 0 0 4px; }
+  .why { font-size: 0.75rem; color: var(--text-muted); margin: 0 0 12px; }
+  code { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 0.7rem; color: #a5b4fc; }
+  .card { border: 1px solid var(--border); border-radius: var(--radius-xl); background: var(--surface); padding: 16px; margin-bottom: 12px; }
+  .num { font-variant-numeric: tabular-nums; }
+  .muted { color: var(--text-muted); }
+  /* --- таймлайн заявки --- */
+  .steps { display: flex; align-items: flex-start; margin: 14px 2px 0; }
+  .step { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+  .dot { width: 10px; height: 10px; border-radius: 9999px; border: 1px solid var(--border); background: var(--surface); }
+  .dot-done { background: var(--primary); border-color: var(--primary); }
+  .dot-now { background: var(--primary); border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-soft); }
+  .link { flex: 1; height: 2px; background: var(--border); margin-top: 5px; }
+  .link-done { background: var(--primary); }
+  .step-label { font-size: 10px; line-height: 12px; white-space: nowrap; }
+  .step-label-now { color: var(--text); font-weight: 600; }
+  /* --- рельс дня --- */
+  .rail { position: relative; padding-left: 20px; }
+  .rail::before { content: ""; position: absolute; left: 4px; top: 8px; bottom: 8px; width: 2px; background: var(--border); }
+  .rail-item { position: relative; padding: 8px 0; }
+  .rail-item::before { content: ""; position: absolute; left: -20px; top: 14px; width: 10px; height: 10px; border-radius: 9999px; background: var(--surface); border: 2px solid var(--border); }
+  .rail-item.now::before { background: var(--primary); border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-soft); }
+  .rail-item.done::before { background: var(--primary); border-color: var(--primary); }
+  .rail-item.cancelled::before { border-color: var(--danger); }
+  .rail-gap { position: relative; padding: 3px 0; }
+  .rail-gap::before { content: ""; position: absolute; left: -16px; top: 8px; width: 8px; border-top: 2px dashed var(--border); }
+  .chip { display: inline-flex; align-items: center; gap: 4px; border-radius: 9999px; padding: 1px 8px; font-size: 10px; font-weight: 600; background: var(--primary-soft); color: var(--primary); }
+  .chip-now { background: var(--primary); color: var(--on-primary); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="spec">
+    <h2>Wave 2. Что это</h2>
+    <p class="why">Волна 1 дала отклик (press/stagger) и визуализацию тренда. Волна 2 — наглядность там, где пользователь задаёт вопрос «где я»: статус заявки («мой запрос уже двигался?») и форма дня («какая пара сейчас/далее, где окна»). Оба элемента — серверный рендер, без JS и библиотек. Токены и отклик из волны 1 переиспользуются.</p>
+  </div>
+
+  <!-- ================= REQUEST TIMELINE ================= -->
+  <div class="spec">
+    <h2>1. Таймлайн заявки (экран «Заявки», карточка заявки)</h2>
+    <p class="why">Сейчас статус — два бейджа текстом. Добавляем шаги продвижения: Новая → В работе → Готова. Три шага, не пять: в данных только три «движущихся» статуса, четвертый (Отклонена) — не «этап», а исход; для него таймлайна нет (отказ не должен выглядеть как пустой шаг). Существующие StatusBadge и «чей ход» ОСТАЮТСЯ — текстовые носители не удаляются.</p>
+    <ul class="why" style="margin:0 0 10px 16px;padding:0">
+      <li>Раскладка: <code>flex</code>, 3 колонки шагов, между ними соединительные линии <code>flex-1 h-0.5</code></li>
+      <li>Точка шага: 10px, радиус full; пройден — <code>bg-primary</code>; текущий — <code>bg-primary</code> + кольцо <code>box-shadow 0 0 0 3px primary-soft</code>; будущий — <code>border border-border bg-surface</code></li>
+      <li>Линия между шагами: пройдена — <code>bg-primary</code>, иначе <code>bg-border</code></li>
+      <li>Подпись под точкой: 10px, nowrap; у текушего — <code>font-semibold text-text</code>, у остальных — <code>text-text-muted</code></li>
+      <li>Доступность: <code>&lt;ol aria-label="Статус заявки"&gt;</code>, текущий шаг — <code>aria-current="step"</code>; состояние НЕ только цветом (подписи + aria-current)</li>
+      <li>REJECTED → компонент возвращает null (таймлайна нет)</li>
+    </ul>
+    <div class="card">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <span class="chip" style="background:var(--surface-2);color:var(--text-muted)">В работе</span>
+        <span class="chip" style="background:var(--surface-2);color:var(--text-muted)">В деканате</span>
+      </div>
+      <ol class="steps" aria-label="Статус заявки">
+        <li class="step"><span class="dot dot-done"></span><span class="step-label muted">Новая</span></li>
+        <li class="link link-done"></li>
+        <li class="step"><span class="dot dot-now"></span><span class="step-label step-label-now" aria-current="step">В работе</span></li>
+        <li class="link"></li>
+        <li class="step"><span class="dot"></span><span class="step-label muted">Готова</span></li>
+      </ol>
+    </div>
+  </div>
+
+  <!-- ================= DAY RAIL ================= -->
+  <div class="spec">
+    <h2>2. Рельс дня (расписание, режим «Сегодня»)</h2>
+    <p class="why">Список пар не показывает форму дня. Рельс — вертикальная ось слева: точка на каждой паре, пунктир на окнах, отметка «сейчас» в хронологической позиции. Текст НЕ приглушаем сильнее text-muted (контраст — триггер доступности): прошедшие пары отличаются полой точкой, текущая — залитой с кольцом и чипом «Сейчас», следующая — чипом «Далее». Отклонённая — точка danger (ряд и так зачёркнут с бейджем).</p>
+    <ul class="why" style="margin:0 0 10px 16px;padding:0">
+      <li>Компонент <code>DayTimeline</code> (серверный): props <code>{ lessons: ScheduleLesson[]; gaps: FreeGap[]; now: Date }</code></li>
+      <li>Рельс: контейнер <code>relative pl-5</code>, линия <code>absolute left-1 top-2 bottom-2 w-0.5 bg-border</code> (псевдоэлемент или div)</li>
+      <li>Пара: <code>li relative</code>, точка 10px на линии (left −20px, top 14px): пройдена — <code>bg-primary border-primary</code>; текущая — то же + <code>ring</code> (box-shadow 0 0 0 3px primary-soft); будущая — <code>bg-surface border-2 border-border</code>; отмененная — <code>border-danger</code></li>
+      <li>Содержимое ряда — КАК в LessonRow (предмет, тип · аудитория, ссылка на преподавателя, бейджи переноса/отмены), но без временного gutter: время уезжает в рельс? НЕТ — время остаётся в ряду (как в LessonRow), рельс добавляет только точки/окна/«сейчас». Дублирования времени нет.</li>
+      <li>Окно (gap): пунктирный сегмент на рельсе + подпись длительности одной строкой muted («1 ч 20 мин», формат formatDuration)</li>
+      <li>Отметка «сейчас»: строка-маркер с чипом «Сейчас» встаёт в хронологической позиции: до первой пары, внутри окна или после последней пары («пары закончились» — чип нейтральный). Если сейчас идёт пара — маркер-строка не нужен, текущая пара помечена чипом «Сейчас»</li>
+      <li><code>now</code> приходит из серверного компонента экрана (<code>new Date()</code>), вид принимает опциональным пропом с дефолтом — тесты детерминированы</li>
+      <li>Утро/вечер: шкала дня НЕ рисуется (нет тиков часов — только события), «сейчас» — единственная привязка ко времени</li>
+    </ul>
+    <div class="rail">
+      <div class="rail-item done"><strong style="font-size:0.8rem">Базы данных</strong><span class="muted" style="font-size:0.7rem"> · Экзамен · II-314</span></div>
+      <div class="rail-gap"><span class="muted num" style="font-size:0.7rem">1 ч 20 мин</span></div>
+      <div class="rail-item now"><span class="chip chip-now">Сейчас</span><br><strong style="font-size:0.8rem">Философия</strong><span class="muted" style="font-size:0.7rem"> · Лекция · I-501</span></div>
+      <div class="rail-gap"><span class="muted num" style="font-size:0.7rem">45 мин</span></div>
+      <div class="rail-item"><span class="chip" style="background:var(--surface-2);color:var(--text-muted)">Далее</span><br><strong style="font-size:0.8rem">Правоведение</strong><span class="muted" style="font-size:0.7rem"> · Семинар · II-208</span></div>
+    </div>
+  </div>
+
+  <div class="spec">
+    <h2>3. Чего в волне 2 НЕ добавлено (via negativa)</h2>
+    <p class="why">Тики часовой шкалы и сетка (шум) · тикающие часы на клиенте (батарея и JS ради декора) · анимация маркера «сейчас» · приглушение прошедших пар сильнее text-muted (контраст) · шаги «Отмена» в таймлайне заявки (отмена — не этап) · таймлайн на дашборде (одна визуализация на экран уже есть) · правки экрана сотрудника (волна 2 — только кабинет студента).</p>
+  </div>
+
+  <div class="spec">
+    <h2>4. QA-гейт волны 2</h2>
+    <p class="why">typecheck 5/5 · npm test (484 + новые: таймлайн NEW/READY/REJECTED, рельс: текущая пара, окно, «сейчас» в окне, после последней пары) · чистая сборка · next start :3100 при 360 px: /requests и /schedule без горизонтального скролла · скриншоты до/после в docs/screenshots/wave-2/.</p>
+  </div>
+
+</div>
+</body>
+</html>
