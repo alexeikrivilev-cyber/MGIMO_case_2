@@ -12,6 +12,7 @@ import { cookies } from 'next/headers';
 import { Card, EmptyState, LinkButton, StatusBadge } from '../../../components/ui';
 import { PageHeader } from '../../../components/PageHeader';
 import { PageResult } from '../../../components/PageStates';
+import { RequestTimeline } from '../../../components/RequestTimeline';
 import { formatMoment } from '../../../components/format';
 import { requestFieldLabel, requestStatusTone, requestTurnLabel } from '../../../components/labels';
 import { loadRequestsPageData, type LoadResult, type RequestsPageData } from '../../../lib/page-data';
@@ -66,6 +67,11 @@ export function RequestsView({
                         <StatusBadge tone={requestStatusTone(request.status)}>{request.statusLabel}</StatusBadge>
                         <StatusBadge tone={turn === 'Ваш ход' ? 'warning' : 'neutral'}>{turn}</StatusBadge>
                       </div>
+
+                      {/* Шаги продвижения заявки (волна 2): бейджи остаются,
+                          таймлайн отвечает «двигалась ли заявка». У отказа
+                          компонент не рендерит ничего. */}
+                      <RequestTimeline status={request.status} />
 
                       <dl className="mt-3 space-y-1.5">
                         {Object.entries(request.formData).map(([key, value]) => (

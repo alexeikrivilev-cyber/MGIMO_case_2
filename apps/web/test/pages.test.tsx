@@ -29,6 +29,7 @@ import { dateKey } from '@udgu/core';
 import { getPrisma } from '@udgu/db';
 import { createSession } from '@udgu/core';
 import middleware from '../middleware';
+import { formatDuration } from '../components/format';
 import {
   closeWebTestDb,
   createGrade,
@@ -374,7 +375,7 @@ test('дашборд: секции обёрнуты в stagger-интервал 
 // Расписание
 // ---------------------------------------------------------------------------
 
-test('расписание «Сегодня»: пары, свободные окна, ссылка на преподавателей', async () => {
+test('расписание «Сегодня»: пары, окна на рельсе, ссылка на преподавателей', async () => {
   const result = await loadSchedulePageData(verifiedCookie, undefined, undefined);
   assert.equal(result.ok, true);
   if (!result.ok) return;
@@ -385,8 +386,202 @@ test('расписание «Сегодня»: пары, свободные ок
   assert.match(html, /Базы данных/);
   assert.match(html, /Лекция/, 'тип занятия словом');
   assert.match(html, /Преподавателев Ольга Игоревна/, 'преподаватель у пары');
-  assert.match(html, /Свободные окна/);
+  // Окна несёт рельс дня в хронологической позиции (карточка-дубль
+  // «Свободные окна» убрана: одна мысль на экран, BRIEF v4).
+  assert.match(html, /border-t-2 border-dashed border-border/, 'пунктирный сегмент окна на рельсе');
+  assert.match(html, /2 ч 10 мин/, 'длительность окна одной строкой на рельсе');
   assert.match(html, /Расписание преподавателей/, 'ссылка на раздел преподавателей');
+});
+
+/** Ряды рельса дня: `<li class="relative …">…</li>` (линия рельса — absolute). */
+function railRows(html: string): readonly string[] {
+  return [...html.matchAll(/<li class="relative[\s\S]*?<\/li>/g)].map((match) => match[0]);
+}
+
+/** Ряд рельса, содержащий подстроку (предмет, чип, длительность). */
+function railRow(html: string, contains: string): string {
+  const row = railRows(html).find((item) => item.includes(contains));
+  assert.ok(row !== undefined, `ряд рельса с «${contains}» не найден`);
+  return row ?? '';
+}
+
+test('расписание «Сегодня»: рельс дня — текущая пара, окно, «сейчас» в окне и после последней пары', async () => {
+  const result = await loadSchedulePageData(verifiedCookie, undefined, undefined);
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+
+  // 13:45 — идёт вторая пара: чип «Сейчас» на ней, маркер-строка не нужна.
+  const inside = render(<ScheduleView result={result} now={new Date(Date.UTC(2026, 0, 15, 13, 45))} />);
+  assert.match(inside, /absolute left-1 top-2 bottom-2 w-0\.5 bg-border/, 'вертикальная линия рельса');
+  const current = railRow(inside, 'Базы данных');
+  assert.match(current, /text-on-primary">Сейчас</, 'чип «Сейчас» на текущей паре');
+  assert.match(
+    current,
+    /rounded-full border-2 border-primary bg-primary shadow-\[0_0_0_3px_var\(--udgu-color-primary-soft\)\]/,
+    'точка текущей пары залита и с кольцом через токен primary-soft',
+  );
+  assert.equal((inside.match(/>Сейчас</g) ?? []).length, 1, 'маркер-строки нет, пока идёт пара');
+  assert.match(inside, /border-t-2 border-dashed border-border/, 'пунктирный сегмент окна на рельсе');
+  assert.match(inside, /2 ч 10 мин/, 'длительность окна одной строкой muted');
+  assert.equal(inside.includes('>Далее</'), false, 'будущих пар нет — чипа «Далее» нет');
+
+  // 12:30 — внутри окна между парами: маркер-строка с чипом «Сейчас»
+  // стоит между парары, у следующей пары чип «Далее».
+  const inGap = render(<ScheduleView result={result} now={new Date(Date.UTC(2026, 0, 15, 12, 30))} />);
+  const gapRows = railRows(inGap);
+  const marker = gapRows.find((item) => item.includes('>Сейчас</'));
+  assert.ok(marker !== undefined, 'маркер «сейчас» в хронологической позиции');
+  assert.match(marker ?? '', /text-on-primary">Сейчас</, 'чип маркера в окне — основной');
+  const firstIndex = gapRows.findIndex((item) => item.includes('Тестирование интерфейсов'));
+  const secondIndex = gapRows.findIndex((item) => item.includes('Базы данных'));
+  assert.ok(
+    firstIndex < gapRows.indexOf(marker ?? '') && gapRows.indexOf(marker ?? '') < secondIndex,
+    'маркер встал между парарами',
+  );
+  assert.match(railRow(inGap, 'Базы данных'), /text-text-muted">Далее</, 'у следующей пары чип «Далее»');
+
+  // 20:00 — пары закончились: маркер после последней пары с нейтральным чипом.
+  const after = render(<ScheduleView result={result} now={new Date(Date.UTC(2026, 0, 15, 20, 0))} />);
+  const afterRows = railRows(after);
+  const afterMarker = afterRows.find((item) => item.includes('>Сейчас</'));
+  assert.ok(afterMarker !== undefined, 'маркер «сейчас» после последней пары');
+  assert.match(afterMarker ?? '', /text-text-muted">Сейчас</, 'после последней пары чип нейтральный');
+  const lastIndex = afterRows.findIndex((item) => item.includes('Базы данных'));
+  assert.ok(
+    lastIndex >= 0 && lastIndex < afterRows.indexOf(afterMarker ?? ''),
+    'маркер стоит после последней пары',
+  );
+  assert.equal(after.includes('>Далее</'), false, 'чипа «Далее» после последней пары нет');
+
+  // 09:00 — до первой пары: маркер перед ней, у первой пары чип «Далее».
+  const before = render(<ScheduleView result={result} now={new Date(Date.UTC(2026, 0, 15, 9, 0))} />);
+  const beforeRows = railRows(before);
+  const beforeMarker = beforeRows.find((item) => item.includes('>Сейчас</'));
+  assert.ok(beforeMarker !== undefined, 'маркер «сейчас» до первой пары');
+  assert.ok(
+    beforeRows.indexOf(beforeMarker ?? '') < beforeRows.findIndex((item) => item.includes('Тестирование интерфейсов')),
+    'маркер встал перед первой парой',
+  );
+  assert.match(
+    railRow(before, 'Тестирование интерфейсов'),
+    /text-text-muted">Далее</,
+    'у первой пары чип «Далее»',
+  );
+});
+
+test('расписание «Сегодня»: рельс дня — отменённая пара не «текущая» и не «далее»', async () => {
+  // Отдельная группа: отменённая пара в середине дня. getFreeGaps считает
+  // окна по фактическим занятиям и сливает их вокруг отменённой, поэтому
+  // серверное окно (2 ч 40 мин) не совпадает с промежутками рельса —
+  // подписи рельса обязан брать из промежутков между парарами.
+  const group = await createGroup('ПИ-61');
+  const teacher = await createTeacher('teacher-rail', { lastName: 'Рельсов' });
+  const first = await createSubject('RAIL-01', 'Первая дисциплина');
+  const cancelled = await createSubject('RAIL-02', 'Отменённая дисциплина');
+  const third = await createSubject('RAIL-03', 'Третья дисциплина');
+  await createScheduleEntry({
+    groupId: group.id,
+    subjectId: first,
+    teacherId: teacher.teacherId,
+    date: TODAY,
+    startTime: '10:00',
+    endTime: '11:20',
+  });
+  await getPrisma().scheduleEntry.create({
+    data: {
+      groupId: group.id,
+      subjectId: cancelled,
+      teacherId: teacher.teacherId,
+      date: utcDay(TODAY),
+      startTime: '12:00',
+      endTime: '13:20',
+      room: 'У-202',
+      type: 'SEMINAR',
+      status: 'CANCELLED',
+      note: 'Отменено: преподаватель на научной конференции',
+    },
+  });
+  await createScheduleEntry({
+    groupId: group.id,
+    subjectId: third,
+    teacherId: teacher.teacherId,
+    date: TODAY,
+    startTime: '14:00',
+    endTime: '15:20',
+  });
+  const student = await createStudent('student-rail', group.id, { lastName: 'Путилов' });
+  const cookie = `udgu_session=${(await createSession(student.userId)).token}`;
+
+  const result = await loadSchedulePageData(cookie, undefined, undefined);
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+
+  // 12:30 — внутри слота отменённой пары: «текущей» она не бывает.
+  const html = render(<ScheduleView result={result} now={new Date(Date.UTC(2026, 0, 15, 12, 30))} />);
+  const cancelledRow = railRow(html, 'Отменённая дисциплина');
+  assert.match(cancelledRow, /rounded-full border-2 border-danger/, 'точка отменённой пары — danger');
+  assert.match(cancelledRow, /line-through decoration-2/, 'ряд отменённой пары зачёркнут');
+  assert.equal(cancelledRow.includes('>Сейчас</'), false, 'у отменённой пары нет чипа «Сейчас»');
+  assert.equal(cancelledRow.includes('>Далее</'), false, 'у отменённой пары нет чипа «Далее»');
+
+  // Маркер «сейчас» встал перед отменённой парой (её слот содержит now).
+  const rows = railRows(html);
+  const marker = rows.find((item) => item.includes('>Сейчас</'));
+  assert.ok(marker !== undefined, 'маркер «сейчас» на рельсе');
+  assert.ok(
+    rows.indexOf(marker ?? '') < rows.findIndex((item) => item.includes('Отменённая дисциплина')),
+    'маркер встал перед отменённой парой',
+  );
+
+  // «Далее» — у следующей реальной пары.
+  assert.match(railRow(html, 'Третья дисциплина'), /text-text-muted">Далее</, '«Далее» у следующей реальной пары');
+
+  // Окна рельса — по промежуткам между парарами (40 и 40 мин), а не по
+  // слитому окну сервиса: рельс не показывает окно, не совпадающее с
+  // расстоянием между парами.
+  assert.equal((html.match(/>40 мин</g) ?? []).length, 2, 'два окна рельса по 40 мин');
+});
+
+test('расписание «Сегодня»: длительность каждого окна на экране ровно один раз', async () => {
+  // Регрессия на дубль: раньше карточка «Свободные окна» повторяла под
+  // рельсом те же длительности (одна мысль на экран, BRIEF v4). Окна
+  // несёт только рельс — в хронологической позиции, без потери минут:
+  // getFreeGaps считает окна только между занятиями дня.
+  const result = await loadSchedulePageData(verifiedCookie, undefined, undefined);
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  const html = render(<ScheduleView result={result} />);
+
+  assert.ok(result.value.freeGaps.length > 0, 'у группы сегодня есть свободные окна');
+  // Число рядов-окон на рельсе равно числу окон сервиса: ни одного не
+  // потеряно и ни одного не продублировано. Сравнение по счёту, а не по
+  // подписи, — две разные пары могут иметь равную длительность.
+  const gapRows = html.split('class="sr-only">Окно').length - 1;
+  assert.equal(
+    gapRows,
+    result.value.freeGaps.length,
+    'окон на рельсе ровно столько, сколько их в дне — без потерь и дублей',
+  );
+  for (const gap of result.value.freeGaps) {
+    const label = formatDuration(gap.durationMinutes);
+    assert.equal(
+      html.split(`>${label}<`).length - 1,
+      1,
+      `окно «${label}» встречается на экране ровно один раз — рельс, а не рельс + карточка`,
+    );
+  }
+  assert.equal(html.includes('Свободные окна'), false, 'карточки-дубля «Свободные окна» на экране нет');
+});
+
+test('рельс дня: ряд окна читаем скринридером (скрытый префикс «Окно»)', async () => {
+  const result = await loadSchedulePageData(verifiedCookie, undefined, undefined);
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  const html = render(<ScheduleView result={result} now={new Date(Date.UTC(2026, 0, 15, 12, 30))} />);
+
+  const row = railRow(html, '2 ч 10 мин');
+  assert.match(row, /class="sr-only">Окно/, 'перед длительностью — скрытый префикс «Окно»');
+  assert.match(row, /class="text-xs tabular-nums text-text-muted">2 ч 10 мин</, 'видимая подпись окна без изменений');
 });
 
 test('расписание «Неделя»: перенос и отмена заметно оформлены', async () => {
@@ -519,6 +714,39 @@ test('заявки: статусы, «чей ход», отмена новой �
   assert.match(html, /В деканате/, 'у новой заявки ход в деканате');
   assert.match(html, /Ваш ход/, 'у готовой заявки ход у студента');
   assert.match(html, /Отменить заявку/, 'отмена доступна для статуса NEW');
+});
+
+test('заявки: таймлайн статуса — шаги у NEW и READY, у отказа таймлайна нет', async () => {
+  const result = await loadRequestsPageData(verifiedCookie);
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  const html = render(<RequestsView result={result} formOpen={false} />);
+
+  // Два таймлайна: у новой и у готовой заявки (отказ — не этап).
+  assert.equal((html.match(/<ol aria-label="Статус заявки"/g) ?? []).length, 2, 'таймлайн у движущихся статусов');
+  const timeline = html.match(/<ol aria-label="Статус заявки"[\s\S]*?<\/ol>/);
+  assert.ok(timeline !== null, 'таймлайн заявки в разметке');
+  assert.match(timeline?.[0] ?? '', />Новая</, 'шаг «Новая»');
+  assert.match(timeline?.[0] ?? '', />В работе</, 'шаг «В работе»');
+  assert.match(timeline?.[0] ?? '', />Готова</, 'шаг «Готова»');
+  assert.match(html, /aria-current="step">Новая</, 'у новой заявки текущий шаг «Новая»');
+  assert.match(html, /aria-current="step">Готова</, 'у готовой заявки текущий шаг «Готова»');
+
+  // Отказ — исход, а не этап: карточка отказа на экране, таймлайна нет.
+  const group = await createGroup('ПИ-51');
+  const rejectedStudent = await createStudent('student-rejected', group.id, { lastName: 'Отказов' });
+  await createRequest(rejectedStudent.studentId, 'REJECTED');
+  const rejectedSession = `udgu_session=${(await createSession(rejectedStudent.userId)).token}`;
+  const rejectedResult = await loadRequestsPageData(rejectedSession);
+  assert.equal(rejectedResult.ok, true);
+  if (!rejectedResult.ok) return;
+  const rejectedHtml = render(<RequestsView result={rejectedResult} formOpen={false} />);
+  assert.match(rejectedHtml, /Отклонена/, 'карточка отказа на экране');
+  assert.equal(
+    rejectedHtml.includes('aria-label="Статус заявки"'),
+    false,
+    'у отказа таймлайна нет в разметке',
+  );
 });
 
 test('уведомления: непрочитанные, отметка всех, ссылки на разделы', async () => {

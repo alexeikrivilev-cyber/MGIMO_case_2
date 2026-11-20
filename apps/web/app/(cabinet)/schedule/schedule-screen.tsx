@@ -12,7 +12,8 @@ import { Card, EmptyState, SegmentedLinks } from '../../../components/ui';
 import { PageHeader } from '../../../components/PageHeader';
 import { PageResult, SectionTitle } from '../../../components/PageStates';
 import { LessonRow } from '../../../components/LessonRow';
-import { formatDateRange, formatDateWithYear, formatDuration, weekdayShort } from '../../../components/format';
+import { DayTimeline } from '../../../components/DayTimeline';
+import { formatDateRange, formatDateWithYear, weekdayShort } from '../../../components/format';
 import { IconChevronLeft, IconChevronRight } from '../../../components/icons';
 import { loadSchedulePageData, type LoadResult, type SchedulePageData } from '../../../lib/page-data';
 import { PRESS_FEEDBACK, TEXT_LINK_CLASS } from '../../../lib/ui';
@@ -33,7 +34,15 @@ function WeekArrow({ href, direction, label }: { href: string; direction: 'prev'
   );
 }
 
-export function ScheduleView({ result }: { result: LoadResult<SchedulePageData> }): React.JSX.Element {
+export function ScheduleView({
+  result,
+  now = new Date(),
+}: {
+  result: LoadResult<SchedulePageData>;
+  /** Момент «сейчас» для рельса дня: серверная обёртка передаёт new Date(),
+   *  тесты — фиксированное время (детерминированный рендер). */
+  now?: Date;
+}): React.JSX.Element {
   return (
     <PageResult result={result}>
       {(data) => {
@@ -87,29 +96,11 @@ export function ScheduleView({ result }: { result: LoadResult<SchedulePageData> 
                   {data.todayLessons.length === 0 ? (
                     <EmptyState title="Сегодня пар нет" />
                   ) : (
-                    <ul>
-                      {data.todayLessons.map((lesson) => (
-                        <LessonRow key={lesson.id} lesson={lesson} />
-                      ))}
-                    </ul>
+                    /* Рельс дня (волна 2): точки на парах, пунктир окон и
+                       отметка «сейчас» в хронологической позиции. */
+                    <DayTimeline lessons={data.todayLessons} gaps={data.freeGaps} now={now} />
                   )}
                 </Card>
-
-                {data.freeGaps.length === 0 ? null : (
-                  <Card className="mb-4">
-                    <SectionTitle>Свободные окна</SectionTitle>
-                    <ul className="space-y-1.5">
-                      {data.freeGaps.map((gap) => (
-                        <li key={`${gap.startTime}-${gap.endTime}`} className="flex items-center justify-between text-sm">
-                          <span className="font-medium tabular-nums text-text">
-                            {gap.startTime} — {gap.endTime}
-                          </span>
-                          <span className="text-text-muted">{formatDuration(gap.durationMinutes)}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </Card>
-                )}
               </>
             ) : null}
 
@@ -169,5 +160,5 @@ export async function ScheduleScreen({
 }): Promise<React.JSX.Element> {
   const cookieStore = await cookies();
   const result = await loadSchedulePageData(cookieStore.toString(), view, offset);
-  return <ScheduleView result={result} />;
+  return <ScheduleView result={result} now={new Date()} />;
 }
