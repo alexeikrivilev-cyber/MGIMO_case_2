@@ -20,7 +20,7 @@ import { Card, EmptyState, LinkButton, StatusBadge } from '../../../components/u
 import { PageHeader } from '../../../components/PageHeader';
 import { PageResult } from '../../../components/PageStates';
 import { formatMoment } from '../../../components/format';
-import { FOCUS_RING } from '../../../lib/ui';
+import { FOCUS_RING, PRESS_FEEDBACK } from '../../../lib/ui';
 import {
   loadMessagesPageData,
   type LoadResult,
@@ -47,7 +47,7 @@ function ConversationRow({
       <Link
         href={`/messages?conversation=${encodeURIComponent(conversation.id)}`}
         aria-current={active ? 'page' : undefined}
-        className={`flex min-h-11 items-center gap-3 rounded-xl border bg-surface px-4 py-3 shadow-sm transition-colors hover:bg-surface-2 ${FOCUS_RING} ${
+        className={`flex min-h-11 items-center gap-3 rounded-xl border bg-surface px-4 py-3 shadow-sm ${PRESS_FEEDBACK} hover:bg-surface-2 ${FOCUS_RING} ${
           active ? 'border-primary/50' : 'border-border'
         }`}
       >

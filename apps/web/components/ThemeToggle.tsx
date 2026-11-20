@@ -10,6 +10,7 @@
  */
 import { useEffect, useState } from 'react';
 import { THEME_COOKIE_NAME, type Theme } from '../lib/theme';
+import { PRESS_FEEDBACK } from '../lib/ui';
 import { IconTheme } from './icons';
 
 function currentTheme(): Theme {
@@ -48,7 +49,7 @@ export function ThemeToggle(): React.JSX.Element {
         setTheme(value);
       }}
       aria-label={mounted ? `Включить ${nextTheme === 'dark' ? 'тёмную' : 'светлую'} тему` : 'Переключить тему'}
-      className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-md border border-border bg-surface text-text-muted transition-colors hover:bg-surface-2 hover:text-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+      className={`inline-flex min-h-11 min-w-11 items-center justify-center rounded-md border border-border bg-surface text-text-muted ${PRESS_FEEDBACK} hover:bg-surface-2 hover:text-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary`}
     >
       <IconTheme />
     </button>

@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>proj-3311 — Wave 3: консистентная отдача интерфейса</title>
+<!--
+  ДИЗАЙН-АРТЕФАКТ волны 3 (тимлид Hermes; генеративный агент Open Design
+  в этой среде неработоспособен, артефакт проходит lint-гейт Open Design).
+
+  Задача волны: убрать НЕРАВНОМЕРНОСТЬ отклика. Волна 1 дала press-отклик
+  (scale 0.96 / 150ms / motion-safe) и он есть на <Button>, SegmentedLinks
+  и WeekArrow — но нижняя навигация (4 оболочки) и четыре «сырых» <button>
+  (чипы ассистентов, вкладки каналов, переключатель темы) отклика не дают
+  вовсе. Часть интерфейса «живая», часть мёртвая — это и есть остаточная
+  «мертвизна», а не недостаток декора.
+
+  Доктрина: НИ ОДНОЙ новой зависимости, НИ ОДНОГО нового цвета, НИ ОДНОГО
+  нового размера. Всё — из токенов волны 1 (PRESS_FEEDBACK, primary,
+  surface-2). Движение только под prefers-reduced-motion: no-preference.
+-->
+<style>
+  :root {
+    --bg: #0b0e14; --surface: #131824; --surface-2: #1b2233; --border: #2a3348;
+    --text: #e8ebf2; --text-muted: #9aa4b8;
+    --primary: #818cf8; --primary-soft: #1e2140; --on-primary: #0b0e14;
+    --motion-fast: 150ms; --ease-out: cubic-bezier(0.2,0,0,1);
+    --radius-md: 0.5rem; --radius-xl: 1rem;
+  }
+  body { background: var(--bg); color: var(--text); font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; margin: 0; }
+  .wrap { max-width: 360px; margin: 0 auto; padding: 16px; }
+  .spec { border: 1px solid var(--border); border-radius: var(--radius-xl); background: var(--surface); padding: 16px; margin-bottom: 16px; }
+  .spec h2 { font-size: 0.875rem; font-weight: 600; margin: 0 0 4px; }
+  .why { font-size: 0.75rem; color: var(--text-muted); margin: 0 0 12px; }
+  code { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 0.7rem; color: #a5b4fc; }
+  ul.why { margin: 0 0 10px 16px; padding: 0; }
+  .num { font-variant-numeric: tabular-nums; }
+  .muted { color: var(--text-muted); }
+
+  /* --- 1. Нижняя навигация: индикатор активного раздела --- */
+  .nav { display: flex; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface); overflow: hidden; }
+  .nav a { position: relative; flex: 1; min-height: 56px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: 6px 2px; text-align: center; font-size: 10px; line-height: 16px; text-decoration: none; color: var(--text-muted); }
+  .nav a.on { color: var(--primary); font-weight: 600; }
+  /* Индикатор: 2px × 24px сверху. Растёт из центра (scaleX 0 → 1). */
+  .nav a.on::before { content: ""; position: absolute; top: 0; left: 50%; width: 24px; height: 2px; margin-left: -12px; border-radius: 0 0 2px 2px; background: var(--primary); transform-origin: center; }
+  @media (prefers-reduced-motion: no-preference) {
+    .nav a.on::before { animation: nav-in var(--motion-fast) var(--ease-out) both; }
+  }
+  @keyframes nav-in { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+
+  /* --- 2. «Сырые» кнопки: тот же отклик, что у <Button> --- */
+  .chip { display: inline-flex; align-items: center; min-height: 44px; border-radius: 9999px; border: 1px solid var(--border); background: var(--surface-2); padding: 0 12px; font-size: 0.875rem; color: var(--text); cursor: pointer; }
+  .chip:hover { color: var(--primary); }
+  .tab { display: inline-flex; align-items: center; min-height: 44px; border-radius: var(--radius-md); border: 1px solid var(--border); background: var(--surface); padding: 0 12px; font-size: 0.875rem; color: var(--text-muted); cursor: pointer; }
+  .tab.on { background: var(--primary); color: var(--on-primary); border-color: var(--primary); }
+  /* Отклик: scale 0.96 на :active, только enabled, только motion-safe. */
+  .press { transition: transform var(--motion-fast) var(--ease-out), background-color var(--motion-fast) var(--ease-out), border-color var(--motion-fast) var(--ease-out), color var(--motion-fast) var(--ease-out); }
+  @media (prefers-reduced-motion: no-preference) {
+    .press:enabled:active, .press:not(:disabled):active { transform: scale(0.96); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="spec">
+    <h2>Wave 3. Что это</h2>
+    <p class="why">Волна 1 дала отклик, волна 2 — наглядность. Осталась «мертвизна» другого рода: отклик есть НЕ ВЕЗДЕ. Нижняя навигация — самый частый тап в кабинете — не отвечает на нажатие, и чипы ассистентов, вкладки каналов и переключатель темы тоже. Пользователь не может объяснить, почему одни кнопки «живые», а другие нет, но чувствует. Волна 3 — сделать отклик однородным: те же токены, те же 150ms, тот же масштаб.</p>
+  </div>
+
+  <div class="spec">
+    <h2>1. Нижняя навигация: отклик + индикатор активного раздела</h2>
+    <p class="why">Оболочки: <code>CabinetShell</code>, <code>StaffShell</code>, <code>TeacherShell</code>, <code>MessagesShell</code> — у всех четыре одна и та же разметка пункта. Сейчас активный пункт отмечен только цветом и весом (<code>font-semibold text-primary</code>); при семи пунктах и подписях 9–10px это слабый сигнал «где я».</p>
+    <ul class="why">
+      <li>К каждому <code>&lt;Link&gt;</code> пункта добавляется <code>PRESS_FEEDBACK</code> (из <code>apps/web/lib/ui.ts</code>) — тот же отклик, что у <code>&lt;Button&gt;</code>. <code>transition-colors</code> при этом ЗАМЕНЯЕТСЯ, а не дополняется: <code>PRESS_FEEDBACK</code> уже перечисляет transform+background+border+color.</li>
+      <li>У активного пункта — индикатор: полоска <code>2px × 24px</code> цветом <code>primary</code> у верхней кромки пункта, <code>rounded-b</code>. Реализация — <code>::before</code> через <code>before:</code> утилиты Tailwind 4 (пункт уже <code>relative</code>), без дополнительной разметки.</li>
+      <li>Индикатор появляется анимацией <code>scaleX 0 → 1</code> за <code>var(--udgu-motion-duration-fast)</code> / <code>var(--udgu-motion-ease-out)</code>, ТОЛЬКО под <code>prefers-reduced-motion: no-preference</code>. Под reduce — индикатор на месте сразу, без движения (как столбцы графика в волне 1).</li>
+      <li>Индикатор — <code>aria-hidden</code> по смыслу: «где я» уже несут <code>aria-current="page"</code> и текст. Дубля для скринридера не добавляем.</li>
+      <li>Никаких изменений высоты/отбивок: <code>min-h-14</code> и раскладка колонкой сохраняются, 360px не ломается.</li>
+    </ul>
+    <div class="nav">
+      <a href="#" class="on"><span>Сегодня</span></a>
+      <a href="#"><span>Пары</span></a>
+      <a href="#"><span>Оценки</span></a>
+      <a href="#"><span>Заявки</span></a>
+    </div>
+  </div>
+
+  <div class="spec">
+    <h2>2. «Сырые» кнопки — тот же отклик, что у всего остального</h2>
+    <p class="why">Четыре места с «сырым» <code>&lt;button&gt;</code> (не <code>&lt;Button&gt;</code> из <code>components/ui.tsx</code>, который отклик уже даёт):</p>
+    <ul class="why">
+      <li><code>AssistantPanel.tsx</code> — чип-вопрос (студент)</li>
+      <li><code>TeacherAssistantPanel.tsx</code> — чип-вопрос (преподаватель)</li>
+      <li><code>ChannelSimulator.tsx</code> — вкладки каналов (telegram/vk/max)</li>
+      <li><code>ThemeToggle.tsx</code> — переключатель темы</li>
+    </ul>
+    <p class="why">Всем четырём добавляется <code>PRESS_FEEDBACK</code>. Никаких других изменений: размеры, цвета, состояния disabled остаются как есть. <code>disabled</code> не масштабируется — это уже в константе (<code>enabled:</code>).</p>
+    <div>
+      <button class="chip press">Какие у меня долги?</button>
+      <button class="chip press">Средний балл</button>
+    </div>
+    <div style="margin-top:10px">
+      <button class="tab press on">Telegram</button>
+      <button class="tab press">VK</button>
+      <button class="tab press">MAX</button>
+    </div>
+  </div>
+
+  <div class="spec">
+    <h2>3. Чего в волне 3 НЕ добавлено (via negativa)</h2>
+    <p class="why">Pull-to-refresh · скелетоны (уже есть на 21 маршруте) · параллакс и scroll-driven анимации · «характер» пустых состояний через текст (BRIEF v4 требует одну строку + действие; характер — только через иконку, и то если отдача волн 3–4 ещё есть) · анимация переходов между страницами (роутерные переходы — отдельная волна и отдельный риск) · любые новые зависимости, цвета и токены.</p>
+  </div>
+
+  <div class="spec">
+    <h2>4. QA-гейт волны 3</h2>
+    <p class="why">typecheck 5/5 · npm test (489 + новые: индикатор и press-отклик на навигации и «сырых» кнопках) · чистая сборка · next start :3100 при 360 px: все оболочки без горизонтального скролла · prefers-reduced-motion: reduce — индикатор на месте без анимации, scale нет · клавиатура: кольцо фокуса на всех пунктах · скриншоты до/после в docs/screenshots/wave-3/.</p>
+  </div>
+
+</div>
+</body>
+</html>

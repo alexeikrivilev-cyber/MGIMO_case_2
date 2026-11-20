@@ -40,7 +40,7 @@ import {
   IconToday,
   IconProfile,
 } from './icons';
-import { FOCUS_RING } from '../lib/ui';
+import { FOCUS_RING, PRESS_FEEDBACK } from '../lib/ui';
 
 /**
  * Разделы нижней навигации: путь → короткая подпись (таб), полное
@@ -87,8 +87,14 @@ function isActive(pathname: string | null, href: string): boolean {
   if (pathname === null) {
     return false;
   }
-  // «Сегодня» — корневой путь: активен только при точном совпадении.
-  return href === '/' ? pathname === '/' : pathname === href || pathname.startsWith(`${href}/`);
+  // «Сегодня» живёт на двух адресах: «/» и «/dashboard» (ответ входа
+  // роли STUDENT ведёт на второй). Активен на обоих — иначе на главном
+  // экране кабинета, куда попадает каждый после входа, ни один пункт
+  // навигации не отмечен и «где я» не отвечает никто.
+  if (href === '/') {
+    return pathname === '/' || pathname === '/dashboard';
+  }
+  return pathname === href || pathname.startsWith(`${href}/`);
 }
 
 export function CabinetShell({ children }: { children: ReactNode }): React.JSX.Element {
@@ -117,7 +123,7 @@ export function CabinetShell({ children }: { children: ReactNode }): React.JSX.E
             <Link
               href="/profile"
               aria-label="Профиль"
-              className={`inline-flex min-h-11 min-w-11 items-center justify-center rounded-md border border-border bg-surface text-text-muted transition-colors hover:bg-surface-2 hover:text-text ${FOCUS_RING}`}
+              className={`inline-flex min-h-11 min-w-11 items-center justify-center rounded-md border border-border bg-surface text-text-muted ${PRESS_FEEDBACK} hover:bg-surface-2 hover:text-text ${FOCUS_RING}`}
             >
               <IconProfile />
             </Link>
@@ -144,8 +150,8 @@ export function CabinetShell({ children }: { children: ReactNode }): React.JSX.E
                   href={href}
                   aria-current={active ? 'page' : undefined}
                   aria-label={fullLabel}
-                  className={`relative flex min-h-14 flex-col items-center justify-center gap-0.5 px-0.5 py-1.5 text-center text-[10px] leading-4 transition-colors ${FOCUS_RING} ${
-                    active ? 'font-semibold text-primary' : 'font-medium text-text-muted hover:text-text'
+                  className={`relative flex min-h-14 flex-col items-center justify-center gap-0.5 px-0.5 py-1.5 text-center text-[10px] leading-4 ${PRESS_FEEDBACK} ${FOCUS_RING} ${
+                    active ? 'nav-indicator font-semibold text-primary' : 'font-medium text-text-muted hover:text-text'
                   }`}
                 >
                   <span className="relative">

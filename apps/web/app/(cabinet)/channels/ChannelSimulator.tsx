@@ -32,7 +32,7 @@ import { ApiClientError, api, type BotChannelMode, type BotChannelName } from '.
 // попадает ядро с доступом к БД (как у ассистента, @udgu/core/assistant).
 import { BOT_CHANNEL_LABELS } from '@udgu/core/bot';
 import { Button, Card, EmptyState, StatusBadge, TextInput } from '../../../components/ui';
-import { FOCUS_RING } from '../../../lib/ui';
+import { FOCUS_RING, PRESS_FEEDBACK } from '../../../lib/ui';
 
 /** Порядок вкладок — как в BRIEF v3: Telegram, VK, MAX. */
 const CHANNELS: readonly BotChannelName[] = ['telegram', 'vk', 'max'];
@@ -156,7 +156,7 @@ export function ChannelSimulator({
                 setCode(null);
                 setError(null);
               }}
-              className={`flex min-h-11 flex-1 flex-col items-center justify-center rounded-md px-1 text-xs font-medium transition-colors ${FOCUS_RING} ${
+              className={`flex min-h-11 flex-1 flex-col items-center justify-center rounded-md px-1 text-xs font-medium ${PRESS_FEEDBACK} ${FOCUS_RING} ${
                 selected ? 'bg-primary-soft text-primary' : 'text-text-muted hover:text-text'
               }`}
             >

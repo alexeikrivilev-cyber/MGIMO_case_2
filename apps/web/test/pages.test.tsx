@@ -939,6 +939,111 @@ test('оболочка: «Сегодня» активно только на ко
   assert.equal(anchorTag(schedule, 'href="/"', 'aria-current'), null, '«Сегодня» на /schedule не активен');
 });
 
+test('оболочка: «Сегодня» активно и на /dashboard — адресе, куда ведёт вход', () => {
+  // Регрессия: экран «Сегодня» живёт на двух адресах («/» и «/dashboard»),
+  // ответ входа роли STUDENT ведёт на второй. Пока активным считался только
+  // «/», на главном экране кабинета — куда попадает каждый после входа — ни
+  // один пункт навигации не был отмечен, и волна 3 (индикатор раздела)
+  // сделала эту дыру видимой.
+  const dashboard = renderShellAtPath('/dashboard', <p>контент</p>);
+
+  const today = anchorTag(dashboard, 'href="/"', 'aria-current="page"');
+  assert.ok(today !== null, 'на /dashboard активен «Сегодня»');
+  assert.ok(today !== null && today.includes('nav-indicator'), 'индикатор раздела на «Сегодня»');
+  assert.equal((dashboard.match(/nav-indicator/g) ?? []).length, 1, 'индикатор ровно на одном пункте');
+  assert.equal(anchorTag(dashboard, 'href="/schedule"', 'aria-current'), null, '«Пары» на /dashboard не активны');
+});
+
+// ---------------------------------------------------------------------------
+// Волна 3 «оживления интерфейса» (docs/design/ui-alive-wave-3.html):
+// однородный отклик на нажатие и индикатор активного раздела
+// ---------------------------------------------------------------------------
+
+/** Характерная подстрока PRESS_FEEDBACK (apps/web/lib/ui.ts). */
+const PRESS_MARK = 'motion-safe:enabled:active:scale-[0.96]';
+
+/** Блок <nav>…</nav> нижней навигации: в разметке оболочки он не вложен. */
+function navBlock(html: string): string {
+  const match = html.match(/<nav[^>]*>[\s\S]*<\/nav>/);
+  assert.ok(match !== null, 'нижняя навигация есть в разметке');
+  return match[0];
+}
+
+/** Тег <button …>, у которого есть все перечисленные атрибуты. */
+function buttonTag(html: string, ...attributes: readonly string[]): string | null {
+  for (const match of html.matchAll(/<button [^>]*>/g)) {
+    const tag = match[0];
+    if (attributes.every((attribute) => tag.includes(attribute))) {
+      return tag;
+    }
+  }
+  return null;
+}
+
+test('оболочка: волна 3 — активный пункт навигации несёт индикатор, неактивный нет', () => {
+  const html = renderShellAtPath('/grades', <p>контент страницы</p>);
+
+  const activeLink = anchorTag(html, 'href="/grades"', 'aria-current="page"');
+  assert.ok(activeLink !== null, 'активный пункт навигации помечен aria-current="page"');
+  assert.ok(activeLink.includes('nav-indicator'), 'у активного пункта есть индикатор раздела');
+
+  // Индикатор — только у активного: «где я» и так несёт aria-current.
+  for (const href of ['/', '/schedule', '/requests', '/notifications', '/assistant', '/channels']) {
+    const link = anchorTag(html, `href="${href}"`);
+    assert.ok(link !== null && !link.includes('nav-indicator'), `неактивный пункт ${href} без индикатора`);
+  }
+  assert.equal((html.match(/nav-indicator/g) ?? []).length, 1, 'индикатор ровно на одном пункте');
+});
+
+test('оболочка: волна 3 — все пункты навигации дают отклик на нажатие', () => {
+  const html = renderShellAtPath('/grades', <p>контент страницы</p>);
+  const nav = navBlock(html);
+
+  const links = [...nav.matchAll(/<a [^>]*>/g)].map((match) => match[0]);
+  assert.equal(links.length, 7, 'в нижней навигации семь пунктов');
+  for (const link of links) {
+    assert.ok(link.includes(PRESS_MARK), `пункт навигации несёт отклик: ${link.slice(0, 60)}…`);
+  }
+});
+
+test('оболочка: волна 3 — в навигации нет конфликта transition-утилит', () => {
+  // PRESS_FEEDBACK уже перечисляет transform+background+border+color:
+  // рядом с transition-colors две transition-утилиты конфликтуют.
+  const html = renderShellAtPath('/grades', <p>контент страницы</p>);
+  const nav = navBlock(html);
+  assert.ok(!nav.includes('transition-colors'), 'transition-colors заменён PRESS_FEEDBACK, а не дописан рядом');
+  assert.ok(nav.includes(PRESS_MARK), 'отклик навигации — PRESS_FEEDBACK');
+});
+
+test('оболочка: волна 3 — переключатель темы даёт отклик на нажатие', () => {
+  const html = render(
+    <CabinetShell>
+      <p>контент страницы</p>
+    </CabinetShell>,
+  );
+
+  const toggle = buttonTag(html, 'aria-label="Переключить тему"');
+  assert.ok(toggle !== null, 'переключатель темы в шапке оболочки');
+  assert.ok(toggle.includes(PRESS_MARK), 'переключатель темы несёт отклик PRESS_FEEDBACK');
+});
+
+test('ассистент: волна 3 — все кнопки экрана дают отклик на нажатие', async () => {
+  const assistant = await loadAssistantPageData(verifiedCookie);
+  assert.equal(assistant.ok, true);
+  if (!assistant.ok) {
+    return;
+  }
+  const html = render(<AssistantView result={assistant} />);
+
+  // Чипы вопросов — «сырые» <button> (не <Button>), кнопка «Спросить» —
+  // <Button>: отклик должен быть у всех, иначе интерфейс снова неровный.
+  const buttons = [...html.matchAll(/<button [^>]*>/g)].map((match) => match[0]);
+  assert.ok(buttons.length >= 2, `чипы вопросов и кнопка отправки (${buttons.length})`);
+  for (const button of buttons) {
+    assert.ok(button.includes(PRESS_MARK), `кнопка несёт отклик: ${button.slice(0, 60)}…`);
+  }
+});
+
 // ---------------------------------------------------------------------------
 // Мобильный вид 360 px и гейтинг /staff, /admin
 // ---------------------------------------------------------------------------

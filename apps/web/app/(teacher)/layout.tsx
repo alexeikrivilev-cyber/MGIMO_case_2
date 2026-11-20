@@ -5,6 +5,7 @@ import { getSessionFromCookieHeader, isTeacherUser } from '../../lib/session';
 import { TeacherShell } from '../../components/TeacherShell';
 import { ConceptBanner } from '../../components/ConceptBanner';
 import { ConceptMark } from '../../components/ConceptMark';
+import { PRESS_FEEDBACK } from '../../lib/ui';
 
 /**
  * Лэйаут кабинета преподавателя (route group (teacher), /teacher/*).
@@ -51,7 +52,7 @@ export default async function TeacherLayout({ children }: { children: ReactNode 
           <div className="mt-6">
             <a
               href={backHref}
-              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-border bg-surface px-4 text-sm font-medium text-text transition-colors hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+              className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-border bg-surface px-4 text-sm font-medium text-text ${PRESS_FEEDBACK} hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary`}
             >
               {backLabel}
             </a>

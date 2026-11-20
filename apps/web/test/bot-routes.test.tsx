@@ -46,6 +46,7 @@ import { GET as botInboxRoute } from '../app/api/bot/inbox/route';
 import middleware from '../middleware';
 import { CabinetShell } from '../components/CabinetShell';
 import { ChannelsView } from '../app/(cabinet)/channels/channels-screen';
+import { ChannelSimulator } from '../app/(cabinet)/channels/ChannelSimulator';
 import { loadChannelsPageData } from '../lib/page-data';
 import { demoChannelUserId } from '../lib/bot/demo-channel';
 import { runChannelDispatch } from '../lib/bot/dispatcher';
@@ -385,6 +386,32 @@ test('оболочка: седьмой пункт навигации «Кана�
   // Прежние разделы не потерялись: полные названия доступны скринридеру.
   for (const label of ['Сегодня', 'Расписание', 'Успеваемость', 'Заявки', 'Уведомления', 'Ассистент']) {
     assert.ok(html.includes(label), `раздел «${label}» остался в навигации`);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Волна 3 «оживления интерфейса» (docs/design/ui-alive-wave-3.html):
+// вкладки каналов дают тот же отклик на нажатие, что и <Button>
+// ---------------------------------------------------------------------------
+
+/** Характерная подстрока PRESS_FEEDBACK (apps/web/lib/ui.ts). */
+const PRESS_MARK = 'motion-safe:enabled:active:scale-[0.96]';
+
+test('страница /channels: волна 3 — вкладки каналов дают отклик на нажатие', () => {
+  // Вкладки — «сырые» <button> (не <Button> из components/ui): без
+  // PRESS_FEEDBACK они молчали бы при нажатии, в отличие от «Отправить».
+  const html = render(
+    <ChannelSimulator
+      statuses={{ telegram: 'demo', vk: 'demo', max: 'demo' }}
+      linked={{ telegram: true, vk: true, max: true }}
+    />,
+  );
+
+  const tabs = [...html.matchAll(/<button [^>]*role="tab"[^>]*>/g)].map((match) => match[0]);
+  assert.equal(tabs.length, 3, 'три вкладки каналов');
+  for (const tab of tabs) {
+    assert.ok(tab.includes(PRESS_MARK), `вкладка несёт отклик: ${tab.slice(0, 60)}…`);
+    assert.ok(!tab.includes('transition-colors'), 'transition-colors заменён PRESS_FEEDBACK');
   }
 });
 

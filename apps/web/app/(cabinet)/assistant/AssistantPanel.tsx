@@ -22,6 +22,7 @@ import { useRouter } from 'next/navigation';
 // бандл не попадает ядро с доступом к БД.
 import { ASSISTANT_VERIFICATION_SUGGESTION } from '@udgu/core/assistant';
 import { ApiClientError, api } from '../../../lib/api-client';
+import { PRESS_FEEDBACK } from '../../../lib/ui';
 import { Button, Card, EmptyState, ErrorState, Spinner, StatusBadge, TextInput } from '../../../components/ui';
 
 const FOCUS_RING =
@@ -43,7 +44,7 @@ function Chip({
         type="button"
         disabled={disabled}
         onClick={() => onPick(label)}
-        className={`inline-flex min-h-11 items-center rounded-full border border-border bg-surface-2 px-3 text-sm text-text transition-colors hover:text-primary disabled:cursor-not-allowed disabled:opacity-60 ${FOCUS_RING}`}
+        className={`inline-flex min-h-11 items-center rounded-full border border-border bg-surface-2 px-3 text-sm text-text ${PRESS_FEEDBACK} hover:text-primary disabled:cursor-not-allowed disabled:opacity-60 ${FOCUS_RING}`}
       >
         {label}
       </button>

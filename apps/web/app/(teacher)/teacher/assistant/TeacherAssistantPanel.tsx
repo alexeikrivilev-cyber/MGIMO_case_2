@@ -18,7 +18,7 @@ import { useState, type FormEvent } from 'react';
 import Link from 'next/link';
 import { ApiClientError, api } from '../../../../lib/api-client';
 import { Button, Card, EmptyState, ErrorState, LinkButton, Spinner, StatusBadge, TextInput } from '../../../../components/ui';
-import { TEXT_LINK_SM_CLASS } from '../../../../lib/ui';
+import { PRESS_FEEDBACK, TEXT_LINK_SM_CLASS } from '../../../../lib/ui';
 import type { StudyPlanListItem } from '@udgu/core';
 
 const FOCUS_RING =
@@ -40,7 +40,7 @@ function Chip({
         type="button"
         disabled={disabled}
         onClick={() => onPick(label)}
-        className={`inline-flex min-h-11 items-center rounded-full border border-border bg-surface-2 px-3 text-sm text-text transition-colors hover:text-primary disabled:cursor-not-allowed disabled:opacity-60 ${FOCUS_RING}`}
+        className={`inline-flex min-h-11 items-center rounded-full border border-border bg-surface-2 px-3 text-sm text-text ${PRESS_FEEDBACK} hover:text-primary disabled:cursor-not-allowed disabled:opacity-60 ${FOCUS_RING}`}
       >
         {label}
       </button>
