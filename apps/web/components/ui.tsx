@@ -20,6 +20,7 @@ import {
   type TextareaHTMLAttributes,
 } from 'react';
 import Link from 'next/link';
+import { PRESS_FEEDBACK } from '../lib/ui';
 
 /** Склейка классов (клиентский аналог clsx — сторонних зависимостей нет). */
 function cn(...values: readonly (string | undefined | false)[]): string {
@@ -93,7 +94,8 @@ export function Button({
       disabled={disabled === true || loading}
       aria-busy={loading || undefined}
       className={cn(
-        'inline-flex min-h-11 items-center justify-center gap-2 rounded-md px-4 text-sm font-medium transition-colors',
+        'inline-flex min-h-11 items-center justify-center gap-2 rounded-md px-4 text-sm font-medium',
+        PRESS_FEEDBACK,
         FOCUS_RING,
         BUTTON_VARIANTS[variant],
         fullWidth && 'w-full',
@@ -145,7 +147,8 @@ export function LinkButton({
       aria-disabled={disabled || undefined}
       tabIndex={disabled ? -1 : undefined}
       className={cn(
-        'inline-flex min-h-11 items-center justify-center gap-2 rounded-md px-4 text-sm font-medium transition-colors',
+        'inline-flex min-h-11 items-center justify-center gap-2 rounded-md px-4 text-sm font-medium',
+        PRESS_FEEDBACK,
         FOCUS_RING,
         BUTTON_VARIANTS[variant],
         fullWidth && 'w-full',
@@ -377,7 +380,8 @@ export function SegmentedLinks({
           href={item.href}
           aria-current={item.active ? 'page' : undefined}
           className={cn(
-            'inline-flex min-h-11 min-w-16 items-center justify-center rounded-md px-3 text-sm font-medium transition-colors',
+            'inline-flex min-h-11 min-w-16 items-center justify-center rounded-md px-3 text-sm font-medium',
+            PRESS_FEEDBACK,
             FOCUS_RING,
             item.active ? 'bg-primary text-on-primary' : 'text-text-muted hover:text-text',
           )}

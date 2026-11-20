@@ -71,6 +71,14 @@
   --udgu-z-modal: 200;
   --udgu-z-toast: 300;
 
+  /* Движение (доктрина better-ui: высокочастотный отклик ≤150ms,
+     входная хореография 300ms ease-out; точное значение easing,
+     встроенный Tailwind ease-out — другая кривая) */
+  --udgu-motion-duration-fast: 150ms;
+  --udgu-motion-duration-base: 220ms;
+  --udgu-motion-duration-slow: 300ms;
+  --udgu-motion-ease-out: cubic-bezier(0.2, 0, 0, 1);
+
   color-scheme: light;
 }
 

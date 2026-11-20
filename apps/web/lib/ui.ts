@@ -19,6 +19,19 @@ export const FOCUS_RING =
   'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary';
 
 /**
+ * Отклик на нажатие (артефакт docs/design/ui-alive-wave-1.html, §2):
+ * масштаб 0.96 за 150ms ease-out под prefers-reduced-motion: no-preference
+ * (motion-safe), disabled никогда не масштабируется (enabled:). Переход —
+ * только именованные свойства, никогда all. Под reduce масштаба нет
+ * (глобальное правило globals.css гасит длительности), остаётся цвет.
+ */
+export const PRESS_FEEDBACK =
+  'transition-[transform,background-color,border-color,color] ' +
+  'duration-[var(--udgu-motion-duration-fast)] ' +
+  'ease-[var(--udgu-motion-ease-out)] ' +
+  'motion-safe:enabled:active:scale-[0.96]';
+
+/**
  * Текстовая ссылка внутри контента: Hit-область >= 24px (WCAG 2.2 AA, 2.5.8).
  * Использовать ВМЕСТО голого `text-primary underline decoration-dotted`.
  */

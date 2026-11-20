@@ -15,7 +15,7 @@ import { LessonRow } from '../../../components/LessonRow';
 import { formatDateRange, formatDateWithYear, formatDuration, weekdayShort } from '../../../components/format';
 import { IconChevronLeft, IconChevronRight } from '../../../components/icons';
 import { loadSchedulePageData, type LoadResult, type SchedulePageData } from '../../../lib/page-data';
-import { TEXT_LINK_CLASS } from '../../../lib/ui';
+import { PRESS_FEEDBACK, TEXT_LINK_CLASS } from '../../../lib/ui';
 
 const FOCUS_RING =
   'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary';
@@ -26,7 +26,7 @@ function WeekArrow({ href, direction, label }: { href: string; direction: 'prev'
     <Link
       href={href}
       aria-label={label}
-      className={`inline-flex min-h-11 min-w-11 items-center justify-center rounded-md border border-border bg-surface text-text-muted transition-colors hover:bg-surface-2 hover:text-text ${FOCUS_RING}`}
+      className={`inline-flex min-h-11 min-w-11 items-center justify-center rounded-md border border-border bg-surface text-text-muted hover:bg-surface-2 hover:text-text ${PRESS_FEEDBACK} ${FOCUS_RING}`}
     >
       {direction === 'prev' ? <IconChevronLeft /> : <IconChevronRight />}
     </Link>

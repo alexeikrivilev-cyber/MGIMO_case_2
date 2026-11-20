@@ -14,6 +14,7 @@ import Link from 'next/link';
 import { Card, EmptyState, SegmentedLinks, StatusBadge } from '../../../components/ui';
 import { PageHeader } from '../../../components/PageHeader';
 import { PageResult, SectionTitle } from '../../../components/PageStates';
+import { TrendChart } from '../../../components/TrendChart';
 import { formatDate, formatDelta, formatScore } from '../../../components/format';
 import { IconArrowDown, IconArrowUp, IconMinus } from '../../../components/icons';
 import { loadGradesPageData, type LoadResult, type GradesPageData } from '../../../lib/page-data';
@@ -105,6 +106,16 @@ function SummaryCard({ data }: { data: GradesPageData }): React.JSX.Element {
           ) : null}
         </div>
       </div>
+
+      {/* Динамика по семестрам (артефакт волны 1, §6): диаграмма — по ВСЕМ
+          семестрам, даже когда список ниже отфильтрован по семестру.
+          Одного семестра недостаточно для сравнения — секции нет вовсе. */}
+      {summary.trend.semesterAverages.length >= 2 ? (
+        <div className="mt-4">
+          <SectionTitle>Динамика по семестрам</SectionTitle>
+          <TrendChart points={summary.trend.semesterAverages} />
+        </div>
+      ) : null}
 
       <div className="mt-4">
         <h3 className="text-sm font-medium text-text">Долги</h3>

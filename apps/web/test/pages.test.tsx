@@ -341,6 +341,9 @@ test('дашборд: приветствие, ближайшая пара, ра�
   assert.match(html, /В деканате/, 'метка «чей ход» на заявке');
   // Карточка-ссылка в ассистент (BRIEF v2 §5): раздел находится без подсказок.
   assert.match(html, /href="\/assistant"/, 'карточка-ссылка в ассистент');
+  // Stagger первого экрана (волна 1, артефакт §3): единственное место
+  // хореографии входа в проекте.
+  assert.match(html, /class="stagger-in"/, 'обёртка stagger-in на дашборде');
   // Верифицированный студент не видит заглушку гейта.
   assert.equal(html.includes('data-testid="verification-gate"'), false);
 });
@@ -354,6 +357,17 @@ test('дашборд неверифицированного: заглушка у
   assert.match(html, /data-testid="verification-gate"/, 'карточка гейта верификации');
   assert.match(html, /Верифицировать студенческий билет/, 'призыв действовать');
   assert.match(html, /Добр(ый день|ое утро|ый вечер|ой ночи), Мария!/, 'профиль доступен и до верификации');
+});
+
+test('дашборд: секции обёрнуты в stagger-интервал (волна 1)', async () => {
+  const result = await loadDashboardData(verifiedCookie);
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  const html = render(<DashboardView result={result} />);
+
+  // Хореография входа живёт в globals.css (.stagger-in + keyframes
+  // udgu-rise, только при prefers-reduced-motion: no-preference).
+  assert.match(html, /class="stagger-in"/, 'контент дашборда в stagger-обёртке');
 });
 
 // ---------------------------------------------------------------------------
@@ -411,6 +425,34 @@ test('успеваемость верифицированного: сводка,
   assert.match(html, /Леверидж/, 'блок «леверидж» (решение Council)');
   assert.match(html, /Целевой средний балл/, 'ползунок цели');
   assert.match(html, /3 семестр/, 'переключатель семестров');
+  // Динамика по семестрам (волна 1): серверный SVG, все числа — в
+  // aria-label (тултипов и JS нет). 1 семестр — 5,00, 2 семестр — 4,00.
+  assert.match(html, /Динамика по семестрам/, 'секция динамики');
+  assert.match(
+    html,
+    /<svg[^>]*role="img"[^>]*aria-label="Средний балл по семестрам: 1 семестр — 5,00; 2 семестр — 4,00"/,
+    'диаграмма тренда с числами обоих семестров в aria-label',
+  );
+});
+
+test('успеваемость: оценки одного семестра — диаграммы динамики нет', async () => {
+  // Сравнивать динамику не с чего: секция не рендерится вовсе (не заглушка).
+  const group = await createGroup('ПИ-32');
+  const student = await createStudent('student4', group.id, { lastName: 'Односеместров' });
+  const singleSubject = await createSubject('TEST-03', 'Динамика одного семестра');
+  await createVerification(student.studentId, 'VERIFIED');
+  await createGrade(student.studentId, singleSubject, 4, null, 'EXAM', 1);
+  const cookie = `udgu_session=${(await createSession(student.userId)).token}`;
+
+  const result = await loadGradesPageData(cookie, undefined);
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  const html = render(<GradesView result={result} />);
+
+  assert.match(html, /data-testid="grades-summary"/, 'сводка на экране');
+  assert.equal(html.includes('Динамика по семестрам'), false, 'секции динамики нет');
+  assert.equal(html.includes('Средний балл по семестрам'), false, 'диаграммы нет');
+  assert.match(html, /недостаточно данных/, 'текст тренда честно говорит о нехватке данных');
 });
 
 test('успеваемость неверифицированного: заглушка гейта, не ошибка', async () => {
@@ -423,6 +465,42 @@ test('успеваемость неверифицированного: загл�
   assert.match(html, /data-testid="verification-gate"/, 'заглушка вместо данных');
   assert.match(html, /Верифицировать студенческий билет/);
   assert.equal(html.includes('Как у меня дела'), false, 'оценки не утекают до верификации');
+});
+
+test('успеваемость: диаграмма динамики — svg с aria-label и числами семестров', async () => {
+  const result = await loadGradesPageData(verifiedCookie, undefined);
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  const html = render(<GradesView result={result} />);
+
+  assert.match(html, /Динамика по семестрам/, 'секция динамики под сеткой сводки');
+  // Скринридер получает все числа диаграммы: семестры и средние баллы
+  // (в фикстуре: 1 семестр — экзамен на 5, 2 семестр — курсовая на 4).
+  assert.match(
+    html,
+    /aria-label="Средний балл по семестрам: 1 семестр — 5,00; 2 семестр — 4,00"/,
+    'диаграмма озвучивает оба семестра и оба средних балла',
+  );
+  assert.match(html, /<svg[^>]*role="img"/, 'смысловой SVG с ролью img');
+  assert.match(html, /class="bar[^"]*"/, 'столбцы несут класс .bar — рост снизу делает CSS');
+});
+
+test('успеваемость: один семестр с оценками — диаграммы нет', async () => {
+  // Свежий студент: оценки только за первый семестр — сравнивать нечего.
+  const group = await createGroup('ПИ-41');
+  const student = await createStudent('student-trend-one', group.id, { lastName: 'Односеместров' });
+  const trendSubject = await createSubject('TREND-01', 'Динамика оценений');
+  await createVerification(student.studentId, 'VERIFIED');
+  await createGrade(student.studentId, trendSubject, 4, null, 'EXAM', 1);
+  const cookie = `udgu_session=${(await createSession(student.userId)).token}`;
+
+  const result = await loadGradesPageData(cookie, undefined);
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  const html = render(<GradesView result={result} />);
+
+  assert.equal(html.includes('Динамика по семестрам'), false, 'секция динамики не рендерится');
+  assert.equal(html.includes('Средний балл по семестрам'), false, 'диаграммы нет');
 });
 
 // ---------------------------------------------------------------------------
