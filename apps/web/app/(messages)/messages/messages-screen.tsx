@@ -20,6 +20,7 @@ import { Card, EmptyState, LinkButton, StatusBadge } from '../../../components/u
 import { PageHeader } from '../../../components/PageHeader';
 import { PageResult } from '../../../components/PageStates';
 import { formatMoment } from '../../../components/format';
+import { IconChat } from '../../../components/icons';
 import { FOCUS_RING, PRESS_FEEDBACK } from '../../../lib/ui';
 import {
   loadMessagesPageData,
@@ -181,7 +182,7 @@ export function MessagesView({ result }: { result: LoadResult<MessagesPageData> 
                 {isStudent ? 'Мои диалоги' : 'Диалоги со студентами'}
               </h2>
               {data.conversations.length === 0 ? (
-                <EmptyState title={isStudent ? 'Диалогов нет' : 'Студенты ещё не писали'} />
+                <EmptyState title={isStudent ? 'Диалогов нет' : 'Студенты ещё не писали'} icon={<IconChat />} />
               ) : (
                 <ul className="space-y-2">
                   {data.conversations.map((conversation) => (

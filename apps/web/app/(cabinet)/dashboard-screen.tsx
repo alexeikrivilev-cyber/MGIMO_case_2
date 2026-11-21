@@ -16,11 +16,12 @@ import { Avatar, Card, EmptyState, LinkButton, StatusBadge } from '../../compone
 import { PageHeader } from '../../components/PageHeader';
 import { PageResult, SectionTitle, VerificationGateCard } from '../../components/PageStates';
 import { LessonRow } from '../../components/LessonRow';
-import { formatDate, formatDayLabel, formatDuration, formatMoment } from '../../components/format';
+import { formatDate, formatDayLabel, formatDuration, formatMoment, lessonMoment } from '../../components/format';
 import { requestTurnLabel, requestStatusTone, verificationStatusTone, VERIFICATION_STATUS_LABELS } from '../../components/labels';
+import { IconBell, IconCalendar, IconMegaphone, IconRequests } from '../../components/icons';
 import { loadDashboardData, type DashboardData, type LoadResult } from '../../lib/page-data';
 import { TEXT_LINK_SM_CLASS } from '../../lib/ui';
-import type { MyRequest } from '@udgu/core';
+import { dateKey, type MyRequest } from '@udgu/core';
 
 /** Приветствие по времени суток (локальному). */
 function greeting(now: Date): string {
@@ -50,12 +51,32 @@ function RequestRow({ request }: { request: MyRequest }): React.JSX.Element {
   );
 }
 
-export function DashboardView({ result }: { result: LoadResult<DashboardData> }): React.JSX.Element {
+export function DashboardView({
+  result,
+  now = new Date(),
+}: {
+  result: LoadResult<DashboardData>;
+  /** Момент «сейчас» для метки ближайшей пары: серверная обёртка передаёт
+   *  new Date(), тесты — фиксированное время (детерминированный рендер). */
+  now?: Date;
+}): React.JSX.Element {
   return (
     <PageResult result={result}>
       {(data) => {
         const { profile } = data;
         const verified = profile.verificationStatus === 'VERIFIED';
+        // Метка «когда» у ближайшей пары: UTC-мгновения (урок волны 2),
+        // поэтому «Через 2 ч 15 мин» не зависит от пояса хоста. Только
+        // здесь: рельс /schedule несёт свои маркеры (волна 2).
+        const nextLessonMoment =
+          data.nextLesson === null
+            ? null
+            : lessonMoment(
+                now,
+                dateKey(data.nextLesson.effectiveDate),
+                data.nextLesson.startTime,
+                data.nextLesson.endTime,
+              );
 
         return (
           /* Единственное место stagger'а в проекте (артефакт волны 1, §3):
@@ -107,9 +128,24 @@ export function DashboardView({ result }: { result: LoadResult<DashboardData> })
             <Card className="mb-4">
               <SectionTitle>Ближайшая пара</SectionTitle>
               {data.nextLesson === null ? (
-                <EmptyState title="Ближайших пар нет" />
+                <EmptyState title="Ближайших пар нет" icon={<IconCalendar />} />
               ) : (
                 <div>
+                  {nextLessonMoment === null || nextLessonMoment.kind === 'FAR' ? null : (
+                    <div className="mb-2">
+                      <StatusBadge
+                        tone={
+                          nextLessonMoment.kind === 'NOW'
+                            ? 'success'
+                            : nextLessonMoment.kind === 'BEFORE'
+                              ? 'info'
+                              : 'neutral'
+                        }
+                      >
+                        {nextLessonMoment.label}
+                      </StatusBadge>
+                    </div>
+                  )}
                   <p className="text-lg font-semibold text-text">{data.nextLesson.subjectName}</p>
                   <p className="mt-1 text-sm text-text-muted">
                     {formatDayLabel(data.nextLesson.effectiveDate)}, {data.nextLesson.startTime}–
@@ -138,7 +174,7 @@ export function DashboardView({ result }: { result: LoadResult<DashboardData> })
               </SectionTitle>
               <Card>
                 {data.todayLessons.length === 0 ? (
-                  <EmptyState title="Сегодня пар нет" />
+                  <EmptyState title="Сегодня пар нет" icon={<IconCalendar />} />
                 ) : (
                   <ul>
                     {data.todayLessons.map((lesson) => (
@@ -185,6 +221,7 @@ export function DashboardView({ result }: { result: LoadResult<DashboardData> })
                 {data.activeRequests.length === 0 ? (
                   <EmptyState
                     title="Активных заявок нет"
+                    icon={<IconRequests />}
                     action={
                       <LinkButton href="/requests?new=1" variant="secondary">
                         Подать заявку
@@ -216,7 +253,7 @@ export function DashboardView({ result }: { result: LoadResult<DashboardData> })
               </SectionTitle>
               <Card>
                 {data.unreadNotifications.length === 0 ? (
-                  <EmptyState title="Непрочитанных нет" />
+                  <EmptyState title="Непрочитанных нет" icon={<IconBell />} />
                 ) : (
                   <ul>
                     {data.unreadNotifications.map((notification) => (
@@ -247,7 +284,7 @@ export function DashboardView({ result }: { result: LoadResult<DashboardData> })
               </SectionTitle>
               <Card>
                 {data.announcements.length === 0 ? (
-                  <EmptyState title="Объявлений нет" />
+                  <EmptyState title="Объявлений нет" icon={<IconMegaphone />} />
                 ) : (
                   <ul>
                     {data.announcements.map((announcement) => (

@@ -36,6 +36,7 @@ import {
 } from '../../../../components/ui';
 import { PRESS_FEEDBACK, TEXT_LINK_SM_CLASS } from '../../../../lib/ui';
 import { ChatBubble, TypingIndicator } from '../../../../components/chat';
+import { IconAssistant, IconRequests } from '../../../../components/icons';
 import type { StudyPlanListItem } from '@udgu/core';
 
 const FOCUS_RING =
@@ -229,6 +230,7 @@ export function TeacherAssistantPanel({
         <EmptyState
           title="Планов пока нет"
           description="Ассистент отвечает по разделам загруженного учебного плана."
+          icon={<IconRequests />}
         />
         <LinkButton href="/teacher/plans" variant="primary">
           Загрузить план
@@ -279,7 +281,7 @@ export function TeacherAssistantPanel({
       {/* Пустое состояние и стартовые чипы — только пока лента пуста. */}
       {exchanges.length === 0 ? (
         <>
-          <EmptyState title="Спросите по плану" description="Темы модулей, лабораторные, контрольные точки." />
+          <EmptyState title="Спросите по плану" description="Темы модулей, лабораторные, контрольные точки." icon={<IconAssistant />} />
           {suggestions.length === 0 ? null : (
             <section aria-labelledby="teacher-assistant-starters">
               <h2 id="teacher-assistant-starters" className="mb-2 text-base font-semibold text-text">

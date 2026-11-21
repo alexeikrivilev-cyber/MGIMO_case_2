@@ -37,6 +37,7 @@ import { ApiClientError, api } from '../../../lib/api-client';
 import { PRESS_FEEDBACK } from '../../../lib/ui';
 import { Button, Card, EmptyState, ErrorState, StatusBadge, TextInput } from '../../../components/ui';
 import { ChatBubble, SourceLinks, TypingIndicator } from '../../../components/chat';
+import { IconAssistant } from '../../../components/icons';
 
 const FOCUS_RING =
   'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary';
@@ -240,6 +241,7 @@ export function AssistantPanel({ suggestions }: { suggestions: readonly string[]
           <EmptyState
             title="Спросите про учёбу"
             description="Долги, средний балл, расписание, заявки — по вашим данным."
+            icon={<IconAssistant />}
           />
           {suggestions.length === 0 ? null : (
             <section aria-labelledby="assistant-starters">

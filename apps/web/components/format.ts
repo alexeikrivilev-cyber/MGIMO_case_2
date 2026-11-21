@@ -78,6 +78,46 @@ export function formatDuration(minutes: number): string {
   return rest === 0 ? `${hours} ч` : `${hours} ч ${rest} мин`;
 }
 
+/** Мгновение пары из «YYYY-MM-DD» + «HH:MM» (UTC): TZ хоста не участвует. */
+function utcMoment(date: string, time: string): Date {
+  const [year, month, day] = date.split('-').map(Number);
+  const [hours, minutes] = time.split(':').map(Number);
+  return new Date(Date.UTC(year, month - 1, day, hours, minutes));
+}
+
+/**
+ * «Когда» ближайшая пара (волна 5, docs/design/ui-alive-wave-5.html):
+ * NOW — идёт сейчас; BEFORE — до начала меньше суток («Через 2 ч 15 мин»);
+ * FAR — до начала сутки и больше (метку не показываем: дата уже в карточке);
+ * AFTER — закончилась. Границы: начало включено, конец исключён.
+ *
+ * Мгновения строятся через Date.UTC из компонентов date/startTime/endTime,
+ * now сравнивается как абсолютный момент — поэтому результат не зависит от
+ * часового пояса хоста (урок волны 2: расписание живёт в UTC).
+ */
+export function lessonMoment(
+  now: Date,
+  date: string,
+  startTime: string,
+  endTime: string,
+): { kind: 'NOW' | 'BEFORE' | 'AFTER' | 'FAR'; label: string } {
+  const start = utcMoment(date, startTime).getTime();
+  const end = utcMoment(date, endTime).getTime();
+  const nowMs = now.getTime();
+
+  if (nowMs >= start && nowMs < end) {
+    return { kind: 'NOW', label: 'Сейчас' };
+  }
+  if (nowMs < start) {
+    const minutesUntil = Math.round((start - nowMs) / 60_000);
+    if (minutesUntil < 24 * 60) {
+      return { kind: 'BEFORE', label: `Через ${formatDuration(minutesUntil)}` };
+    }
+    return { kind: 'FAR', label: '' };
+  }
+  return { kind: 'AFTER', label: 'Завершилась' };
+}
+
 /** Средний балл с русской запятой: 4.35 → «4,35». */
 export function formatScore(value: number | null): string {
   if (value === null) return '—';

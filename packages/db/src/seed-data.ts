@@ -781,15 +781,31 @@ function findMovedDate(
   original: Date,
   groupName: string,
   startTime: string,
+  windowStart: Date,
   horizon: Date,
   taken: (groupName: string, dateKey: string, startTime: string) => boolean,
 ): Date | null {
-  let candidate = addDays(original, 1);
-  while (candidate.getTime() <= horizon.getTime()) {
-    if (isWeekday(candidate) && !taken(groupName, toDateKey(candidate), startTime)) {
-      return candidate;
-    }
-    candidate = addDays(candidate, 1);
+  // Ищем слот в любом буднем дне окна, КРОМЕ исходной даты: перенос
+  // допустим и на более позднюю, и на более раннюю дату within окна.
+  // Приоритет — ближайшая дата ПОСЛЕ исходной (естественный перенос),
+  // иначе ближайшая до неё. Почему всё окно: при старте сидера с
+  // выходных конца окна не хватает будних слотов «после», и попытки
+  // переноса поздних пар пустовали — инвариант «>= 2 переносов» падал
+  // по субботам и воскресеньям (red-прогон 21.11).
+  const free = (candidate: Date): boolean =>
+    isWeekday(candidate) &&
+    !taken(groupName, toDateKey(candidate), startTime) &&
+    toDateKey(candidate) !== toDateKey(original);
+
+  for (let offset = 1; offset <= 14; offset += 1) {
+    const candidate = addDays(original, offset);
+    if (candidate.getTime() > horizon.getTime()) break;
+    if (free(candidate)) return candidate;
+  }
+  for (let offset = 1; offset <= 14; offset += 1) {
+    const candidate = addDays(original, -offset);
+    if (candidate.getTime() < windowStart.getTime()) break;
+    if (free(candidate)) return candidate;
   }
   return null;
 }
@@ -1179,7 +1195,7 @@ export async function buildSeedData(options: BuildSeedDataOptions = {}): Promise
     const entry = scheduleEntries[index];
     if (!entry || entry.status !== 'SCHEDULED') continue;
     const original = new Date(`${entry.date}T00:00:00.000Z`);
-    const movedToDate = findMovedDate(original, entry.groupName, entry.startTime, scheduleEnd, slotTaken);
+    const movedToDate = findMovedDate(original, entry.groupName, entry.startTime, now, scheduleEnd, slotTaken);
     if (movedToDate === null) continue;
     const movedToRoom = pick(
       rng,
@@ -1192,6 +1208,26 @@ export async function buildSeedData(options: BuildSeedDataOptions = {}): Promise
       movedToDate: toDateKey(movedToDate),
       movedToRoom,
     };
+  }
+
+  // Гарантия инварианта «>= 2 переносов» на ЛЮБОМ стартовом дне: если
+  // основных попыток не хватило (тесное окно выходных), проходим
+  // ранние записи по порядку и переносим первые свободные для переноса.
+  let movedCount = scheduleEntries.filter((entry) => entry.status === 'MOVED').length;
+  for (let index = 0; index < scheduleEntries.length && movedCount < 2; index += 1) {
+    const entry = scheduleEntries[index];
+    if (!entry || entry.status !== 'SCHEDULED') continue;
+    const original = new Date(`${entry.date}T00:00:00.000Z`);
+    const movedToDate = findMovedDate(original, entry.groupName, entry.startTime, now, scheduleEnd, slotTaken);
+    if (movedToDate === null) continue;
+    scheduleEntries[index] = {
+      ...entry,
+      status: 'MOVED',
+      note: MOVED_NOTE,
+      movedToDate: toDateKey(movedToDate),
+      movedToRoom: pick(rng, ROOMS.filter((room) => room !== entry.room)),
+    };
+    movedCount += 1;
   }
 
   for (const index of uniqueIndexes(cancelledIndexes)) {
@@ -1689,7 +1725,11 @@ export async function buildSeedData(options: BuildSeedDataOptions = {}): Promise
   ];
 
   // ---- Эмуляция согласия OAuth: один использованный интент, один активный ----
-  const exactNow = new Date();
+  // Интенты строятся от ПЕРЕДАННОГО now (не от реального времени запуска):
+  // детерминизация сидера — одинаковый now даёт идентичный датасет
+  // (исключение намеренное — passwordHash: соль argon2id случайна by design).
+  // Активный интент живёт 15 минут от «сейчас» сидера и не портится со временем.
+  const exactNow = now;
   const consumedCreatedAt = atTime(addDays(now, -30), 10, 0);
 
   const oauthIntents: OAuthIntentSeed[] = [

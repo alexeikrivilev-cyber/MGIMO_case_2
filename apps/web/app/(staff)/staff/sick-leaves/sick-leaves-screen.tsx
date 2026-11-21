@@ -15,6 +15,7 @@ import { Card, EmptyState, SegmentedLinks, StatusBadge } from '../../../../compo
 import { PageHeader } from '../../../../components/PageHeader';
 import { StaffPageResult } from '../../../../components/StaffPageResult';
 import { formatDateRange } from '../../../../components/format';
+import { IconCalendar } from '../../../../components/icons';
 import {
   loadStaffSickLeavesPageData,
   type LoadResult,
@@ -109,9 +110,9 @@ export function StaffSickLeavesView({
             </div>
 
             {data.onlyActive && data.sickLeaves.length === 0 ? (
-              <EmptyState title="Сейчас никто не болеет" />
+              <EmptyState title="Сейчас никто не болеет" icon={<IconCalendar />} />
             ) : data.sickLeaves.length === 0 ? (
-              <EmptyState title="Отметок о болезни нет" />
+              <EmptyState title="Отметок о болезни нет" icon={<IconCalendar />} />
             ) : (
               <ul className="space-y-3">
                 {data.sickLeaves.map((leave) => (

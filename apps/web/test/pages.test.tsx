@@ -396,6 +396,79 @@ test('дашборд: секции обёрнуты в stagger-интервал 
   assert.match(html, /class="stagger-in"/, 'контент дашборда в stagger-обёртке');
 });
 
+test('дашборд: пустые состояния несут иконку раздела (волна 5)', async () => {
+  // Свежая группа без расписания: у студента нет пар сегодня и ближайших.
+  const group = await createGroup('ПИ-71');
+  const student = await createStudent('student-empty', group.id, { lastName: 'Пустошов' });
+  const cookie = `udgu_session=${(await createSession(student.userId)).token}`;
+
+  const result = await loadDashboardData(cookie);
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  const html = render(<DashboardView result={result} />);
+
+  assert.match(html, /Ближайших пар нет/, 'карточка ближайшей пары пуста');
+  assert.match(html, /Сегодня пар нет/, 'расписание на сегодня пусто');
+
+  // Характер пустого состояния — иконка раздела над заголовком: 40 px,
+  // токен text-muted, декоративная (aria-hidden), без новой строки текста.
+  const iconIndex = html.indexOf('mb-3 flex justify-center text-text-muted');
+  assert.ok(iconIndex >= 0, 'блок иконки пустого состояния на месте');
+  const titleIndex = html.indexOf('Сегодня пар нет');
+  assert.ok(iconIndex >= 0 && iconIndex < titleIndex, 'иконка стоит над заголовком');
+  assert.match(
+    html.slice(iconIndex, titleIndex),
+    /<svg[^>]*aria-hidden="true"/,
+    'иконка декоративна — смысл несёт заголовок',
+  );
+  assert.match(
+    html.slice(iconIndex, titleIndex),
+    /\[&amp;_svg\]:h-10 \[&amp;_svg\]:w-10/,
+    'иконка 40 px через arbitrary-варианты Tailwind',
+  );
+});
+
+test('дашборд: у ближайшей пары — метка «когда», и только на дашборде (волна 5)', async () => {
+  // Свежая группа с единственной парой завтра в 08:30: «сейчас» теста
+  // фиксировано (DashboardView принимает now), поэтому метка детерминирована
+  // и не зависит от времени запуска — в отличие от загрузчиков, где новый
+  // день берёт настоящий new Date().
+  const group = await createGroup('ПИ-72');
+  const momentTeacher = await createTeacher('teacher-moment', { lastName: 'Моментов' });
+  const momentSubject = await createSubject('MOMENT-01', 'Моментная дисциплина');
+  await createScheduleEntry({
+    groupId: group.id,
+    subjectId: momentSubject,
+    teacherId: momentTeacher.teacherId,
+    date: TOMORROW,
+    startTime: '08:30',
+    endTime: '09:50',
+  });
+  const student = await createStudent('student-moment', group.id, { lastName: 'Моментов' });
+  const cookie = `udgu_session=${(await createSession(student.userId)).token}`;
+
+  const result = await loadDashboardData(cookie);
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.ok(result.value.nextLesson !== null, 'ближайшая пара найдена');
+
+  // Сегодня 12:00 UTC — до начала 20 ч 30 мин: метка «Через …» в info-тоне.
+  const before = render(<DashboardView result={result} now={new Date(`${TODAY}T12:00:00.000Z`)} />);
+  assert.match(before, /Моментная дисциплина/, 'предмет ближайшей пары на карточке');
+  assert.match(before, /text-primary">Через 20 ч 30 мин</, 'метка «когда» в primary-тоне');
+
+  // Больше суток до начала — метки нет: дата уже в карточке (via-negativa).
+  const far = render(
+    <DashboardView
+      result={result}
+      now={new Date(new Date(`${TODAY}T12:00:00.000Z`).getTime() - 30 * 3_600_000)}
+    />,
+  );
+  assert.equal(far.includes('>Через '), false, 'метки «Через …» у далёкой пары нет');
+  assert.equal(far.includes('>Сейчас<'), false, 'метки «Сейчас» нет');
+  assert.equal(far.includes('>Завершилась<'), false, 'метки «Завершилась» нет');
+});
+
 // ---------------------------------------------------------------------------
 // Расписание
 // ---------------------------------------------------------------------------

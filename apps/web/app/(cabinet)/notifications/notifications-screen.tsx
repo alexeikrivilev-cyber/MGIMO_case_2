@@ -13,6 +13,7 @@ import { Card, EmptyState, StatusBadge } from '../../../components/ui';
 import { PageHeader } from '../../../components/PageHeader';
 import { PageResult } from '../../../components/PageStates';
 import { formatMoment } from '../../../components/format';
+import { IconBell } from '../../../components/icons';
 import { loadNotificationsPageData, type LoadResult, type NotificationsPageData } from '../../../lib/page-data';
 import { MarkAllReadButton } from './MarkAllReadButton';
 import { TEXT_LINK_SM_CLASS } from '../../../lib/ui';
@@ -48,7 +49,7 @@ export function NotificationsView({ result }: { result: LoadResult<Notifications
           </div>
 
           {data.notifications.length === 0 ? (
-            <EmptyState title="Уведомлений нет" />
+            <EmptyState title="Уведомлений нет" icon={<IconBell />} />
           ) : (
             <ul className="space-y-3">
               {data.notifications.map((notification) => (

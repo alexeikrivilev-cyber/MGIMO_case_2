@@ -8,7 +8,7 @@ import Link from 'next/link';
 import { EmptyState } from '../../../components/ui';
 import { PageHeader } from '../../../components/PageHeader';
 import { PageResult } from '../../../components/PageStates';
-import { IconChevronRight } from '../../../components/icons';
+import { IconChevronRight, IconProfile } from '../../../components/icons';
 import { PRESS_FEEDBACK } from '../../../lib/ui';
 import { loadTeachersPageData, type LoadResult, type TeachersPageData } from '../../../lib/page-data';
 
@@ -26,7 +26,7 @@ export function TeachersView({ result }: { result: LoadResult<TeachersPageData> 
           />
 
           {data.teachers.length === 0 ? (
-            <EmptyState title="Преподавателей нет" />
+            <EmptyState title="Преподавателей нет" icon={<IconProfile />} />
           ) : (
             <ul className="space-y-2">
               {data.teachers.map((teacher) => (

@@ -21,6 +21,7 @@ import { Card, EmptyState, StatusBadge } from '../../../components/ui';
 import { PageHeader } from '../../../components/PageHeader';
 import { PageResult } from '../../../components/PageStates';
 import { formatMoment } from '../../../components/format';
+import { IconChannels } from '../../../components/icons';
 import { TEXT_LINK_CLASS } from '../../../lib/ui';
 import { loadChannelsPageData, type ChannelsPageData, type LoadResult } from '../../../lib/page-data';
 import { ChannelSimulator } from './ChannelSimulator';
@@ -74,6 +75,7 @@ export function ChannelsView({ result }: { result: LoadResult<ChannelsPageData> 
               <EmptyState
                 title="Уведомлений в каналах нет"
                 description="Сообщение преподавателя, решение по заявке, объявление и перенос пары приходят и в канал."
+                icon={<IconChannels />}
               />
             ) : (
               <ul className="space-y-3" data-testid="channel-inbox">

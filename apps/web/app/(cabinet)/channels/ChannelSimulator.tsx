@@ -33,6 +33,7 @@ import { ApiClientError, api, type BotChannelMode, type BotChannelName } from '.
 import { BOT_CHANNEL_LABELS } from '@udgu/core/bot';
 import { Button, Card, EmptyState, StatusBadge, TextInput } from '../../../components/ui';
 import { FOCUS_RING, PRESS_FEEDBACK } from '../../../lib/ui';
+import { IconChannels } from '../../../components/icons';
 
 /** Порядок вкладок — как в BRIEF v3: Telegram, VK, MAX. */
 const CHANNELS: readonly BotChannelName[] = ['telegram', 'vk', 'max'];
@@ -214,7 +215,7 @@ export function ChannelSimulator({
 
         {/* Лента переписки с ботом. */}
         {messages.length === 0 ? (
-          <EmptyState title="Напишите /help" description="Список команд кабинета: расписание, оценки, заявки, уведомления." />
+          <EmptyState title="Напишите /help" description="Список команд кабинета: расписание, оценки, заявки, уведомления." icon={<IconChannels />} />
         ) : (
           <ul className="space-y-2" data-testid="channel-chat">
             {messages.map((message) => (

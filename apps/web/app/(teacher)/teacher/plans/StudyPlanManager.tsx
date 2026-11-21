@@ -19,6 +19,7 @@ import { useRouter } from 'next/navigation';
 import { ApiClientError, api, validateStudyPlanFile } from '../../../../lib/api-client';
 import { Button, Card, EmptyState, TextInput } from '../../../../components/ui';
 import { formatFileSize, formatMoment } from '../../../../components/format';
+import { IconRequests } from '../../../../components/icons';
 import type { StudyPlanListItem } from '@udgu/core';
 
 /** Форма плана: заголовок + файл + одна строка пояснения. */
@@ -214,6 +215,7 @@ export function StudyPlanManager({ plans }: { plans: readonly StudyPlanListItem[
           <EmptyState
             title="Планов пока нет"
             description="Загрузите учебный план — ассистент начнёт отвечать по его разделам."
+            icon={<IconRequests />}
           />
         ) : (
           <ul className="space-y-2">

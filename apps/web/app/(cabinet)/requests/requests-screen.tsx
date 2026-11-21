@@ -15,6 +15,7 @@ import { PageResult } from '../../../components/PageStates';
 import { RequestTimeline } from '../../../components/RequestTimeline';
 import { formatMoment } from '../../../components/format';
 import { requestFieldLabel, requestStatusTone, requestTurnLabel } from '../../../components/labels';
+import { IconRequests } from '../../../components/icons';
 import { loadRequestsPageData, type LoadResult, type RequestsPageData } from '../../../lib/page-data';
 import { RequestForm } from './RequestForm';
 import { CancelRequestButton } from './CancelRequestButton';
@@ -49,6 +50,7 @@ export function RequestsView({
           {data.requests.length === 0 ? (
             <EmptyState
               title="Заявок нет"
+              icon={<IconRequests />}
               action={
                 <LinkButton href="/requests?new=1">
                   Подать заявку

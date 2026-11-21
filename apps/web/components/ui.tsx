@@ -411,13 +411,24 @@ export function EmptyState({
   title,
   description,
   action,
+  icon,
 }: {
   title: string;
   description?: string;
   action?: ReactNode;
+  /**
+   * Иконка раздела над заголовком (волна 5, docs/design/ui-alive-wave-5.html):
+   * характер пустого состояния без новой строки текста. Иконки из
+   * components/icons.tsx декоративны (aria-hidden) — подпись остаётся
+   * заголовком. Без icon разметка прежняя.
+   */
+  icon?: ReactNode;
 }): React.JSX.Element {
   return (
     <div className="rounded-xl border border-dashed border-border bg-surface-2/50 px-4 py-8 text-center">
+      {icon === undefined ? null : (
+        <div className="mb-3 flex justify-center text-text-muted [&_svg]:h-10 [&_svg]:w-10">{icon}</div>
+      )}
       <p className="text-sm font-medium text-text">{title}</p>
       {description === undefined ? null : <p className="mx-auto mt-1 max-w-xs text-sm text-text-muted">{description}</p>}
       {action === undefined ? null : <div className="mt-4 flex justify-center">{action}</div>}
