@@ -16,6 +16,8 @@
  *   AVERAGE, IMPROVE), у неверифицированного студента получают честную
  *   заглушку вместо данных (VerificationRequiredError ловится здесь);
  * - UNKNOWN не выдумывает ответ: честное «не понял вопрос» + подсказки.
+ * - sources (assistantSourcesFor в assistantClient.ts): из каких разделов
+ *   кабинета собран ответ — атрибуция в интерфейсе (волна 4 «оживления»).
  *
  * Минимализм текста (BRIEF v4): одна мысль на строку, списки — построчно,
  * без абзацев.
@@ -41,7 +43,11 @@ import { getMyNotifications, type MyNotification } from './notifications';
 import { VerificationRequiredError } from './verification';
 import type { AuthSession } from '../session';
 import { ASSISTANT_SYSTEM_PROMPT, type LlmClient } from '../llm';
-import { ASSISTANT_VERIFICATION_SUGGESTION } from '../assistantClient';
+import {
+  ASSISTANT_VERIFICATION_SUGGESTION,
+  assistantSourcesFor,
+  type AssistantSource,
+} from '../assistantClient';
 
 // Единый источник для движка и интерфейса: чип-действие гейта верификации.
 export { ASSISTANT_VERIFICATION_SUGGESTION };
@@ -62,12 +68,14 @@ export type AssistantIntent =
 /** Режим ответа: детерминированный движок или LLM по его данным. */
 export type AssistantMode = 'deterministic' | 'llm';
 
-/** Ответ ассистента: текст, интент, follow-up-подсказки и режим. */
+/** Ответ ассистента: текст, интент, follow-up-подсказки, режим и источники. */
 export interface AssistantAnswer {
   readonly intent: AssistantIntent;
   readonly answer: string;
   readonly suggestions: readonly string[];
   readonly mode: AssistantMode;
+  /** Разделы кабинета, из которых собран ответ (атрибуция, волна 4). */
+  readonly sources: readonly AssistantSource[];
 }
 
 /** Параметры askAssistant: LLM подключается инъекцией, не глобалом. */
@@ -319,6 +327,8 @@ function gateAnswer(intent: AssistantIntent): AssistantAnswer {
     answer: 'Оценки откроются после верификации студбилета.',
     suggestions: [ASSISTANT_VERIFICATION_SUGGESTION, 'Что ты умеешь?', 'Расписание на сегодня'],
     mode: 'deterministic',
+    // Заглушка не построена на данных кабинета: источников нет.
+    sources: [],
   };
 }
 
@@ -581,7 +591,13 @@ function renderAnswer(intent: AssistantIntent, facts: AssistantFacts, now: Date)
       break;
   }
 
-  return { intent, answer, suggestions: suggestionsFor(intent, false), mode: 'deterministic' };
+  return {
+    intent,
+    answer,
+    suggestions: suggestionsFor(intent, false),
+    mode: 'deterministic',
+    sources: assistantSourcesFor(intent),
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -723,7 +739,14 @@ export async function askAssistant(
     if (answer === '') {
       return deterministic;
     }
-    return { intent, answer, suggestions: deterministic.suggestions, mode: 'llm' };
+    // LLM переформулирует те же факты кабинета — источники те же.
+    return {
+      intent,
+      answer,
+      suggestions: deterministic.suggestions,
+      mode: 'llm',
+      sources: deterministic.sources,
+    };
   } catch (error) {
     // Ошибка/таймаут LLM → детерминированный ответ с пометкой.
     // В лог уходит только текст ошибки: заголовки (и ключ) в него не входят.

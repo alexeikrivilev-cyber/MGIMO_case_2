@@ -8,7 +8,9 @@
  *   LLM в env нет — режим deterministic по определению);
  * - неверифицированный студент получает заглушку гейта, а не 500;
  * - экран /assistant рендерится из серверного загрузчика (стартовые
- *   подсказки) — пустое состояние и поле ввода на месте.
+ *   подсказки) — пустое состояние и поле ввода на месте;
+ * - лента обменов (волна 4): appendExchange накапливает обмены, пузыри
+ *   чата и индикатор «печатает» рендерятся примитивами components/chat.
  *
  * Обработчики вызываются напрямую (test/http.ts): это тот же код, что
  * в продакшене, но без сервера. База — тестовая horizon_test.
@@ -40,6 +42,9 @@ import { apiRequest, callRoute } from './http';
 const { AssistantView } = await import('../app/(cabinet)/assistant/assistant-screen');
 const { loadAssistantPageData } = await import('../lib/page-data');
 const { CabinetShell } = await import('../components/CabinetShell');
+// Примитивы ленты и чистая функция обменов (волна 4 «оживления»).
+const { ChatBubble, SourceLinks, TypingIndicator } = await import('../components/chat');
+const { appendExchange, AssistantBubble } = await import('../app/(cabinet)/assistant/AssistantPanel');
 
 /** Контекст роутера: клиентский остров вызывает useRouter/usePathname. */
 const ROUTER_CONTEXT = {
@@ -129,6 +134,7 @@ test('POST /api/assistant: студент → 200 с ответом по его 
     intent: string;
     suggestions: readonly string[];
     mode: string;
+    sources: readonly { label: string; href: string }[];
   }>();
   assert.equal(body.intent, 'DEBTS');
   assert.equal(body.mode, 'deterministic', 'без ключа LLM в env — детерминированный режим');
@@ -138,6 +144,11 @@ test('POST /api/assistant: студент → 200 с ответом по его 
   assert.match(body.answer, /сегодня|Свободных окон/);
   assert.ok(Array.isArray(body.suggestions));
   assert.ok(body.suggestions.length >= 2 && body.suggestions.length <= 4);
+  // Атрибуция (волна 4): из каких разделов кабинета собран ответ.
+  assert.deepEqual(body.sources, [
+    { label: 'Успеваемость', href: '/grades' },
+    { label: 'Расписание', href: '/schedule' },
+  ]);
 });
 
 test('POST /api/assistant: нераспознанный вопрос → 200 без выдумок', async () => {
@@ -150,10 +161,12 @@ test('POST /api/assistant: нераспознанный вопрос → 200 б�
     }),
   );
   assert.equal(response.status(), 200);
-  const body = await response.json<{ answer: string; intent: string }>();
+  const body = await response.json<{ answer: string; intent: string; sources: readonly unknown[] }>();
   assert.equal(body.intent, 'UNKNOWN');
   assert.match(body.answer, /Не понял вопрос/);
   assert.doesNotMatch(body.answer, /Машинное обучение/);
+  // Ответ не построен на данных кабинета — источников нет.
+  assert.deepEqual(body.sources, []);
 });
 
 test('POST /api/assistant: неверифицированный студент → заглушка гейта', async () => {
@@ -166,10 +179,17 @@ test('POST /api/assistant: неверифицированный студент �
     }),
   );
   assert.equal(response.status(), 200);
-  const body = await response.json<{ answer: string; intent: string; suggestions: readonly string[] }>();
+  const body = await response.json<{
+    answer: string;
+    intent: string;
+    suggestions: readonly string[];
+    sources: readonly unknown[];
+  }>();
   assert.equal(body.intent, 'AVERAGE');
   assert.equal(body.answer, 'Оценки откроются после верификации студбилета.');
   assert.ok(body.suggestions.includes('Верифицировать билет'));
+  // Заглушка гейта не построена на данных кабинета — источников нет.
+  assert.deepEqual(body.sources, []);
 });
 
 test('страница /assistant: рендерится из серверного загрузчика', async () => {
@@ -231,4 +251,141 @@ test('оболочка: «Ассистент» — шестой раздел н�
     anchorTag(html, 'href="/grades"', 'aria-current') === null,
     'остальные разделы aria-current не получают',
   );
+});
+
+// ---------------------------------------------------------------------------
+// Волна 4 «оживления интерфейса» (docs/design/ui-alive-wave-4.html):
+// лента обменов — вопрос сразу, индикатор «печатает», источники ответа
+// ---------------------------------------------------------------------------
+
+test('appendExchange: два вопроса подряд → два обмена, id уникальны, вопросы по порядку', () => {
+  const first = appendExchange([], 'Какие у меня долги?');
+  const second = appendExchange(first, 'Расписание на сегодня');
+
+  assert.equal(second.length, 2);
+  assert.equal(second[0]?.question, 'Какие у меня долги?');
+  assert.equal(second[1]?.question, 'Расписание на сегодня');
+  assert.notEqual(second[0]?.id, second[1]?.id, 'идентификаторы обменов уникальны');
+  // Новый обмен ещё без ответа: в ленте на его месте индикатор «печатает».
+  assert.equal(second[1]?.answer, null);
+  assert.equal(second[1]?.error, null);
+  // Прежний массив не мутируется: лента растёт копией.
+  assert.equal(first.length, 1);
+});
+
+test('лента чата: SourceLinks рендерит ссылки-источники (Hit ≥ 24px, без target)', () => {
+  const html = renderToStaticMarkup(
+    React.createElement(SourceLinks, {
+      sources: [
+        { label: 'Успеваемость', href: '/grades' },
+        { label: 'Расписание', href: '/schedule' },
+      ],
+    }),
+  );
+
+  assert.match(html, /Источники:/);
+  const grades = anchorTag(html, 'href="/grades"');
+  assert.ok(grades !== null, 'ссылка на раздел «Успеваемость»');
+  assert.ok(!(grades ?? '').includes('target='), 'ссылка открывается в том же окне');
+  assert.ok(
+    anchorTag(html, 'href="/schedule"') !== null,
+    'ссылка на раздел «Расписание»',
+  );
+  assert.match(html, /min-h-6/, 'Hit-area ≥ 24 px (WCAG 2.5.8)');
+  assert.match(html, /decoration-dotted/, 'пунктирное подчёркивание ссылки-источника');
+});
+
+test('лента чата: пустые источники не рендерятся', () => {
+  const html = renderToStaticMarkup(React.createElement(SourceLinks, { sources: [] }));
+  assert.equal(html, '', 'у HELP, UNKNOWN и заглушки гейта источников нет');
+});
+
+test('лента чата: ChatBubble студента — текст вопроса, рамка primary-soft', () => {
+  const html = renderToStaticMarkup(
+    React.createElement(ChatBubble, { role: 'student', children: 'Какие у меня долги?' }),
+  );
+
+  assert.match(html, /Какие у меня долги\?/, 'текст вопроса в пузыре');
+  assert.match(html, /bg-primary-soft/, 'пузырь студента на primary-soft');
+  assert.match(html, /self-end/, 'пузырь студента прижат вправо');
+  assert.match(html, /rounded-br-md/, '«хвост» пузыря справа снизу');
+  assert.match(html, /whitespace-pre-line/, 'многострочный ответ сохраняет переносы');
+});
+
+test('лента чата: ChatBubble ассистента — слева, на surface', () => {
+  const html = renderToStaticMarkup(
+    React.createElement(ChatBubble, { role: 'assistant', children: 'Долгов: 1' }),
+  );
+
+  assert.match(html, /Долгов: 1/);
+  assert.match(html, /bg-surface/, 'пузырь ассистента на surface');
+  assert.match(html, /self-start/, 'пузырь ассистента прижат влево');
+});
+
+test('лента чата: TypingIndicator — статус для скринридера и три точки', () => {
+  const html = renderToStaticMarkup(React.createElement(TypingIndicator));
+
+  assert.match(html, /role="status"/);
+  assert.match(html, /Ассистент печатает…/, 'скрытый текст статуса');
+  assert.match(html, /sr-only/);
+  assert.equal((html.match(/typing-dot/g) ?? []).length, 3, 'три точки индикатора');
+});
+
+test('лента чата: пузырь ассистента с ответом — бейдж режима и источники', () => {
+  const html = renderToStaticMarkup(
+    React.createElement(AssistantBubble, {
+      exchange: {
+        id: 'exchange-test-1',
+        question: 'Какие у меня долги?',
+        answer: 'Долгов: 1',
+        mode: 'deterministic',
+        sources: [{ label: 'Успеваемость', href: '/grades' }],
+        error: null,
+      },
+      onRetry: () => {},
+    }),
+  );
+
+  assert.match(html, /Долгов: 1/);
+  assert.match(html, /По данным кабинета/, 'бейдж режима ответа');
+  assert.match(html, /href="\/grades"/, 'источник под ответом');
+});
+
+test('лента чата: пузырь ассистента без ответа — индикатор «печатает», без бейджа', () => {
+  const html = renderToStaticMarkup(
+    React.createElement(AssistantBubble, {
+      exchange: {
+        id: 'exchange-test-2',
+        question: 'Расписание на сегодня',
+        answer: null,
+        mode: null,
+        sources: [],
+        error: null,
+      },
+      onRetry: () => {},
+    }),
+  );
+
+  assert.match(html, /role="status"/, 'индикатор ожидания в ленте');
+  assert.doesNotMatch(html, /По данным кабинета/, 'режим ответа ещё неизвестен');
+});
+
+test('лента чата: ошибка обмена — ErrorState с повтором внутри пузыря ассистента', () => {
+  const html = renderToStaticMarkup(
+    React.createElement(AssistantBubble, {
+      exchange: {
+        id: 'exchange-test-3',
+        question: 'Какие у меня долги?',
+        answer: null,
+        mode: null,
+        sources: [],
+        error: 'Не удалось получить ответ. Попробуйте снова.',
+      },
+      onRetry: () => {},
+    }),
+  );
+
+  assert.match(html, /role="alert"/);
+  assert.match(html, /Не удалось получить ответ/);
+  assert.match(html, /Повторить/);
 });

@@ -11,7 +11,9 @@
  * - неверифицированный студент получает заглушку гейта вместо оценок;
  * - без LLM — mode deterministic; с мок-LMN — ответ модели; ошибка LLM —
  *   фолбэк на движок с пометкой;
- * - вопрос student2 не отдаёт данные student1.
+ * - вопрос student2 не отдаёт данные student1;
+ * - источники ответа (sources): из каких разделов кабинета он собран
+ *   (атрибуция, волна 4 «оживления») — по интенту, без БД.
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -23,6 +25,7 @@ import {
   type AuthSession,
   type LlmClient,
 } from '../src/index.js';
+import { assistantSourcesFor } from '../src/assistantClient.js';
 import {
   addUtcDays,
   dateKey,
@@ -364,4 +367,84 @@ test('HELP и UNKNOWN не обращаются к LLM', async () => {
   const unknown = await askAssistant(student1, 'Сколько минут в часе?', { llm });
   assert.equal(unknown.mode, 'deterministic');
   assert.equal(llm.prompts.length, 0, 'для HELP и UNKNOWN модель не вызывалась');
+});
+
+// ---------------------------------------------------------------------------
+// Атрибуция: из каких разделов кабинета собран ответ (волна 4)
+// ---------------------------------------------------------------------------
+
+test('источники: DEBTS → «Успеваемость» и «Расписание» (план закрытия использует окна)', async () => {
+  const answer = await askAssistant(student1, 'Какие у меня долги?');
+  assert.deepEqual(answer.sources, [
+    { label: 'Успеваемость', href: '/grades' },
+    { label: 'Расписание', href: '/schedule' },
+  ]);
+});
+
+test('источники: SCHEDULE_TODAY → единственный источник «Расписание»', async () => {
+  const answer = await askAssistant(student1, 'Расписание на сегодня');
+  assert.deepEqual(answer.sources, [{ label: 'Расписание', href: '/schedule' }]);
+});
+
+test('источники: REQUESTS и NOTIFICATIONS → свои разделы кабинета', async () => {
+  const requests = await askAssistant(student1, 'Какие у меня заявки?');
+  assert.deepEqual(requests.sources, [{ label: 'Заявки', href: '/requests' }]);
+
+  const notifications = await askAssistant(student1, 'Есть новые уведомления?');
+  assert.deepEqual(notifications.sources, [{ label: 'Уведомления', href: '/notifications' }]);
+});
+
+test('источники: HELP и UNKNOWN → источников нет (ответ не построен на данных кабинета)', async () => {
+  const help = await askAssistant(student1, 'Что ты умеешь?');
+  assert.deepEqual(help.sources, []);
+
+  const unknown = await askAssistant(student1, 'Сколько минут в часе?');
+  assert.deepEqual(unknown.sources, []);
+});
+
+test('источники: заглушка гейта верификации → источников нет', async () => {
+  for (const question of ['Какие у меня долги?', 'Как закрыть долги?', 'Какой средний балл?', 'Что подтянуть?']) {
+    const answer = await askAssistant(unverified, question);
+    assert.deepEqual(answer.sources, [], `вопрос «${question}»`);
+  }
+});
+
+test('источники: LLM наследует источники детерминированного ответа (данные те же)', async () => {
+  const llm = recordingLlm('Два долга: рисунок и физкультура. Окно сегодня 11:20–13:30.');
+  const llmAnswer = await askAssistant(student1, 'Какие у меня долги?', { llm });
+  assert.equal(llmAnswer.mode, 'llm');
+
+  const deterministic = await askAssistant(student1, 'Какие у меня долги?');
+  assert.deepEqual(llmAnswer.sources, deterministic.sources);
+});
+
+test('источники: ошибка LLM → фолбэк сохраняет источники движка', async () => {
+  const answer = await askAssistant(student1, 'Какие у меня долги?', { llm: brokenLlm });
+  assert.equal(answer.mode, 'deterministic');
+  assert.deepEqual(answer.sources, [
+    { label: 'Успеваемость', href: '/grades' },
+    { label: 'Расписание', href: '/schedule' },
+  ]);
+});
+
+test('assistantSourcesFor: маппинг по интенту и пустой список для всего остального', () => {
+  assert.deepEqual(assistantSourcesFor('AVERAGE'), [
+    { label: 'Успеваемость', href: '/grades' },
+    { label: 'Расписание', href: '/schedule' },
+  ]);
+  assert.deepEqual(assistantSourcesFor('IMPROVE'), [
+    { label: 'Успеваемость', href: '/grades' },
+    { label: 'Расписание', href: '/schedule' },
+  ]);
+  assert.deepEqual(assistantSourcesFor('STUDY_PLAN'), [
+    { label: 'Успеваемость', href: '/grades' },
+    { label: 'Расписание', href: '/schedule' },
+  ]);
+  assert.deepEqual(assistantSourcesFor('SCHEDULE_NEXT'), [{ label: 'Расписание', href: '/schedule' }]);
+  assert.deepEqual(assistantSourcesFor('HELP'), []);
+  assert.deepEqual(assistantSourcesFor('UNKNOWN'), []);
+  // Произвольные строки (и пустая) источников не дают: интенты — точный матч.
+  assert.deepEqual(assistantSourcesFor(''), []);
+  assert.deepEqual(assistantSourcesFor('debts'), []);
+  assert.deepEqual(assistantSourcesFor('ЧТО-ТО НЕИЗВЕСТНОЕ'), []);
 });

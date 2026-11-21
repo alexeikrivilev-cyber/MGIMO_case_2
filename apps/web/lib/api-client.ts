@@ -26,6 +26,7 @@
  * Тесты подменяют fetch (createApiClient({ fetch })) — сеть не нужна.
  */
 import type {
+  AssistantSource,
   MyProfile,
   MyVerification,
   SessionUser,
@@ -201,12 +202,14 @@ export interface CreateRequestInput {
  * Ответ ассистента студента (POST /api/assistant, BRIEF v2 §5).
  * mode: deterministic — ответ движка по данным кабинета; llm — ответ
  * модели по той же сводке (ключ только в env сервера).
+ * sources: разделы кабинета, из которых собран ответ (атрибуция, волна 4).
  */
 export interface AssistantPayload {
   readonly answer: string;
   readonly intent: string;
   readonly suggestions: readonly string[];
   readonly mode: 'deterministic' | 'llm';
+  readonly sources: readonly AssistantSource[];
 }
 
 /**

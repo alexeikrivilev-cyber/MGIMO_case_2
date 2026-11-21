@@ -135,6 +135,30 @@ const TODAY = dateKey(new Date());
 const TOMORROW = dateKey(new Date(Date.now() + 24 * 60 * 60 * 1000));
 const DAY_AFTER = dateKey(new Date(Date.now() + 2 * 24 * 60 * 60 * 1000));
 
+/**
+ * Дни ТЕКУЩЕЙ UTC-недели (пн=0 … вс=6) для фикстур переноса и отмены.
+ *
+ * Зачем: тест «Неделя» рендерит неделю 0 («Текущая неделя») и требует
+ * видеть в ней И запись «Перенесена» (живёт на исходной дате), И запись
+ * «Отменена». Пока фикстуры стояли на TODAY/TOMORROW/DAY_AFTER, это
+ * работало только пн–пт: в субботу DAY_AFTER уходил в следующую неделю,
+ * и бейдж отмены выпадал из вида (красный прогон 21.11 в 00:00 UTC — не
+ * регрессия волны 4, а хрупкость фикстур ко дню недели). Теперь даты
+ * выбираются внутри текущей недели и никогда не попадают на сегодня —
+ * сегодняшние тесты расписания не затрагиваются.
+ */
+const WEEK_ANCHORED: readonly Date[] = (() => {
+  const now = new Date();
+  const dow = (now.getUTCDay() + 6) % 7; // 0 = понедельник
+  const monday = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - dow);
+  // Кандидаты вт–сб без сегодняшнего дня: всегда остаётся ≥ 3 дня.
+  return [1, 2, 3, 4, 5]
+    .filter((day) => day !== dow)
+    .slice(0, 3)
+    .map((day) => new Date(monday + day * 86_400_000));
+})();
+const [MOVED_ON, MOVED_TO, CANCELLED_ON] = WEEK_ANCHORED;
+
 test.before(async () => {
   await resetWebTestData();
 
@@ -169,20 +193,21 @@ test.before(async () => {
     startTime: '08:30',
     endTime: '09:50',
   });
-  // Перенос и отмена — заметные бейджи (требование кейса).
+  // Перенос и отмена — заметные бейджи (требование кейса). Даты — внутри
+  // текущей недели (WEEK_ANCHORED), иначе вид «Неделя» их не показывает.
   await getPrisma().scheduleEntry.create({
     data: {
       groupId: group.id,
       subjectId: subject2,
       teacherId: teacher.teacherId,
-      date: utcDay(TOMORROW),
+      date: MOVED_ON,
       startTime: '10:00',
       endTime: '11:20',
       room: 'У-202',
       type: 'SEMINAR',
       status: 'MOVED',
       note: 'Перенос согласован с кафедрой',
-      movedToDate: utcDay(DAY_AFTER),
+      movedToDate: MOVED_TO,
       movedToRoom: 'Л-305',
     },
   });
@@ -191,7 +216,7 @@ test.before(async () => {
       groupId: group.id,
       subjectId: subject,
       teacherId: teacher.teacherId,
-      date: utcDay(DAY_AFTER),
+      date: CANCELLED_ON,
       startTime: '13:30',
       endTime: '14:50',
       room: 'У-311',

@@ -53,7 +53,9 @@ import { apiRequest, callRoute, callRouteWithParams, responseJson } from './http
 (globalThis as unknown as { React: typeof React }).React = React;
 
 const { StudyPlanManager } = await import('../app/(teacher)/teacher/plans/StudyPlanManager');
-const { TeacherAssistantPanel } = await import('../app/(teacher)/teacher/assistant/TeacherAssistantPanel');
+const { TeacherAssistantPanel, TeacherAssistantBubble, appendExchange } = await import(
+  '../app/(teacher)/teacher/assistant/TeacherAssistantPanel'
+);
 const { TeacherShell } = await import('../components/TeacherShell');
 const { loadTeacherPlansPageData, loadTeacherAssistantPageData } = await import('../lib/page-data');
 
@@ -431,6 +433,9 @@ test('страницы: /teacher/plans и /teacher/assistant рендерятс�
     assert.match(html, /Какие темы проходят в 3 модуле\?/);
     assert.match(html, /Что по лабораторным\?/);
     assert.match(html, /Где контрольные точки\?/);
+    // Волна 4: живая область постоянна — существует и пустой, пока лента пуста.
+    assert.match(html, /aria-live="polite"/);
+    assert.match(html, /Загрузить ещё план/);
   }
 });
 
@@ -475,4 +480,63 @@ test('ассистент преподавателя: волна 3 — чипы �
     assert.ok(button.includes(PRESS_MARK), `кнопка несёт отклик: ${button.slice(0, 60)}…`);
     assert.ok(!button.includes('transition-colors'), 'transition-colors заменён PRESS_FEEDBACK');
   }
+});
+
+// ---------------------------------------------------------------------------
+// Волна 4 «оживления интерфейса» (docs/design/ui-alive-wave-4.html):
+// та же лента обменов, что и в кабинете студента — общие примитивы
+// components/chat.tsx; цитаты-разделы плана остаются в пузыре ответа.
+// ---------------------------------------------------------------------------
+
+test('ассистент преподавателя: волна 4 — цитаты-разделы плана остаются в пузыре ответа', () => {
+  const html = render(
+    <TeacherAssistantBubble
+      exchange={{
+        id: 'exchange-test-1',
+        question: 'Что по лабораторным?',
+        answer: 'Восемь лабораторных работ по циклам и массивам.',
+        mode: 'deterministic',
+        citations: [{ section: 'Лабораторные работы', score: 0.42 }],
+        error: null,
+      }}
+      onRetry={() => {}}
+    />,
+  );
+
+  assert.match(html, /Восемь лабораторных работ/);
+  assert.match(html, /По плану/, 'бейдж режима ответа');
+  assert.match(html, /data-testid="assistant-citations"/, 'маркер цитат сохранён');
+  assert.match(html, /Раздел плана: Лабораторные работы/);
+});
+
+test('ассистент преподавателя: волна 4 — обмен без ответа показывает индикатор «печатает»', () => {
+  const html = render(
+    <TeacherAssistantBubble
+      exchange={{
+        id: 'exchange-test-2',
+        question: 'Где контрольные точки?',
+        answer: null,
+        mode: null,
+        citations: [],
+        error: null,
+      }}
+      onRetry={() => {}}
+    />,
+  );
+
+  assert.match(html, /role="status"/, 'индикатор ожидания в ленте');
+  assert.match(html, /Ассистент печатает…/);
+  assert.doesNotMatch(html, /data-testid="assistant-citations"/, 'цитат без ответа нет');
+});
+
+test('ассистент преподавателя: волна 4 — appendExchange накапливает ленту', () => {
+  const first = appendExchange([], 'Что по лабораторным?');
+  const second = appendExchange(first, 'Где контрольные точки?');
+
+  assert.equal(second.length, 2);
+  assert.equal(second[0]?.question, 'Что по лабораторным?');
+  assert.equal(second[1]?.question, 'Где контрольные точки?');
+  assert.notEqual(second[0]?.id, second[1]?.id, 'идентификаторы обменов уникальны');
+  assert.equal(second[1]?.answer, null);
+  assert.deepEqual(second[1]?.citations, []);
 });
