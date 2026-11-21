@@ -570,6 +570,27 @@ test('фото верификации: свой факультет читает,
   assert.equal(audit, 1);
 });
 
+test('фото студбилета: файл пропал из хранилища → честная ошибка, а не «проверьте формат»', async () => {
+  const photoPath = idCardPhotoRelativePath(ownStudentId, 'card.jpg');
+  await rm(join(storageDir, photoPath), { force: true });
+
+  await assert.rejects(
+    () => getStaffVerificationPhoto(staffSession, ownVerificationId),
+    (error: unknown) =>
+      error instanceof ValidationError &&
+      error.code === 'NOT_FOUND' &&
+      /Фото студбилета не найдено/i.test(error.message),
+    'сотрудник видит честную ошибку о пропавшем фото',
+  );
+
+  // Ошибка хранилища наверх не уходит: иначе клиент получил бы 400
+  // «Файл не принят: проверьте формат (JPEG, PNG или WebP)».
+  await assert.rejects(
+    () => getStaffVerificationPhoto(staffSession, ownVerificationId),
+    (error: unknown) => !(error instanceof Error && error.name === 'IdCardStorageError'),
+  );
+});
+
 test('решение по верификации: через существующий reviewVerification, чужая → NOT_OWNER', async () => {
   await assert.rejects(
     () => decideStaffVerification(staffSession, otherVerificationId, { status: 'VERIFIED' }),

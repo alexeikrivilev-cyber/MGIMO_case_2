@@ -1204,7 +1204,15 @@ export async function askStudyPlanAssistant(
     let planText: string;
     try {
       planText = (await readStudyPlan(plan.storagePath)).toString('utf8');
-    } catch {
+    } catch (error) {
+      // Запись плана есть, а файл пропал (ручная правка хранилища, сбой
+      // диска): преподаватель ничего не загружал, поэтому ошибка чтения
+      // не должна уходить наверх как «файл не принят» — отвечаем честно
+      // и просим загрузить план заново. В лог — только текст ошибки.
+      console.warn(
+        '[study-plan] файл плана недоступен:',
+        error instanceof Error ? error.message : error,
+      );
       return {
         answer: `План «${plan.title}» недоступен: файл не найден в хранилище. Загрузите план заново.`,
         mode: 'deterministic',
