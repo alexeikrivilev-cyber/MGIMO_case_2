@@ -1,6 +1,6 @@
 /**
  * AI-ассистент ПРЕПОДАВАТЕЛЯ: RAG по загруженному учебному плану
- * (BRIEF v2 §5, P2b).
+ * (BRIEF v2 §5, P2b) + ответы по данным кабинета.
  *
  * Поток: преподаватель загружает учебный план (.md/.txt, ≤1 МБ) → файл
  * уходит в ПРИВАТНОЕ хранилище (storage.ts, study-plans/<teacherId>/,
@@ -8,6 +8,14 @@
  * детерминированным TF-IDF по чанкам → askStudyPlanAssistant находит
  * релевантные разделы и отвечает цитатами из плана владельца сессии,
  * сопоставляя их с долгами студентов его групп.
+ *
+ * План — НЕ единственный источник ответа (волна 6, «Improve»): вопросы
+ * про своё расписание и часы приёма отвечаются данными кабинета
+ * (getTeacherSchedule/getTeacherOfficeHours), как у ассистента студента.
+ * Раньше они получали шаблонное «В плане не найдено ответа», хотя
+ * расписание и часы приёма в кабинете есть. Поэтому интенты
+ * TEACHER_SCHEDULE и OFFICE_HOURS проверяются ДО чтения плана: план
+ * может отсутствовать вовсе — и это нормально.
  *
  * Архитектура (решение Hermes, как у ассистента студента):
  * - детерминированный движок — основа: свой парсинг, свой индекс, свой
@@ -30,6 +38,16 @@ import { OwnershipError, ValidationError } from '../errors';
 import { writeAuditEvent } from '../audit';
 import { firstIssues } from '../validation';
 import type { AuthSession } from '../session';
+import {
+  addUtcDays,
+  dayEmptyLessons,
+  dayHeading,
+  dayOffsetFromQuestion,
+  getTeacherOfficeHours,
+  getTeacherSchedule,
+  type TeacherLesson,
+  type TeacherOfficeHour,
+} from './schedule';
 import {
   MAX_STUDY_PLAN_SIZE_BYTES,
   STUDY_PLAN_ALLOWED_MIME,
@@ -122,6 +140,8 @@ export const TEACHER_ASSISTANT_STARTER_QUESTIONS: readonly string[] = [
   'Какие темы проходят в 3 модуле?',
   'Что по лабораторным?',
   'Где контрольные точки?',
+  // Одна новая подсказка: расписание преподавателя — тоже данные кабинета.
+  'Моё расписание на сегодня',
 ];
 
 /** Сколько чанков плана уходит в ответ. */
@@ -142,6 +162,97 @@ const NO_PLAN_ANSWER = 'Загрузите учебный план — асси�
 /** Подпись раздела для текста до первого заголовка. */
 const PREAMBLE_SECTION = 'Начало плана';
 
+/** Максимум пунктов в списках ответа (минимализм текста, BRIEF v4). */
+const MAX_LIST_ITEMS = 5;
+
+// ---------------------------------------------------------------------------
+// Интенты кабинета: расписание и часы приёма (проверяются ДО плана)
+// ---------------------------------------------------------------------------
+
+/**
+ * Маркеры вопроса про СВОЁ расписание (нормализованный текст: нижний
+ * регистр, «ё» → «е»).
+ */
+const TEACHER_SCHEDULE_MARKERS: readonly string[] = [
+  'расписание',
+  'мои пары',
+  'моя пар',
+  'пары на',
+  'расписание на',
+  'мои занят',
+  'когда у меня пар',
+  'у меня пар',
+];
+
+/**
+ * Маркеры вопроса про часы приёма. Проверяются ПЕРЕД расписанием:
+ * «когда у меня часы приёма» содержит и «у меня», и вопрос про пары по
+ * смыслу не задан — часы приёма это не занятия.
+ */
+const OFFICE_HOURS_MARKERS: readonly string[] = [
+  'час приема',
+  'часы приема',
+  'часов приема',
+  'мои часы',
+  'консультац',
+  'прием',
+];
+
+/**
+ * Маркеры ПРЯМОГО вопроса про долги студентов. Такой вопрос отвечается
+ * долгами всегда, без требования совпадения токенов дисциплины с
+ * разделами плана: преподаватель спрашивает прямо — и получает долги.
+ */
+const DEBT_MARKERS: readonly string[] = [
+  'долг',
+  'неуспева',
+  'пересдач',
+  'не сдал',
+  'не сдач',
+  'задолжен',
+  'хвост',
+];
+
+/**
+ * Притяжательные markers: вопрос про СВОЁ («моё расписание», «мои пары»,
+ * «у меня часы»), а не про план как документ.
+ */
+const POSSESSIVE_MARKERS: readonly string[] = ['мое', 'моя', 'мои', 'у меня', 'меня'];
+
+/** Нормализация вопроса: регистр и «ё» не важны. */
+function normalizeQuestion(question: string): string {
+  return question.toLowerCase().replaceAll('ё', 'е').trim();
+}
+
+function hasAny(text: string, markers: readonly string[]): boolean {
+  return markers.some((marker) => text.includes(marker));
+}
+
+/** Вопрос про часы приёма (проверяется ПЕРЕД расписанием). */
+function isOfficeHoursQuestion(text: string): boolean {
+  return hasAny(text, OFFICE_HOURS_MARKERS);
+}
+
+/**
+ * Вопрос про своё расписание.
+ *
+ * Приоритет над планом — только когда план не загружен/не найден ИЛИ
+ * вопрос притяжательный («моё», «моя», «мои», «у меня», «меня»). Иначе
+ * «расписание» внутри вопроса про план («что в плане про расписание
+ * сессии») уводило бы ответ мимо плана.
+ */
+function isScheduleQuestion(text: string, hasPlan: boolean): boolean {
+  if (!hasAny(text, TEACHER_SCHEDULE_MARKERS)) {
+    return false;
+  }
+  return !hasPlan || hasAny(text, POSSESSIVE_MARKERS);
+}
+
+/** Прямой вопрос про долги студентов. */
+function isDebtQuestion(text: string): boolean {
+  return hasAny(text, DEBT_MARKERS);
+}
+
 // ---------------------------------------------------------------------------
 // Токенизация: русский текст, ё→е, стоп-слова
 // ---------------------------------------------------------------------------
@@ -160,15 +271,18 @@ const STOP_WORDS: ReadonlySet<string> = new Set([
 /**
  * Токены текста: нижний регистр, «ё» → «е», разделители — всё, что не
  * буква и не цифра (пунктуация и markdown-разметка исчезают сами).
- * Односимвольные токены отбрасываются: «3 модуля» несёт смысл в слове
- * «модуля», а не в цифре.
+ *
+ * Одиночная ЦИФРА — валидный токен: «3 модуле» должно различать
+ * «Модуль 3» от «Модуля 1», а без цифры вопрос про третий модуль
+ * получал в ответе ещё и первый со вторым. Односимвольные БУКВЫ
+ * по-прежнему отбрасываются: они не несут темы.
  */
 export function tokenizePlanText(text: string): string[] {
   return text
     .toLowerCase()
     .replaceAll('ё', 'е')
     .split(/[^\p{L}\p{N}]+/u)
-    .filter((token) => token.length >= 2 && !STOP_WORDS.has(token));
+    .filter((token) => (token.length >= 2 || /^\d$/.test(token)) && !STOP_WORDS.has(token));
 }
 
 /**
@@ -662,17 +776,32 @@ function debtsMatchingSections(
   });
 }
 
-/** Долги для ответа: по вопросу и по найденным разделам, без повторов. */
+/**
+ * Долги для ответа: по вопросу и по найденным разделам, без повторов.
+ *
+ * `all` — вопрос задан ПРЯМО про долги («кто не сдал зачёт?»): тогда
+ * долги показываются ВСЕГДА, до MAX_DEBT_LINES, без требования совпадения
+ * токенов дисциплины с разделами плана. Без `all` сопоставление остаётся
+ * как было: показываем только долги, тема которых совпала с вопросом или
+ * с найденным разделом плана.
+ */
 function debtsForAnswer(
   debts: readonly TeacherDebtSubject[],
   questionTokens: readonly string[],
   retrieved: readonly RetrievedChunk[],
+  all: boolean,
 ): readonly TeacherDebtSubject[] {
-  if (retrieved.length === 0) {
+  if (retrieved.length === 0 && !all) {
     return [];
   }
   const byName = new Map<string, TeacherDebtSubject>();
-  for (const debt of [...debtsMatchingQuestion(debts, questionTokens), ...debtsMatchingSections(debts, retrieved)]) {
+  const matched = [
+    ...debtsMatchingQuestion(debts, questionTokens),
+    ...debtsMatchingSections(debts, retrieved),
+  ];
+  // При прямом вопросе долги идут первыми и в порядке нагрузки (loadTeacherDebts
+  // сортирует по числу студентов) — самый проблемный предмет сверху.
+  for (const debt of all ? [...debts, ...matched] : matched) {
     byName.set(debt.subjectName, debt);
   }
   return [...byName.values()].slice(0, MAX_DEBT_LINES);
@@ -740,18 +869,49 @@ function score2(value: number): number {
   return Math.round(value * 100) / 100;
 }
 
+/** Одна строка долга: «Долги по «…»: N студентов (группы) → раздел «…»». */
+function debtLine(debt: TeacherDebtSubject, index: StudyPlanIndex | null): string {
+  const section = index === null ? null : sectionForSubject(index, debt.subjectName);
+  const groups = debt.groupNames.slice(0, 3).join(', ');
+  const tail = section === null ? '' : ` → раздел «${section}»`;
+  return `Долги по «${debt.subjectName}»: ${debt.studentsCount} ${plural(debt.studentsCount, [
+    'студент',
+    'студента',
+    'студентов',
+  ])} (${groups})${tail}`;
+}
+
+/** Ответ на прямой вопрос про долги: только долги, без цитат плана. */
+function renderDebtsAnswer(
+  debts: readonly TeacherDebtSubject[],
+  index: StudyPlanIndex | null,
+): string {
+  if (debts.length === 0) {
+    return 'Долгов у студентов ваших групп нет.';
+  }
+  return ['Долги студентов ваших групп:', ...debts.map((debt) => debtLine(debt, index))].join('\n');
+}
+
 /**
  * Детерминированный ответ: цитаты-подсказки из разделов плана и, если
  * тема вопроса совпала с долгами студентов, сопоставление «долги →
  * раздел плана». Всё — одной мыслью на строку (BRIEF v4).
+ *
+ * Вопрос мимо плана отвечается двояко: прямой вопрос про долги — долгами
+ * (данные кабинета, как расписание и часы приёма), всё остальное — честным
+ * «в плане не найдено».
  */
 function renderAnswer(
   planTitle: string,
   retrieved: readonly RetrievedChunk[],
   debts: readonly TeacherDebtSubject[],
-  index: StudyPlanIndex,
+  index: StudyPlanIndex | null,
+  debtQuestion: boolean,
 ): string {
   if (retrieved.length === 0) {
+    if (debtQuestion) {
+      return renderDebtsAnswer(debts, index);
+    }
     return `В плане «${planTitle}» не найдено ответа на этот вопрос.`;
   }
 
@@ -764,18 +924,42 @@ function renderAnswer(
   // Сопоставление тем плана с долгами студентов: показываем только когда
   // тема вопроса или найденного раздела совпала с дисциплиной долга.
   for (const debt of debts) {
-    const section = sectionForSubject(index, debt.subjectName);
-    const groups = debt.groupNames.slice(0, 3).join(', ');
-    const tail = section === null ? '' : ` → раздел «${section}»`;
-    lines.push(
-      `Долги по «${debt.subjectName}»: ${debt.studentsCount} ${plural(debt.studentsCount, [
-        'студент',
-        'студента',
-        'студентов',
-      ])} (${groups})${tail}`,
-    );
+    lines.push(debtLine(debt, index));
   }
 
+  return lines.join('\n');
+}
+
+/** Расписание преподавателя за день: строки как в кабинете студента. */
+function renderTeacherSchedule(lessons: readonly TeacherLesson[], dayOffset: number): string {
+  if (lessons.length === 0) {
+    return dayEmptyLessons(dayOffset);
+  }
+  const lines = [dayHeading(dayOffset)];
+  for (const lesson of lessons.slice(0, MAX_LIST_ITEMS)) {
+    const status = lesson.status === 'SCHEDULED' ? '' : ` · ${lesson.statusLabel.toLowerCase()}`;
+    lines.push(
+      `${lesson.startTime}–${lesson.endTime} ${lesson.subjectName} · ${lesson.room} · ${lesson.groupName}${status}`,
+    );
+  }
+  if (lessons.length > MAX_LIST_ITEMS) {
+    lines.push(`и ещё ${lessons.length - MAX_LIST_ITEMS}`);
+  }
+  return lines.join('\n');
+}
+
+/** Часы приёма преподавателя: день недели, время, аудитория, тип. */
+function renderOfficeHours(hours: readonly TeacherOfficeHour[]): string {
+  if (hours.length === 0) {
+    return 'Часов приёма нет.';
+  }
+  const lines = [`Часов приёма: ${hours.length}`];
+  for (const hour of hours.slice(0, MAX_LIST_ITEMS)) {
+    lines.push(`${hour.weekdayLabel} ${hour.startTime}–${hour.endTime} · ${hour.room} · ${hour.typeLabel}`);
+  }
+  if (hours.length > MAX_LIST_ITEMS) {
+    lines.push(`и ещё ${hours.length - MAX_LIST_ITEMS}`);
+  }
   return lines.join('\n');
 }
 
@@ -942,6 +1126,10 @@ export async function deleteStudyPlan(session: AuthSession, planId: string): Pro
  * разделов плана + сопоставление с долгами студентов его групп. LLM,
  * если клиент передан, только переформулирует ответ по тем же чанкам;
  * ошибка или таймаут → детерминированный ответ с пометкой.
+ *
+ * Порядок проверки — часть контракта: часы приёма, затем своё
+ * расписание, затем прямой вопрос про долги, и только потом план. План
+ * может отсутствовать вовсе — кабинетные вопросы отвечаются и без него.
  */
 export async function askStudyPlanAssistant(
   session: AuthSession,
@@ -955,7 +1143,11 @@ export async function askStudyPlanAssistant(
     throw new ValidationError('INVALID_INPUT', 'Некорректный вопрос.', firstIssues(parsed.error));
   }
   const { question, planId } = parsed.data;
+  const text = normalizeQuestion(question);
 
+  // План резолвим (и проверяем владение) всегда: он нужен и для поля
+  // plan в ответе, и для сопоставления долгов с разделами. Сам ФАЙЛ
+  // плана читаем ниже — кабинетные интенты до него не доходят.
   const plan =
     planId === undefined
       ? await prisma().studyPlan.findFirst({
@@ -964,8 +1156,37 @@ export async function askStudyPlanAssistant(
           select: { id: true, teacherId: true, title: true, storagePath: true },
         })
       : await loadOwnPlan(teacherId, planId);
+  const planRef = plan === null ? null : { id: plan.id, title: plan.title };
 
-  if (plan === null) {
+  // 1. Часы приёма — ДО расписания: «когда у меня часы приёма» не должно
+  // уходить в пары.
+  if (isOfficeHoursQuestion(text)) {
+    return {
+      answer: renderOfficeHours(await getTeacherOfficeHours(teacherId)),
+      mode: 'deterministic',
+      // Ответ не по плану: цитировать нечего.
+      citations: [],
+      suggestions: TEACHER_ASSISTANT_STARTER_QUESTIONS,
+      plan: planRef,
+    };
+  }
+
+  // 2. Своё расписание: смещение дня из вопроса, как у студента.
+  if (isScheduleQuestion(text, plan !== null)) {
+    const dayOffset = dayOffsetFromQuestion(question);
+    const day = addUtcDays(new Date(), dayOffset);
+    return {
+      answer: renderTeacherSchedule(await getTeacherSchedule(teacherId, day, day), dayOffset),
+      mode: 'deterministic',
+      citations: [],
+      suggestions: TEACHER_ASSISTANT_STARTER_QUESTIONS,
+      plan: planRef,
+    };
+  }
+
+  // 3. Прямой вопрос про долги — данные кабинета, план не нужен.
+  const debtQuestion = isDebtQuestion(text);
+  if (plan === null && !debtQuestion) {
     return {
       answer: NO_PLAN_ANSWER,
       mode: 'deterministic',
@@ -975,25 +1196,48 @@ export async function askStudyPlanAssistant(
     };
   }
 
-  const text = (await readStudyPlan(plan.storagePath)).toString('utf8');
-  const index = buildStudyPlanIndex(buildPlanChunks(parseStudyPlanSections(text)));
-  const retrieved = retrieveChunks(index, question, TOP_CHUNKS);
-  // Долги грузим только когда есть что сопоставлять: без релевантных
-  // разделов ответ «в плане не найдено», и лишний запрос не нужен.
+  // 4. План: файл из приватного хранилища. Побитые данные (запись в БД
+  // есть, файл удалён или путь сломан) не должны ронять экран ассистента
+  // исключением — отдаём честный ответ с предложением загрузить заново.
+  let index: StudyPlanIndex | null = null;
+  if (plan !== null) {
+    let planText: string;
+    try {
+      planText = (await readStudyPlan(plan.storagePath)).toString('utf8');
+    } catch {
+      return {
+        answer: `План «${plan.title}» недоступен: файл не найден в хранилище. Загрузите план заново.`,
+        mode: 'deterministic',
+        citations: [],
+        suggestions: TEACHER_ASSISTANT_STARTER_QUESTIONS,
+        plan: planRef,
+      };
+    }
+    index = buildStudyPlanIndex(buildPlanChunks(parseStudyPlanSections(planText)));
+  }
+
+  const retrieved = index === null ? [] : retrieveChunks(index, question, TOP_CHUNKS);
+  // Долги грузим, когда есть что сопоставлять ИЛИ когда спросили прямо:
+  // раньше без релевантных разделов ответ был бы «в плане не найдено».
   const debts =
-    retrieved.length === 0
+    retrieved.length === 0 && !debtQuestion
       ? []
-      : debtsForAnswer(await loadTeacherDebts(teacherId), tokenizePlanText(question), retrieved);
+      : debtsForAnswer(
+          await loadTeacherDebts(teacherId),
+          tokenizePlanText(question),
+          retrieved,
+          debtQuestion,
+        );
 
   const deterministic: StudyPlanAssistantAnswer = {
-    answer: renderAnswer(plan.title, retrieved, debts, index),
+    answer: renderAnswer(plan?.title ?? '', retrieved, debts, index, debtQuestion),
     mode: 'deterministic',
     citations: retrieved.map((item) => ({
       section: item.chunk.section === '' ? PREAMBLE_SECTION : item.chunk.section,
       score: score2(item.score),
     })),
     suggestions: TEACHER_ASSISTANT_STARTER_QUESTIONS,
-    plan: { id: plan.id, title: plan.title },
+    plan: planRef,
   };
 
   const llm = options.llm ?? null;
@@ -1004,11 +1248,11 @@ export async function askStudyPlanAssistant(
   }
 
   try {
-    const text = await llm.complete({
+    const reply = await llm.complete({
       system: TEACHER_ASSISTANT_SYSTEM_PROMPT,
-      user: buildLlmContext(plan.title, question, retrieved),
+      user: buildLlmContext(plan?.title ?? '', question, retrieved),
     });
-    const answer = text.trim().slice(0, MAX_ANSWER_LENGTH);
+    const answer = reply.trim().slice(0, MAX_ANSWER_LENGTH);
     if (answer === '') {
       return deterministic;
     }

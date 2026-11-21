@@ -28,9 +28,9 @@ export interface AssistantSource {
  *
  * Единый маппинг для движка и интерфейса: ответ собран из тех же
  * сервисов кабинета, что и страницы разделов, поэтому ссылка ведёт
- * именно туда, откуда данные. HELP и UNKNOWN на данных кабинета не
- * построены — источников нет (врать нечем), как и у заглушки гейта
- * верификации (оценки закрыты).
+ * именно туда, откуда данные. HELP, GREETING и UNKNOWN на данных
+ * кабинета не построены — источников нет (врать нечем), как и у
+ * заглушки гейта верификации (оценки закрыты).
  */
 export function assistantSourcesFor(intent: string): readonly AssistantSource[] {
   switch (intent) {
@@ -47,6 +47,8 @@ export function assistantSourcesFor(intent: string): readonly AssistantSource[] 
     case 'SCHEDULE_TODAY':
     case 'SCHEDULE_NEXT':
       return [{ label: 'Расписание', href: '/schedule' }];
+    case 'SICK_LEAVE':
+      return [{ label: 'Я заболел', href: '/sick-leave' }];
     case 'REQUESTS':
       return [{ label: 'Заявки', href: '/requests' }];
     case 'NOTIFICATIONS':
