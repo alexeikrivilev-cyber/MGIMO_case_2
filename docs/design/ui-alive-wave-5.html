@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>proj-3311 — Wave 5: характер пустых состояний + живая карточка пары</title>
+<!--
+  ДИЗАЙН-АРТЕФАКТ волны 5 (тимлид Hermes; генеративный агент Open Design
+  в этой среде неработоспособен — AGENT_CLI_SESSION_REFUSED, проверено
+  исполнением 21.11; артефакт проходит настоящий lint-гейт Open Design).
+
+  Задача волны — два остатка «мертвизны» из аудита (проверено чтением
+  кода 21.11):
+  1. ПУСТЫЕ СОСТОЯНИЯ БЕЗ ХАРАКТЕРА. EmptyState (components/ui.tsx) —
+     заголовок + пояснение + действие, и всё. 29 использований в 21
+     экране, ни одного со «лицом». Директива владельца: «пустые состояния
+     с характером через иконку (не текст)». Иконки УЖЕ ЕСТЬ —
+     components/icons.tsx, 17 шт., штриховые SVG на currentColor,
+     aria-hidden по построению. Характер = существующая иконка раздела
+     в 40px над заголовком. Ноль новых ассетов, ноль новых цветов.
+  2. «БЛИЖАЙШАЯ ПАРА» БЕЗ ЖИВОГО СТАТУСА. Герой-карточка дашборда —
+     предмет + дата + аудитория текстом. Данные для ответа «когда»
+     есть (effectiveDate + startTime/endTime + серверное now), но
+     интерфейс их не показывает: студент сам считает, через сколько
+     пара. Добавляем метку-пилюлю: «Сейчас» / «Через 2 ч 15 мин» /
+     «Завершилась».
+
+  Доктрина (via-negativa): убирать текст, а не добавлять. Метка даёт
+  ответ одним словосочетанием; иконка даёт характер без иллюстраций.
+  НЕ добавляем: движения (иконки статичны — reduced-motion не затронут
+  вовсе), новых цветов, новых иконок, сцен-иллюстраций, лottie.
+  Pre-mortem: (1) иконка декоративна → aria-hidden + сторог на класс;
+  (2) 360 px → 40px по центру, без сдвига вёрстки; (3) 29 сайтов →
+  воркер проходит КЛАСС, сторож ловит пропущенный сайт; (4) метка пары
+  считается на сервере от UTC-мгновений (TZ-ловушка волны 2 не повторяется).
+-->
+<style>
+  :root {
+    --bg: #0b0e14; --surface: #131824; --surface-2: #1b2233; --border: #2a3348;
+    --text: #e8ebf2; --text-muted: #9aa4b8;
+    --primary: #818cf8; --primary-soft: #1e2140; --on-primary: #0b0e14;
+    --success: #34d399; --warning: #fbbf24;
+    --motion-fast: 150ms; --ease-out: cubic-bezier(0.2,0,0,1);
+    --radius-md: 0.5rem; --radius-xl: 1rem;
+  }
+  body { background: var(--bg); color: var(--text); font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; margin: 0; }
+  .wrap { max-width: 360px; margin: 0 auto; padding: 16px; }
+  .spec { border: 1px solid var(--border); border-radius: var(--radius-xl); background: var(--surface); padding: 16px; margin-bottom: 16px; }
+  .spec h2 { font-size: 0.875rem; font-weight: 600; margin: 0 0 4px; }
+  .why { font-size: 0.75rem; color: var(--text-muted); margin: 0 0 12px; }
+  code { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 0.7rem; color: #a5b4fc; }
+  ul.why { margin: 0 0 10px 16px; padding: 0; }
+
+  /* --- Пустое состояние с иконкой --- */
+  .empty { border: 1px dashed var(--border); border-radius: var(--radius-xl); background: color-mix(in srgb, var(--surface-2) 50%, transparent); padding: 32px 16px; text-align: center; }
+  .empty .icon { color: var(--text-muted); margin-bottom: 12px; }
+  .empty .icon svg { width: 40px; height: 40px; }
+  .empty .title { font-size: 0.875rem; font-weight: 500; margin: 0; }
+  .empty .desc { font-size: 0.875rem; color: var(--text-muted); margin: 4px auto 0; max-width: 20rem; }
+  .empty .act { margin-top: 16px; }
+  .btn { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; border-radius: var(--radius-md); border: 1px solid var(--border); background: var(--surface); padding: 0 16px; font-size: 0.875rem; font-weight: 500; color: var(--text); text-decoration: none; }
+
+  /* --- Метка «когда» у ближайшей пары --- */
+  .pill { display: inline-flex; align-items: center; border-radius: 9999px; border: 1px solid var(--border); background: var(--surface-2); padding: 2px 10px; font-size: 0.75rem; font-weight: 500; color: var(--text-muted); }
+  .pill.now { border-color: color-mix(in srgb, var(--success) 30%, transparent); background: color-mix(in srgb, var(--success) 12%, var(--surface)); color: var(--success); }
+  .pill.next { border-color: color-mix(in srgb, var(--primary) 30%, transparent); background: var(--primary-soft); color: var(--primary); }
+  .card { border: 1px solid var(--border); border-radius: var(--radius-xl); background: var(--surface); padding: 16px; }
+  .card .subject { font-size: 1.125rem; font-weight: 600; margin: 8px 0 0; }
+  .card .meta { font-size: 0.875rem; color: var(--text-muted); margin: 4px 0 0; }
+  .sect { font-size: 0.875rem; font-weight: 600; margin: 0 0 8px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="spec">
+    <h2>Wave 5. Что это</h2>
+    <p class="why">Волны 1–4 оживили отклик, данные, «где я» и чат. Остались два «мёртвых» места, найденных аудитом кода: пустые состояния без лица (29 экранов) и герой-карточка «Ближайшая пара», которая не отвечает на главный вопрос «когда?». Волна 5 — иконка раздела в пустых состояниях и метка времени у ближайшей пары. Только существующие токены и иконки; движения не добавляем вовсе.</p>
+  </div>
+
+  <div class="spec">
+    <h2>1. Пустые состояния: иконка раздела вместо пустоты</h2>
+    <p class="why"><code>EmptyState</code> получает необязательный <code>icon?: ReactNode</code>: 40px, <code>text-text-muted</code>, по центру над заголовком. Иконки — из <code>components/icons.tsx</code> (уже <code>aria-hidden</code>), смысл по разделу:</p>
+    <ul class="why">
+      <li>расписание/пары → <code>IconCalendar</code>; заявки → <code>IconRequests</code>; уведомления → <code>IconBell</code>; объявления → <code>IconMegaphone</code>; успеваемость → <code>IconGrades</code>; ассистент → <code>IconAssistant</code>; переписка → <code>IconChat</code>; каналы → <code>IconChannels</code>; преподаватели → <code>IconProfile</code>; верификация/студбилет → <code>IconIdCard</code>; планы → <code>IconRequests</code>; переносы → <code>IconMove</code>.</li>
+      <li>Класс, не сайт: ВСЕ 29 использований получают иконку по смыслу раздела. Сторож <code>empty-state-icon.test.ts</code> обходит исходники и роняет прогон на <code>&lt;EmptyState</code> без <code>icon=</code> — новый экран без иконки сразу красный.</li>
+      <li>Текста не добавляем ни строки (BRIEF v4): заголовок остаётся одной строкой, иконка несёт характер.</li>
+    </ul>
+    <div class="empty">
+      <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"></rect><path d="M3.5 9.5h17M8 3v4M16 3v4"></path></svg></div>
+      <p class="title">Сегодня пар нет</p>
+      <p class="desc">Свободный день — или время для долгов.</p>
+    </div>
+  </div>
+
+  <div class="spec">
+    <h2>2. «Ближайшая пара»: метка «когда»</h2>
+    <p class="why">Чистая функция <code>lessonMoment(now, date, startTime, endTime)</code> (в <code>components/format.ts</code>, рядом с форматтерами) считает по UTC-мгновениям, как сервисы расписания (повторяем TZ-урок волны 2):</p>
+    <ul class="why">
+      <li>пара идёт сейчас → <span class="pill now">Сейчас</span> (success-тон);</li>
+      <li>до начала меньше суток → <span class="pill next">Через 2 ч 15 мин</span> / <code>Через 45 мин</code> (primary-тон);</li>
+      <li>больше суток → дата уже есть в карточке, метку не дублируем;</li>
+      <li>пара закончилась → <span class="pill">Завершилась</span> (нейтральная).</li>
+    </ul>
+    <div class="card">
+      <span class="pill now">Сейчас</span>
+      <p class="subject">Базы данных</p>
+      <p class="meta">сегодня, 10:00–11:20 · У-202</p>
+      <p class="meta">Семинар · Преподавателев О. И.</p>
+    </div>
+    <ul class="why" style="margin-top:12px">
+      <li>Метка — только на дашборде, в герой-карточке. Рельс <code>/schedule</code> уже несёт свои маркеры «Сейчас/Далее» (волна 2) — дублировать на всех экранах шум (via-negativa).</li>
+      <li>Никакого JS и таймеров: серверный рендер, метка верна на момент отдачи страницы. Тикающие часы на дашборде — не делаем.</li>
+      <li>Границы (ровно начало, ровно конец, минута до конца) — тестами чистой функции.</li>
+    </ul>
+  </div>
+
+  <div class="spec">
+    <h2>3. Границы волны</h2>
+    <ul class="why">
+      <li>Ноль зависимостей, ноль новых цветов, ноль новых иконок, ноль анимаций.</li>
+      <li>Не переписываем текст пустых состояний (BRIEF v4 уже держится) — только иконка.</li>
+      <li>Метка «когда» — только дашборд. Не трогаем ассистента, рельс, учителя, сотрудника.</li>
+    </ul>
+  </div>
+
+</div>
+</body>
+</html>

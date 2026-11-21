@@ -11,6 +11,7 @@ import { Card, EmptyState, StatusBadge } from '../../../../components/ui';
 import { PageHeader } from '../../../../components/PageHeader';
 import { StaffPageResult } from '../../../../components/StaffPageResult';
 import { formatMoment } from '../../../../components/format';
+import { IconMegaphone } from '../../../../components/icons';
 import {
   loadStaffAnnouncementsPageData,
   type LoadResult,
@@ -75,7 +76,7 @@ export function StaffAnnouncementsView({
               Опубликованные объявления
             </h2>
           {data.announcements.length === 0 ? (
-            <EmptyState title="Объявлений нет" />
+            <EmptyState title="Объявлений нет" icon={<IconMegaphone />} />
           ) : (
               <ul className="space-y-3">
                 {data.announcements.map((announcement) => (

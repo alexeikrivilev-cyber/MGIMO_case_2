@@ -11,6 +11,7 @@ import { Card, EmptyState, StatusBadge } from '../../../components/ui';
 import { PageHeader } from '../../../components/PageHeader';
 import { PageResult } from '../../../components/PageStates';
 import { formatDate, formatMoment } from '../../../components/format';
+import { IconCalendar } from '../../../components/icons';
 import { loadSickLeavePageData, type LoadResult, type SickLeavePageData } from '../../../lib/page-data';
 import { SickLeaveForm } from './SickLeaveForm';
 import type { MySickLeave } from '@udgu/core';
@@ -81,7 +82,7 @@ export function SickLeaveView({ result }: { result: LoadResult<SickLeavePageData
                 История отметок
               </h2>
               {data.items.length === 0 ? (
-                <EmptyState title="Отметок нет" />
+                <EmptyState title="Отметок нет" icon={<IconCalendar />} />
               ) : (
                 <ul className="space-y-3">
                   {data.items.map((leave) => (

@@ -14,6 +14,7 @@ import { cookies } from 'next/headers';
 import { EmptyState, SegmentedLinks } from '../../../../components/ui';
 import { PageHeader } from '../../../../components/PageHeader';
 import { StaffPageResult } from '../../../../components/StaffPageResult';
+import { IconRequests } from '../../../../components/icons';
 import {
   loadStaffRequestsPageData,
   type LoadResult,
@@ -67,6 +68,7 @@ export function StaffRequestsView({
             {data.requests.length === 0 ? (
               <EmptyState
                 title={activeFilter === 'ALL' ? 'В очереди нет заявок' : 'В этом статусе заявок нет'}
+                icon={<IconRequests />}
                 action={
                   activeFilter === 'ALL' ? undefined : (
                     <SegmentedLinks

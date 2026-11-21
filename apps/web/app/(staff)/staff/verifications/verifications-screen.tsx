@@ -17,6 +17,7 @@ import { PageHeader } from '../../../../components/PageHeader';
 import { StaffPageResult } from '../../../../components/StaffPageResult';
 import { formatMoment, formatScore } from '../../../../components/format';
 import { VERIFICATION_STATUS_LABELS, verificationStatusTone } from '../../../../components/labels';
+import { IconIdCard } from '../../../../components/icons';
 import {
   loadStaffVerificationsPageData,
   type LoadResult,
@@ -142,6 +143,7 @@ export function StaffVerificationsView({
                 title={
                   activeFilter === 'PENDING' ? 'Очередь верификаций пуста' : 'В этом статусе заявок нет'
                 }
+                icon={<IconIdCard />}
                 action={
                   activeFilter === 'PENDING' ? undefined : (
                     <SegmentedLinks

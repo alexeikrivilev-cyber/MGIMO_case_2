@@ -8,6 +8,7 @@ import { Card, EmptyState, StatusBadge } from '../../../components/ui';
 import { PageHeader } from '../../../components/PageHeader';
 import { PageResult } from '../../../components/PageStates';
 import { formatMoment } from '../../../components/format';
+import { IconMegaphone } from '../../../components/icons';
 import { loadAnnouncementsPageData, type LoadResult, type AnnouncementsPageData } from '../../../lib/page-data';
 
 export function AnnouncementsView({ result }: { result: LoadResult<AnnouncementsPageData> }): React.JSX.Element {
@@ -18,7 +19,7 @@ export function AnnouncementsView({ result }: { result: LoadResult<Announcements
           <PageHeader title="Объявления" subtitle="Новости деканата для вас" />
 
           {data.announcements.length === 0 ? (
-            <EmptyState title="Объявлений нет" />
+            <EmptyState title="Объявлений нет" icon={<IconMegaphone />} />
           ) : (
             <ul className="space-y-3">
               {data.announcements.map((announcement) => (

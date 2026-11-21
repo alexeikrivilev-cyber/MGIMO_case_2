@@ -10,7 +10,7 @@ import { Card, EmptyState, StatusBadge } from '../../../../components/ui';
 import { PageHeader } from '../../../../components/PageHeader';
 import { PageResult, SectionTitle } from '../../../../components/PageStates';
 import { LessonRow } from '../../../../components/LessonRow';
-import { IconChevronLeft } from '../../../../components/icons';
+import { IconCalendar, IconChevronLeft, IconProfile } from '../../../../components/icons';
 import type { LoadResult } from '../../../../lib/page-data';
 import type { TeacherCard } from '@udgu/core';
 
@@ -37,7 +37,7 @@ function TeacherCardView({ result }: { result: LoadResult<TeacherCard> }): React
               <span id="teacher-schedule">Расписание на две недели</span>
             </SectionTitle>
             {teacher.lessons.length === 0 ? (
-              <EmptyState title="На две недели пар нет" />
+              <EmptyState title="На две недели пар нет" icon={<IconCalendar />} />
             ) : (
               <Card>
                 <ul>
@@ -59,7 +59,7 @@ function TeacherCardView({ result }: { result: LoadResult<TeacherCard> }): React
               <span id="office-hours">Часы приёма и консультации</span>
             </SectionTitle>
             {teacher.officeHours.length === 0 ? (
-              <EmptyState title="Часов приёма нет" />
+              <EmptyState title="Часов приёма нет" icon={<IconProfile />} />
             ) : (
               <ul className="space-y-2">
                 {teacher.officeHours.map((hour) => (

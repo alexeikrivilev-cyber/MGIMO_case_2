@@ -25,6 +25,10 @@ function startOfDay(date: Date): Date {
   return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
 }
 
+function dayUTC(year: number, month: number, day: number): Date {
+  return new Date(Date.UTC(year, month - 1, day));
+}
+
 function addDays(date: Date, days: number): Date {
   const next = new Date(date);
   next.setUTCDate(next.getUTCDate() + days);
@@ -539,7 +543,6 @@ test('oauth-интенты: уникальные state, активный инт�
   assert.equal(new Set(states).size, states.length, 'state уникален');
 
   const groupNames = new Set(data.groups.map((group) => group.name));
-  const nowIso = new Date().toISOString();
 
   for (const intent of data.oauthIntents) {
     assert.ok(['VK_ID', 'MAX', 'TELEGRAM'].includes(intent.provider));
@@ -552,7 +555,12 @@ test('oauth-интенты: уникальные state, активный инт�
       assert.ok(intent.consumedAt >= intent.createdAt, 'использован после создания');
       assert.ok(intent.expiresAt >= intent.consumedAt, 'использован до истечения срока');
     } else {
-      assert.ok(intent.expiresAt > nowIso, 'активный интент не истёк');
+      // Детерминизация (волна 5): «жив» = не использован и несёт реальный
+      // TTL — проверяем ОТНОСИТЕЛЬНО createdAt, а не относительно стены
+      // часов: снимок данных от «сейчас» сидера не должен зависеть от
+      // времени чтения файла тестом.
+      const ttlMinutes = (Date.parse(intent.expiresAt) - Date.parse(intent.createdAt)) / 60_000;
+      assert.equal(ttlMinutes, 15, 'активный интент живёт 15 минут от создания');
     }
   }
 
@@ -723,4 +731,44 @@ test('учебный план: один план teacher1, разделы — е
   assert.match(plan.text, /Модуль 3/, 'в плане есть темы третьего модуля');
   assert.match(plan.text, /Лабораторные/, 'в плане есть лабораторные работы');
   assert.match(plan.text, /Контрольные точки/, 'в плане есть контрольные точки');
+});
+
+test('детерминизация: одинаковый now → идентичный датасет, кроме соли argon2id', async () => {
+  // Суббота 21.11.2026 — день, на котором инвариант «>= 2 переносов» падал
+  // до правки findMovedDate (red-прогон 21.11). Дата фиксирована, поэтому
+  // тест проверяет САМУ ДЕТЕРМИНИЗАЦИЮ, а не «повезло сегодня».
+  const fixed = dayUTC(2026, 11, 21);
+  const stripSalts = (data: SeedData): string =>
+    JSON.stringify({
+      ...data,
+      users: data.users.map((user) => ({ ...user, passwordHash: '' })),
+    });
+  assert.equal(
+    stripSalts(await buildSeedData({ now: fixed })),
+    stripSalts(await buildSeedData({ now: fixed })),
+    'два прогона с одним now совпадают везде, кроме passwordHash',
+  );
+});
+
+test('инварианты переносов и отмен держатся на ЛЮБОМ стартовом дне', async () => {
+  // Окно расписания — две недели от «сейчас». Если старт выпал на выходные
+  // конца окна, будних слотов «после» исходной даты не хватало, и переносы
+  // поздних пар пустовали. Правка ищет слот по всему окну + добирает ранние
+  // записи. Проверяем ВСЕ дни недели и границу года исполнением.
+  for (const now of [
+    dayUTC(2026, 11, 21), // суббота (баг)
+    dayUTC(2026, 11, 22), // воскресенье
+    dayUTC(2026, 11, 23), // понедельник
+    dayUTC(2026, 11, 26), // четверг
+    dayUTC(2026, 11, 29), // воскресенье
+    dayUTC(2026, 12, 31), // граница года
+    dayUTC(2027, 1, 3), // воскресенье нового года
+  ]) {
+    const data = await buildSeedData({ now });
+    const moved = data.scheduleEntries.filter((entry) => entry.status === 'MOVED');
+    const cancelled = data.scheduleEntries.filter((entry) => entry.status === 'CANCELLED');
+    const day = now.toISOString().slice(0, 10);
+    assert.ok(moved.length >= 2, `переносов на старте ${day}: ${moved.length}, нужно >= 2`);
+    assert.equal(cancelled.length, 4, `отмен на старте ${day}: ${cancelled.length}, нужно 4`);
+  }
 });

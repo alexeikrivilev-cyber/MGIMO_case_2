@@ -23,6 +23,7 @@ import { Card, EmptyState, LinkButton, StatusBadge } from '../../../components/u
 import { PageHeader } from '../../../components/PageHeader';
 import { StaffPageResult } from '../../../components/StaffPageResult';
 import { FOCUS_RING, PRESS_FEEDBACK } from '../../../lib/ui';
+import { IconMove, IconRequests } from '../../../components/icons';
 import { loadStaffDashboardPageData, type LoadResult, type StaffDashboardPageData } from '../../../lib/page-data';
 
 /** Плитка очереди: счётчик + подпись + куда ведёт. */
@@ -132,6 +133,7 @@ export function StaffDashboardView({ result }: { result: LoadResult<StaffDashboa
               {dashboard.todayScheduleChanges === 0 ? (
                 <EmptyState
                   title="На сегодня изменений нет"
+                  icon={<IconMove />}
                   action={
                     <LinkButton href="/staff/schedule" variant="secondary">
                       Открыть расписание
@@ -159,6 +161,7 @@ export function StaffDashboardView({ result }: { result: LoadResult<StaffDashboa
               <div className="mt-6">
                 <EmptyState
                   title="Очереди обработаны"
+                  icon={<IconRequests />}
                   action={
                     <LinkButton href="/staff/announcements">
                       Опубликовать объявление

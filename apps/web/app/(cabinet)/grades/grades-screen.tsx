@@ -16,7 +16,7 @@ import { PageHeader } from '../../../components/PageHeader';
 import { PageResult, SectionTitle } from '../../../components/PageStates';
 import { TrendChart } from '../../../components/TrendChart';
 import { formatDate, formatDelta, formatScore } from '../../../components/format';
-import { IconArrowDown, IconArrowUp, IconMinus } from '../../../components/icons';
+import { IconArrowDown, IconArrowUp, IconGrades, IconMinus } from '../../../components/icons';
 import { loadGradesPageData, type LoadResult, type GradesPageData } from '../../../lib/page-data';
 import type { MyGradeEntry } from '@udgu/core';
 import { LeveragePanel } from './LeveragePanel';
@@ -190,7 +190,7 @@ export function GradesView({ result }: { result: LoadResult<GradesPageData> }): 
               </SectionTitle>
 
               {data.grades.semesters.length === 0 ? (
-                <EmptyState title="Оценок пока нет" />
+                <EmptyState title="Оценок пока нет" icon={<IconGrades />} />
               ) : (
                 <div className="space-y-4">
                   {data.grades.semesters.map((semesterGroup) => (

@@ -14,7 +14,7 @@ import { PageResult, SectionTitle } from '../../../components/PageStates';
 import { LessonRow } from '../../../components/LessonRow';
 import { DayTimeline } from '../../../components/DayTimeline';
 import { formatDateRange, formatDateWithYear, weekdayShort } from '../../../components/format';
-import { IconChevronLeft, IconChevronRight } from '../../../components/icons';
+import { IconCalendar, IconChevronLeft, IconChevronRight } from '../../../components/icons';
 import { loadSchedulePageData, type LoadResult, type SchedulePageData } from '../../../lib/page-data';
 import { PRESS_FEEDBACK, TEXT_LINK_CLASS } from '../../../lib/ui';
 
@@ -94,7 +94,7 @@ export function ScheduleView({
                 <Card className="mb-4">
                   <SectionTitle>Пары на сегодня</SectionTitle>
                   {data.todayLessons.length === 0 ? (
-                    <EmptyState title="Сегодня пар нет" />
+                    <EmptyState title="Сегодня пар нет" icon={<IconCalendar />} />
                   ) : (
                     /* Рельс дня (волна 2): точки на парах, пунктир окон и
                        отметка «сейчас» в хронологической позиции. */

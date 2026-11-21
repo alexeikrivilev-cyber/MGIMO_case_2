@@ -17,6 +17,7 @@ import { Card, EmptyState, LinkButton, StatusBadge } from '../../../../component
 import { PageHeader } from '../../../../components/PageHeader';
 import { StaffPageResult } from '../../../../components/StaffPageResult';
 import { formatDate, formatDayLabel, weekdayShort } from '../../../../components/format';
+import { IconCalendar } from '../../../../components/icons';
 import { addUtcDays, dateKey, type StaffLessonItem } from '@udgu/core';
 import {
   loadStaffSchedulePageData,
@@ -158,6 +159,7 @@ export function StaffScheduleView({
           {data.days.length === 0 ? (
             <EmptyState
               title="На этот период пар нет"
+              icon={<IconCalendar />}
               action={
                 <LinkButton href="/staff/schedule" variant="secondary">
                   Текущие две недели
