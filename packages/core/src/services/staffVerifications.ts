@@ -21,7 +21,7 @@ import { prisma } from '../db';
 import { requireStaffScope, facultyStudentFilter } from './staff-scope';
 import { OwnershipError, ValidationError } from '../errors';
 import { writeAuditEvent } from '../audit';
-import { readIdCardPhoto, ID_CARD_ALLOWED_MIME } from '../storage';
+import { readIdCardPhoto, ID_CARD_ALLOWED_MIME, IdCardStorageError } from '../storage';
 import { reviewVerification, verificationReviewSchema } from './verification';
 import type { AuthSession } from '../session';
 import type { VerificationStatus } from '@udgu/db';
@@ -144,7 +144,21 @@ export async function getStaffVerificationPhoto(
   }
 
   const mime = mimeForPhotoPath(verification.idCardPhotoPath);
-  const buffer = await readIdCardPhoto(verification.idCardPhotoPath);
+  let buffer: Buffer;
+  try {
+    buffer = await readIdCardPhoto(verification.idCardPhotoPath);
+  } catch (error) {
+    // Заявка есть, а фото в хранилище пропало: это битые данные, а не
+    // «плохой файл от клиента» — сотрудник ничего не загружал. Честная
+    // ошибка вместо «проверьте формат (JPEG, PNG или WebP)».
+    if (error instanceof IdCardStorageError) {
+      throw new ValidationError(
+        'NOT_FOUND',
+        'Фото студбилета не найдено в хранилище. Попросите студента загрузить его заново.',
+      );
+    }
+    throw error;
+  }
 
   // Аудит просмотра фото: доступ к персональным данным объясним.
   await writeAuditEvent({

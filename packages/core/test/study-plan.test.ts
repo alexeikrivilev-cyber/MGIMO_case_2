@@ -17,7 +17,7 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, readdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
@@ -32,6 +32,7 @@ import {
   tokenizePlanText,
   tokensMatch,
   uploadStudyPlan,
+  TEACHER_ASSISTANT_STARTER_QUESTIONS,
   OwnershipError,
   ValidationError,
   type AuthSession,
@@ -413,6 +414,48 @@ test('ответ: вопрос вне плана → честное «в пла�
   assert.equal(answer.mode, 'deterministic');
   assert.match(answer.answer, /не найден/);
   assert.equal(answer.citations.length, 0, 'цитат нет — врать нечем');
+});
+
+test('ответ: запись плана есть, а файл пропал → «загрузите заново», а не ошибка хранилища', async () => {
+  // Свой преподаватель и свой план: чужие фикстуры файла не трогаем.
+  const fresh = await createTeacher('plan-teacher-lost-file');
+  const session = await authSessionFor(fresh.userId);
+  const plan = await uploadStudyPlan(session, {
+    title: 'Основы программирования',
+    fileName: 'plan.md',
+    mime: 'text/markdown',
+    buffer: Buffer.from(PLAN_TEXT, 'utf8'),
+  });
+
+  // Файл пропадает из хранилища (ручная правка, сбой диска): запись в БД
+  // осталась — план есть в списке, но читать нечего.
+  const teacherDir = join(storageDir, 'study-plans', fresh.teacherId);
+  for (const file of await readdir(teacherDir)) {
+    await rm(join(teacherDir, file), { force: true });
+  }
+
+  // Без planId (самый свежий план) и с явным planId — один и тот же честный
+  // ответ: план недоступен, загрузите заново. Исключение наружу не летит.
+  for (const input of [
+    { question: 'Что по лабораторным?' },
+    { question: 'Что по лабораторным?', planId: plan.id },
+  ]) {
+    const answer = await askStudyPlanAssistant(session, input);
+    assert.equal(answer.mode, 'deterministic');
+    assert.deepEqual(answer.plan, { id: plan.id, title: 'Основы программирования' });
+    assert.match(answer.answer, /недоступен/i);
+    assert.match(answer.answer, /загрузите план заново/i);
+    assert.equal(answer.citations.length, 0, 'цитат нет — файла нет');
+    assert.deepEqual(answer.suggestions, TEACHER_ASSISTANT_STARTER_QUESTIONS);
+    // Внутренности хранилища наружу не утекают даже в этом ответе.
+    assert.doesNotMatch(answer.answer, /storage|study-plans|\.md/i);
+  }
+
+  // Список планов не сломан: запись на месте, путь наружу не отдаётся.
+  const plans = await listMyStudyPlans(session);
+  assert.equal(plans.length, 1);
+  assert.equal(plans[0]?.id, plan.id);
+  assert.equal('storagePath' in (plans[0] ?? {}), false);
 });
 
 // ---------------------------------------------------------------------------

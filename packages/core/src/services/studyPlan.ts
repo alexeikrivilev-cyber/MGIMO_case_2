@@ -139,6 +139,10 @@ const FALLBACK_NOTE = 'Ответ по плану: ИИ-режим недост�
 /** Ответ, когда у преподавателя нет ни одного плана. */
 const NO_PLAN_ANSWER = 'Загрузите учебный план — ассистент ответит по нему.';
 
+/** Ответ, когда запись плана есть, а файл в хранилище пропал. */
+const PLAN_UNAVAILABLE_ANSWER =
+  'Учебный план недоступен: файл не найден в хранилище. Загрузите план заново — ассистент ответит по нему.';
+
 /** Подпись раздела для текста до первого заголовка. */
 const PREAMBLE_SECTION = 'Начало плана';
 
@@ -942,6 +946,7 @@ export async function deleteStudyPlan(session: AuthSession, planId: string): Pro
  * разделов плана + сопоставление с долгами студентов его групп. LLM,
  * если клиент передан, только переформулирует ответ по тем же чанкам;
  * ошибка или таймаут → детерминированный ответ с пометкой.
+ * файл плана пропал → честный ответ "загрузите заново", а не ошибка хранилища.
  */
 export async function askStudyPlanAssistant(
   session: AuthSession,
@@ -975,7 +980,26 @@ export async function askStudyPlanAssistant(
     };
   }
 
-  const text = (await readStudyPlan(plan.storagePath)).toString('utf8');
+  let text: string;
+  try {
+    text = (await readStudyPlan(plan.storagePath)).toString('utf8');
+  } catch (error) {
+    // Запись плана есть, а файл пропал (ручная правка хранилища, сбой
+    // диска). Преподаватель ничего не загружал, поэтому ошибка чтения
+    // не должна уходить наверх как «файл не принят»: отвечаем честно и
+    // просим загрузить план заново. В лог — только текст ошибки.
+    console.warn(
+      '[study-plan] файл плана недоступен:',
+      error instanceof Error ? error.message : error,
+    );
+    return {
+      answer: PLAN_UNAVAILABLE_ANSWER,
+      mode: 'deterministic',
+      citations: [],
+      suggestions: TEACHER_ASSISTANT_STARTER_QUESTIONS,
+      plan: { id: plan.id, title: plan.title },
+    };
+  }
   const index = buildStudyPlanIndex(buildPlanChunks(parseStudyPlanSections(text)));
   const retrieved = retrieveChunks(index, question, TOP_CHUNKS);
   // Долги грузим только когда есть что сопоставлять: без релевантных

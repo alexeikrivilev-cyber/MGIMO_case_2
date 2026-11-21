@@ -257,8 +257,9 @@ export async function getMyScheduleWeek(
 
 /**
  * Ближайшая пара студента (своя группа). MOVED считается по новой дате
- * и новой аудитории, CANCELLED — пропускается. Окно поиска — 14 дней
- * (горизонт сидера); при отсутствии пар возвращает null.
+ * и новой аудитории, CANCELLED — пропускается. MOVED без movedToDate
+ * (битые данные) не выдаётся за ближайшую пару: слот освобождён, обещать нечего.
+ * Окно поиска — 14 дней (горизонт сидера); при отсутствии пар возвращает null.
  */
 export async function getMyNextLesson(
   session: AuthSession,
@@ -270,7 +271,14 @@ export async function getMyNextLesson(
 
   const lessons = await lessonsForGroup(groupId, from, to);
   const upcoming = lessons
-    .filter((lesson) => lesson.status !== 'CANCELLED')
+    // CANCELLED не состоится вовсе. MOVED без movedToDate — битые данные:
+    // нового слота нет, а исходный уже освобождён (логика getFreeGaps),
+    // поэтому обещать пару в исходном слоте нельзя.
+    .filter(
+      (lesson) =>
+        lesson.status === 'SCHEDULED' ||
+        (lesson.status === 'MOVED' && lesson.movedToDate !== null),
+    )
     .map((lesson) => ({ lesson, occurrence: toOccurrence(lesson) }))
     .filter(({ occurrence }) => occurrence.effectiveStart.getTime() > now.getTime())
     .sort((left, right) => left.occurrence.effectiveStart.getTime() - right.occurrence.effectiveStart.getTime());

@@ -309,6 +309,70 @@ test('ближайшая пара: отменённые пары пропуск�
   assert.ok(next === null || dateKey(next.date) === dateKey(farWednesday));
 });
 
+// Битый перенос проверяем на ОТДЕЛЬНЫХ группе и преподавателе: в общей
+// фикстуре уже есть корректная MOVED-пара с movedToDate, и «ближайшая» от
+// неё зависела бы от времени суток прогона, а не от проверяемого правила.
+// Свой преподаватель — чтобы пары теста не попадали в счётчик расписания
+// преподавателя фикстуры (getTeacherSchedule ниже).
+test('MOVED без movedToDate: битый перенос не выдаётся за ближайшую пару', async () => {
+  const tomorrow = dateKey(addUtcDays(new Date(), 1));
+  const dayAfter = dateKey(addUtcDays(new Date(), 2));
+
+  const ownTeacher = await createTeacher('teacher-broken-move');
+  const group = await createGroup('РАС-БИТЫЙ-1', FACULTY);
+  const student = await createStudent('student-broken-move', group.id, { lastName: 'Битыйперенос' });
+  const session = await authSessionFor(student.userId);
+
+  // Завтра: «перенесённая» пара БЕЗ новой даты + настоящая пара днём позже.
+  await createScheduleEntry({
+    groupId: group.id,
+    subjectId: subjectIds.math,
+    teacherId: ownTeacher.teacherId,
+    date: tomorrow,
+    startTime: '10:00',
+    endTime: '11:20',
+    status: 'MOVED',
+    movedToDate: null,
+  });
+  await createScheduleEntry({
+    groupId: group.id,
+    subjectId: subjectIds.math,
+    teacherId: ownTeacher.teacherId,
+    date: dayAfter,
+    startTime: '12:00',
+    endTime: '13:20',
+  });
+
+  const next = await getMyNextLesson(session, new Date());
+  assert.ok(next !== null, 'ближайшая пара есть — настоящая');
+  assert.equal(next?.status, 'SCHEDULED', 'битый перенос не выдаётся за пару');
+  assert.equal(dateKey(next?.effectiveDate ?? new Date(0)), dayAfter);
+
+  // Слот «перенесённой» пары освобождён — этого поведения не ломаем.
+  const gaps = await getFreeGaps(session, new Date(`${tomorrow}T00:00:00.000Z`));
+  assert.deepEqual(gaps, [], 'в день битого переноса пар нет — слот свободен');
+
+  // Битый перенос — единственная пара группы: обещать нечего → null.
+  const lonelyGroup = await createGroup('РАС-БИТЫЙ-2', FACULTY);
+  const lonely = await createStudent('student-only-broken-move', lonelyGroup.id, { lastName: 'Один' });
+  const lonelySession = await authSessionFor(lonely.userId);
+  await createScheduleEntry({
+    groupId: lonelyGroup.id,
+    subjectId: subjectIds.math,
+    teacherId: ownTeacher.teacherId,
+    date: tomorrow,
+    startTime: '10:00',
+    endTime: '11:20',
+    status: 'MOVED',
+    movedToDate: null,
+  });
+  assert.equal(
+    await getMyNextLesson(lonelySession, new Date()),
+    null,
+    'битый перенос единственной парой пары не обещает',
+  );
+});
+
 test('расписание преподавателя доступно студенту', async () => {
   const today = startOfUtcDay(new Date());
   const to = addUtcDays(today, 7);
