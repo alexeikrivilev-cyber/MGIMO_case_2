@@ -169,20 +169,42 @@ test('интенты: ключевые слова, регистр и «ё» не
     ['Успеваемость', 'AVERAGE'],
     ['Что подтянуть?', 'IMPROVE'],
     ['Расписание на сегодня', 'SCHEDULE_TODAY'],
+    ['Где моя пара?', 'SCHEDULE_TODAY'],
     ['Какая следующая пара?', 'SCHEDULE_NEXT'],
     ['Ближайшая пара', 'SCHEDULE_NEXT'],
+    ['Я болею', 'SICK_LEAVE'],
+    ['Я заболел, не приду на пару', 'SICK_LEAVE'],
+    ['Как отметить больничный?', 'SICK_LEAVE'],
     ['Какие у меня заявки?', 'REQUESTS'],
     ['Когда будет готова справка?', 'REQUESTS'],
     ['Есть новые уведомления?', 'NOTIFICATIONS'],
     ['Новости деканата', 'NOTIFICATIONS'],
     ['Что ты умеешь?', 'HELP'],
     ['Помощь', 'HELP'],
+    ['помоги', 'HELP'],
+    ['Привет', 'GREETING'],
+    ['Здравствуйте', 'GREETING'],
     ['Сколько минут в часе?', 'UNKNOWN'],
     ['', 'UNKNOWN'],
   ];
   for (const [question, intent] of cases) {
     assert.equal(detectAssistantIntent(question), intent, `вопрос «${question}»`);
   }
+});
+
+test('интенты: корень «боле» намеренно не используется (ложное «более»)', () => {
+  // «более 5 баллов» — про балл, а не про больничный: корень 'боле'
+  // матчился бы в «более» и уводил вопрос про успеваемость в SICK_LEAVE.
+  assert.equal(detectAssistantIntent('более 5 баллов как поднять'), 'STUDY_PLAN');
+  assert.equal(detectAssistantIntent('Как поднять балл более чем на 1?'), 'STUDY_PLAN');
+  assert.equal(detectAssistantIntent('Хочу оценить более 5 работ'), 'UNKNOWN');
+});
+
+test('интенты: приветствие проверяется последним — смешанный вопрос уходит в суть', () => {
+  // «добрый день, какие у меня долги» — это DEBTS, а не приветствие.
+  assert.equal(detectAssistantIntent('Добрый день, какие у меня долги?'), 'DEBTS');
+  assert.equal(detectAssistantIntent('Привет, что ты умеешь?'), 'HELP');
+  assert.equal(detectAssistantIntent('привет'), 'GREETING');
 });
 
 test('HELP: список возможностей без обращений к БД', async () => {
@@ -207,16 +229,22 @@ test('UNKNOWN: честно «не понял вопрос», без выдум�
 // Долги и план
 // ---------------------------------------------------------------------------
 
-test('DEBTS: долги студента со семестрами', async () => {
+test('DEBTS: долги студента со семестрами — без строки левериджа', async () => {
   const answer = await askAssistant(student1, 'Какие у меня долги?');
   assert.equal(answer.intent, 'DEBTS');
   assert.equal(answer.mode, 'deterministic');
   assert.match(answer.answer, /Долгов: 2/);
   assert.match(answer.answer, /Рисунок — 1 семестр/);
   assert.match(answer.answer, /Физическая культура — 2 семестра/);
+  // Когда закрывать: свободные окна есть в ответе.
+  assert.match(answer.answer, /Когда закрывать: сегодня 11:20–13:30/);
+  // Контракт: DEBTS — перечень долгов, строка левериджа из него убрана.
+  assert.doesNotMatch(answer.answer, /До среднего|Цель \d/);
 });
 
-test('STUDY_PLAN: план содержит свободные окна и леверидж', async () => {
+test('STUDY_PLAN: «как закрыть долги» — долги и окна, БЕЗ строки левериджа', async () => {
+  // Контракт разделён намеренно: леверидж — про «план роста среднего
+  // балла», поэтому в ответе про перечень долгов его нет.
   const answer = await askAssistant(student1, 'Как закрыть долги?');
   assert.equal(answer.intent, 'STUDY_PLAN');
   // Долги.
@@ -224,6 +252,15 @@ test('STUDY_PLAN: план содержит свободные окна и ле�
   // Когда закрывать: свободные окна сегодня и завтра (getFreeGaps).
   assert.match(answer.answer, /сегодня 11:20–13:30/);
   assert.match(answer.answer, /завтра 09:50–11:00/);
+  // Левериджа нет: вопрос про долги, а не про балл.
+  assert.doesNotMatch(answer.answer, /До среднего|Цель \d/);
+});
+
+test('STUDY_PLAN: вопрос про балл — долги, окна и леверидж', async () => {
+  const answer = await askAssistant(student1, 'Как поднять средний балл до 4?');
+  assert.equal(answer.intent, 'STUDY_PLAN');
+  assert.match(answer.answer, /Рисунок — 1 семестр/);
+  assert.match(answer.answer, /сегодня 11:20–13:30/);
   // Леверидж: средний 3,75, оценённых 4, предстоящих 2 → цель 4 достижима:
   // нужно 4 × 6 − 15 = 9 баллов, в среднем 4,5 за работу.
   assert.match(answer.answer, /До среднего 4: 9 баллов на 2 предстоящих работах — в среднем 4,5/);

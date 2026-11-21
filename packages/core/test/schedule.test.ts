@@ -376,3 +376,69 @@ test('пустой teacherId в расписании преподавателя 
   await assert.rejects(() => getTeacherSchedule('', new Date(), new Date()), TypeError);
   await assert.rejects(() => getTeacherOfficeHours(''), TypeError);
 });
+
+test('MOVED без movedToDate: пара остаётся в слоте с честной отметкой', async () => {
+  // Отдельная группа: битая запись не должна меняться подсчёты других
+  // тестов этого файла.
+  const group = await createGroup('РАС-88-8', FACULTY);
+  const subject = await createSubject('РАС-888', 'Битые данные');
+  const student = await createStudent('student-broken-moved', group.id);
+  const day = addUtcDays(startOfUtcDay(new Date()), 3);
+  const dayKeyValue = dateKey(day);
+  const dayStart = new Date(`${dayKeyValue}T00:00:00.000Z`);
+
+  // Сломанная строка: статус MOVED, но movedToDate = null.
+  await createScheduleEntry({
+    groupId: group.id,
+    subjectId: subject,
+    teacherId,
+    date: dayKeyValue,
+    startTime: '10:00',
+    endTime: '11:20',
+    status: 'MOVED',
+    movedToDate: null,
+  });
+  await createScheduleEntry({
+    groupId: group.id,
+    subjectId: subject,
+    teacherId,
+    date: dayKeyValue,
+    startTime: '12:00',
+    endTime: '13:20',
+  });
+  const session = await authSessionFor(student.userId);
+
+  // Сетка дня: пара на месте в исходном слоте, отметка без выдумывания
+  // новой даты («Перенесено.» — и ничего больше).
+  const lessons = await getMyScheduleToday(session, dayStart);
+  assert.equal(lessons.length, 2);
+  const broken = lessons.find((lesson) => lesson.status === 'MOVED');
+  assert.ok(broken, 'битая пара присутствует в сетке');
+  assert.equal(broken.movedToDate, null);
+  assert.equal(broken.changeHint, 'Перенесено.');
+
+  // Свободные окна: битая пара не занимает слот (movedToDate = null не
+  // матчится ни один день), окно между парами не появляется — 12:00
+  // остаётся единственным занятием.
+  const gaps = await getFreeGaps(session, dayStart);
+  assert.deepEqual(gaps, [], 'битая пара не занимает слот и окна не создаёт');
+
+  // Ближайшая пара: считается по исходному слоту — дата не придумывается.
+  const before = new Date(dayStart.getTime() + 9 * 60 * 60 * 1000); // 09:00 UTC
+  const next = await getMyNextLesson(session, before);
+  assert.ok(next);
+  assert.equal(next.status, 'MOVED');
+  assert.equal(dateKey(next.effectiveDate), dayKeyValue, 'фактическая дата — исходный слот');
+  assert.equal(next.startTime, '10:00');
+
+  // Неделя: пара остаётся в своём дне, неделя не ломается. Смещение
+  // недели считаем от дня пары — от «сегодня» оно зависит от дня недели.
+  const weekOffset = Math.round(
+    (mondayOfUtcWeek(day).getTime() - mondayOfUtcWeek(new Date()).getTime()) / (7 * 24 * 60 * 60 * 1000),
+  );
+  const week = await getMyScheduleWeek(session, weekOffset);
+  const inWeek = week.days
+    .flatMap((weekDay) => weekDay.lessons)
+    .filter((lesson) => lesson.status === 'MOVED');
+  assert.equal(inWeek.length, 1);
+});

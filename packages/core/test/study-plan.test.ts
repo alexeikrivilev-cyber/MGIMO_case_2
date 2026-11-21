@@ -17,7 +17,7 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, readdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
@@ -182,11 +182,25 @@ test.after(async () => {
 
 test('токенизация: регистр, ё→е, стоп-слова и односимвольные токены', () => {
   const tokens = tokenizePlanText('Что проходит в 3 модуле? Циклы и ёлочки!');
-  assert.deepEqual(tokens.filter((token) => !['проходит', 'модуле', 'циклы', 'елочки'].includes(token)), []);
-  // «что», «в», «и» — стоп-слова, «3» — односимвольный токен.
+  assert.deepEqual(
+    tokens.filter((token) => !['проходит', 'модуле', 'циклы', 'елочки', '3'].includes(token)),
+    [],
+  );
+  // «что», «в», «и» — стоп-слова; односимвольные БУКВЫ отбрасываются
+  // (они не несут темы), а ЦИФРА — валидный токен: «3 модуле» должно
+  // различать «3 модуль» от «модулей 2, 4 и 6».
   assert.equal(tokens.includes('что'), false);
   assert.equal(tokens.includes('в'), false);
-  assert.equal(tokens.includes('3'), false);
+  assert.equal(tokens.includes('и'), false);
+  assert.equal(tokens.includes('3'), true);
+});
+
+test('retrieve: вопрос про «3 модуль» находит именно раздел 3 модуля', async () => {
+  // Без цифры в токенах вопрос про третий модуль получал в ответе ещё и
+  // контрольные точки «после 2, 4 и 6 модулей» — цифра различает разделы.
+  const answer = await askStudyPlanAssistant(teacher1, { question: 'Что проходит в 3 модуле?' });
+  assert.equal(answer.citations[0]?.section, '3 модуль: циклы и массивы', 'первая цитата — нужный раздел');
+  assert.match(answer.answer, /циклы и массивы/);
 });
 
 test('совпадение токенов: точное, префикс и общий корень', () => {
@@ -291,6 +305,18 @@ test('загрузка: студент и сотрудник без профил
       }),
       (error: unknown) => error instanceof OwnershipError && error.code === 'NOT_A_TEACHER',
       `${label} не может загружать планы`,
+    );
+    // Список и вопрос ассистенту закрыты той же проверкой: teacherId
+    // берётся только из сессии, вне сессии его не подделать.
+    await assert.rejects(
+      listMyStudyPlans(session),
+      (error: unknown) => error instanceof OwnershipError && error.code === 'NOT_A_TEACHER',
+      `${label} не видит список планов`,
+    );
+    await assert.rejects(
+      askStudyPlanAssistant(session, { question: 'Что по лабораторным?' }),
+      (error: unknown) => error instanceof OwnershipError && error.code === 'NOT_A_TEACHER',
+      `${label} не спрашивает ассистента по планам`,
     );
   }
 });
@@ -485,4 +511,40 @@ test('без планов: честная подсказка загрузить 
   assert.equal(answer.plan, null);
   assert.match(answer.answer, /Загрузите учебный план/);
   assert.equal(answer.citations.length, 0);
+});
+
+test('файл плана пропал из хранилище → «план недоступен», а не 400/500', async () => {
+  // Свой преподаватель: чужие фикстуры теста не трогаем.
+  const fresh = await createTeacher('plan-teacher-lost-file');
+  const session = await authSessionFor(fresh.userId);
+  const plan = await uploadStudyPlan(session, {
+    title: 'Основы программирования',
+    fileName: 'plan.md',
+    mime: 'text/markdown',
+    buffer: Buffer.from(PLAN_TEXT, 'utf8'),
+  });
+
+  // Файл пропадает из хранилища (ручная правка, сбой диска): запись в
+  // БД осталась — план есть в списке, но читать нечего.
+  const teacherDir = join(storageDir, 'study-plans', fresh.teacherId);
+  for (const file of await readdir(teacherDir)) {
+    await rm(join(teacherDir, file), { force: true });
+  }
+
+  // Без planId (самый свежий план) и с явным planId — один и тот же
+  // честный ответ: перезагрузите план.
+  for (const input of [{ question: 'Что по лабораторным?' }, { question: 'Что по лабораторным?', planId: plan.id }]) {
+    const answer = await askStudyPlanAssistant(session, input);
+    assert.equal(answer.mode, 'deterministic');
+    assert.equal(answer.plan?.id, plan.id, 'запись плана в БД узнана');
+    assert.match(answer.answer, /недоступен/);
+    assert.match(answer.answer, /загрузите план заново/i);
+    assert.equal(answer.citations.length, 0, 'цитат нет — файла нет');
+    assert.ok(answer.suggestions.length >= 3, 'подсказки для продолжения диалога на месте');
+  }
+
+  // Список планов не сломан: запись на месте, путь наружу не отдаётся.
+  const plans = await listMyStudyPlans(session);
+  assert.equal(plans.length, 1);
+  assert.equal(plans[0]?.id, plan.id);
 });

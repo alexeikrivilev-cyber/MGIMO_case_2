@@ -69,6 +69,53 @@ export function dateKey(date: Date): string {
   return date.toISOString().slice(0, 10);
 }
 
+/**
+ * Подпись дня по смещению от сегодня: 0 — «сегодня», 1 — «завтра»,
+ * 2 — «послезавтра». Дальше не различаем: ассистенты понимают только
+ * эти три дня, всё остальное — вопрос вне их грамматики.
+ *
+ * Общая для ассистента студента и ассистента преподавателя: формулировки
+ * дня должны совпадать в обоих кабинетах.
+ */
+export function dayWord(dayOffset: number): string {
+  if (dayOffset === 2) {
+    return 'послезавтра';
+  }
+  if (dayOffset === 1) {
+    return 'завтра';
+  }
+  return 'сегодня';
+}
+
+/** Заголовок дня в ответе: «Сегодня:» / «Завтра:» / «Послезавтра:». */
+export function dayHeading(dayOffset: number): string {
+  const word = dayWord(dayOffset);
+  return `${word.charAt(0).toUpperCase()}${word.slice(1)}:`;
+}
+
+/** Пустой день в ответе: «Сегодня пар нет.» / «Завтра пар нет.» / «Послезавтра пар нет.» */
+export function dayEmptyLessons(dayOffset: number): string {
+  return `${dayHeading(dayOffset).slice(0, -1)} пар нет.`;
+}
+
+/**
+ * Смещение дня из вопроса: «послезавтра» → 2, «завтра» → 1, иначе 0.
+ * Нормализация — нижний регистр и «ё» → «е» (как в ассистентах).
+ * «послезавтра» проверяется ПЕРВЫМ: оно содержит «завтра» и иначе дало
+ * бы смещение 1 — вопрос про послезавтра отвечался бы расписанием
+ * завтра (дефект пробного прогона волны 6).
+ */
+export function dayOffsetFromQuestion(question: string): number {
+  const text = question.toLowerCase().replaceAll('ё', 'е');
+  if (text.includes('послезавтра')) {
+    return 2;
+  }
+  if (text.includes('завтра')) {
+    return 1;
+  }
+  return 0;
+}
+
 /** Понедельник недели, содержащей date, со смещением weekOffset недель. */
 export function mondayOfUtcWeek(date: Date, weekOffset = 0): Date {
   const day = startOfUtcDay(date);

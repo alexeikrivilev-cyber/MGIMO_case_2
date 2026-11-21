@@ -147,7 +147,16 @@ export async function ensureTestDatabase(baseTestDatabaseUrl: string): Promise<s
       [isolated],
     );
     if (existing.rowCount === 0 || existing.rowCount === null) {
-      await client.query(`CREATE DATABASE "${isolated.replace(/"/g, '""')}"`);
+      try {
+        await client.query(`CREATE DATABASE "${isolated.replace(/"/g, '""')}"`);
+      } catch (error) {
+        // Гонка: базу успели создать между проверкой и созданием (например,
+        // два ensureTestDatabaseOnce в одном процессе или соседний прогон).
+        // Дубль имени — не ошибка: база уже есть, миграции применим к ней.
+        if ((error as { code?: string }).code !== '23505') {
+          throw error;
+        }
+      }
     }
   });
 

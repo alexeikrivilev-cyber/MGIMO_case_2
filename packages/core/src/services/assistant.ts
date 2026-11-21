@@ -14,7 +14,8 @@
  *   таймаут LLM → ответ детерминированного движка с пометкой;
  * - гейт верификации: интенты, которым нужны оценки (DEBTS, STUDY_PLAN,
  *   AVERAGE, IMPROVE), у неверифицированного студента получают честную
- *   заглушку вместо данных (VerificationRequiredError ловится здесь);
+ *   заглушку вместо данных (VerificationRequiredError ловится здесь).
+ *   Больничный (SICK_LEAVE) гейтом НЕ закрыт: он не зависит от оценок;
  * - UNKNOWN не выдумывает ответ: честное «не понял вопрос» + подсказки.
  * - sources (assistantSourcesFor в assistantClient.ts): из каких разделов
  *   кабинета собран ответ — атрибуция в интерфейсе (волна 4 «оживления»).
@@ -28,18 +29,25 @@ import {
   getMyGrades,
   type AcademicSummary,
   type LeverageResult,
+  type LeverageWork,
 } from './grades';
 import {
   addUtcDays,
+  dayEmptyLessons,
+  dayHeading,
+  dayOffsetFromQuestion,
+  dayWord,
   getFreeGaps,
   getMyNextLesson,
   getMyScheduleToday,
+  startOfUtcDay,
   type FreeGap,
   type LessonOccurrence,
   type ScheduleLesson,
 } from './schedule';
 import { getMyRequests, type MyRequest } from './requests';
 import { getMyNotifications, type MyNotification } from './notifications';
+import { getMySickLeaves, isSickNow, type MySickLeave } from './sickleave';
 import { VerificationRequiredError } from './verification';
 import type { AuthSession } from '../session';
 import { ASSISTANT_SYSTEM_PROMPT, type LlmClient } from '../llm';
@@ -60,9 +68,11 @@ export type AssistantIntent =
   | 'IMPROVE'
   | 'SCHEDULE_TODAY'
   | 'SCHEDULE_NEXT'
+  | 'SICK_LEAVE'
   | 'REQUESTS'
   | 'NOTIFICATIONS'
   | 'HELP'
+  | 'GREETING'
   | 'UNKNOWN';
 
 /** Режим ответа: детерминированный движок или LLM по его данным. */
@@ -94,6 +104,9 @@ export const ASSISTANT_STARTER_QUESTIONS: readonly string[] = [
   'Что подтянуть?',
   'Расписание на сегодня',
   'Что ты умеешь?',
+  // Одна новая подсказка: раньше «Я болею» уходило в UNKNOWN, хотя
+  // раздел «Я заболел» в кабинете есть.
+  'Я болею',
 ];
 
 /** Интенты, которым нужны оценки: закрыты гейтом верификации. */
@@ -107,6 +120,7 @@ const DATA_INTENTS: readonly AssistantIntent[] = [
   'IMPROVE',
   'SCHEDULE_TODAY',
   'SCHEDULE_NEXT',
+  'SICK_LEAVE',
   'REQUESTS',
   'NOTIFICATIONS',
 ];
@@ -121,12 +135,34 @@ const MAX_ANSWER_LENGTH = 1000;
 const MAX_LIST_ITEMS = 5;
 
 /**
+ * Минимальная длина свободного окна для закрытия долга, минуты.
+ *
+ * 10-минутная перемена между сменами бесполезна для закрытия долга: в
+ * ней не успеть ни сдать работу, ни разобрать тему. Поэтому в «когда
+ * закрывать» попадают только окна, в которые реально успеть.
+ */
+const MIN_GAP_MINUTES_FOR_DEBT = 30;
+
+/**
  * Распознавание интента по ключевым словам.
  *
- * Порядок проверки — часть контракта: «как закрыть долги» — это STUDY_PLAN
- * (план), а «какие у меня долги» — DEBTS (перечень), поэтому план и долги
- * проверяются раньше общего «балла» и «расписания». Нормализация:
- * нижний регистр + «ё» → «е», чтобы «незачёт» и «незачет» совпадали.
+ * Порядок проверки — часть контракта:
+ * - «как закрыть долги» — это STUDY_PLAN (план), а «какие у меня долги» —
+ *   DEBTS (перечень), поэтому план и долги проверяются раньше общего
+ *   «балла» и «расписания»;
+ * - SICK_LEAVE идёт ПОСЛЕ REQUESTS/NOTIFICATIONS (чтобы «пришли справку
+ *   о болезни» оставалось заявкой) и ПЕРЕД HELP (иначе «помогите
+ *   оформить больничный» уходило бы в помощь);
+ * - GREETING — последним перед UNKNOWN, чтобы «добрый день, какие у меня
+ *   долги» уходило в DEBTS, а не в приветствие.
+ *
+ * Корни подобраны так, чтобы не давать ложных срабатываний: в SICK_LEAVE
+ * намеренно НЕТ корня 'боле' — он матчится в «более» («более 5 баллов» —
+ * это про балл, а не про больничный), поэтому проверяются только явные
+ * формы «болею/заболе/болезн/больнич».
+ *
+ * Нормализация: нижний регистр + «ё» → «е», чтобы «незачёт» и «незачет»
+ * совпадали.
  */
 const INTENT_KEYWORDS: readonly { readonly intent: AssistantIntent; readonly keywords: readonly string[] }[] = [
   { intent: 'SCHEDULE_NEXT', keywords: ['следующая пара', 'следующ', 'ближайш', 'след пара', 'дальше по расписанию'] },
@@ -134,10 +170,15 @@ const INTENT_KEYWORDS: readonly { readonly intent: AssistantIntent; readonly key
   { intent: 'DEBTS', keywords: ['долг', 'незачет', 'хвост', 'долж'] },
   { intent: 'AVERAGE', keywords: ['средний балл', 'средняя оценка', 'успеваемость', 'gpa', 'средний бал'] },
   { intent: 'IMPROVE', keywords: ['подтянуть', 'подучить', 'слабые', 'хуже всего', 'что улучшить'] },
-  { intent: 'SCHEDULE_TODAY', keywords: ['расписание', 'пары', 'пары сегодня', 'сегодня', 'занятия'] },
+  // 'пара' — единственное число: «Где моя пара?» это про расписание.
+  { intent: 'SCHEDULE_TODAY', keywords: ['расписание', 'пары', 'пара', 'сегодня', 'занятия'] },
   { intent: 'REQUESTS', keywords: ['заявк', 'справк', 'заявление', 'заказать'] },
   { intent: 'NOTIFICATIONS', keywords: ['уведомлен', 'новости', 'объявлен', 'напоминани', 'что нового'] },
-  { intent: 'HELP', keywords: ['помощ', 'что ты умеешь', 'умеешь', 'команды', 'как пользоваться'] },
+  { intent: 'SICK_LEAVE', keywords: ['болею', 'заболе', 'болезн', 'больнич', 'не приду', 'опозда'] },
+  // 'помог' намеренно рядом с 'помощ': «помоги»/«помогите» не содержат
+  // корня «помощ», а без этого уходили в UNKNOWN.
+  { intent: 'HELP', keywords: ['помощ', 'помог', 'что ты умеешь', 'умеешь', 'команды', 'как пользоваться'] },
+  { intent: 'GREETING', keywords: ['привет', 'здравствуй', 'добрый день', 'добрый вечер', 'доброе утро', 'салют', 'хай'] },
 ];
 
 /** Нормализация вопроса: регистр и «ё» не важны. */
@@ -145,7 +186,13 @@ function normalize(question: string): string {
   return question.toLowerCase().replaceAll('ё', 'е').trim();
 }
 
-/** Интент вопроса (чистая функция — проверяется без БД). */
+/**
+ * Интент вопроса (чистая функция — проверяется без БД).
+ *
+ * Чистота — свойство контракта: detectAssistantIntent не обращается ни к
+ * БД, ни к окружению, поэтому весь разбор ключевых слов проверяется
+ * юнит-тестами без фикстур.
+ */
 export function detectAssistantIntent(question: string): AssistantIntent {
   const text = normalize(question);
   if (text === '') {
@@ -196,6 +243,30 @@ function plural(count: number, forms: readonly [string, string, string]): string
   return forms[2];
 }
 
+/** Дата в виде «дд.мм.гггг» (UTC — как даты хранит сервис болезни). */
+function formatDayMonthYear(date: Date): string {
+  const day = String(date.getUTCDate()).padStart(2, '0');
+  const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+  return `${day}.${month}.${date.getUTCFullYear()}`;
+}
+
+/**
+ * Нужна ли строка левериджа в ответе STUDY_PLAN.
+ *
+ * Леверидж — про «план роста среднего балла», поэтому он уместен только
+ * когда студент спросил про балл/среднее/gpa. «Как закрыть долги» —
+ * про перечень долгов и окна: строка «Все работы оценены. Цель 4 уже
+ * достигнута» там была шумом.
+ *
+ * Граница слова — Unicode-aware: `\b` в JavaScript считается только по
+ * ASCII-буквам, поэтому `\bбалл` не срабатывает перед кириллицей вовсе.
+ */
+const LEVERAGE_QUESTION = /(?<![\p{L}\p{N}_])(?:балл|gpa|средн)/u;
+
+function wantsLeverage(question: string): boolean {
+  return LEVERAGE_QUESTION.test(normalize(question));
+}
+
 /** Число в русской записи: 4.2 → «4,2». */
 function num(value: number): string {
   return String(value).replace('.', ',');
@@ -223,6 +294,27 @@ function dayLabel(date: Date, now: Date): string {
 // Загрузка фактов: только сервисы кабинета, только данные владельца сессии
 // ---------------------------------------------------------------------------
 
+/**
+ * Работы студента сессии для расчёта левериджа: зачёты (CREDIT) в средний
+ * балл не входят, поэтому они отфильтровываются ещё до calculateLeverage.
+ */
+async function leverageWorks(session: AuthSession): Promise<readonly LeverageWork[]> {
+  const grades = await getMyGrades(session);
+  return grades.semesters
+    .flatMap((semester) => semester.entries)
+    .filter((entry) => entry.type !== 'CREDIT')
+    .map((entry) => ({ value: entry.value }));
+}
+
+/**
+ * Уведомление с непустым заголовком. Записи с пустым/пробельным title —
+ * побитые данные (ручное вмешательство в БД): в ответе они дают пустую
+ * строку вместо смысла, поэтому пропускаются.
+ */
+function isShowableNotification(notification: MyNotification): boolean {
+  return notification.title.trim() !== '';
+}
+
 /** Факты для ответа; null — данные этому интенту не нужны. */
 interface AssistantFacts {
   readonly verificationRequired: boolean;
@@ -230,12 +322,16 @@ interface AssistantFacts {
   readonly leverage: LeverageResult | null;
   readonly targetGpa: number;
   readonly todayLessons: readonly ScheduleLesson[] | null;
+  /** Смещение дня расписания из вопроса (0 — сегодня, 1 — завтра, 2 — послезавтра). */
+  readonly dayOffset: number;
   readonly nextLesson: LessonOccurrence | null;
   readonly gapsToday: readonly FreeGap[] | null;
   readonly gapsTomorrow: readonly FreeGap[] | null;
   readonly requests: readonly MyRequest[] | null;
   readonly notifications: readonly MyNotification[] | null;
   readonly unreadCount: number | null;
+  readonly sickLeaves: readonly MySickLeave[] | null;
+  readonly sickNow: boolean;
 }
 
 async function loadFacts(
@@ -250,20 +346,40 @@ async function loadFacts(
     leverage: null,
     targetGpa: targetGpaFromQuestion(question),
     todayLessons: null,
+    dayOffset: 0,
     nextLesson: null,
     gapsToday: null,
     gapsTomorrow: null,
     requests: null,
     notifications: null,
     unreadCount: null,
+    sickLeaves: null,
+    sickNow: false,
   };
 
   if (intent === 'SCHEDULE_TODAY') {
-    return { ...empty, todayLessons: await getMyScheduleToday(session, now) };
+    // «Расписание на завтра» — это расписание ЗАВТРА, а не сегодня:
+    // смещение дня берём из вопроса и просим у сервиса нужный день.
+    const dayOffset = dayOffsetFromQuestion(question);
+    return {
+      ...empty,
+      dayOffset,
+      todayLessons: await getMyScheduleToday(session, addUtcDays(now, dayOffset)),
+    };
   }
 
   if (intent === 'SCHEDULE_NEXT') {
     return { ...empty, nextLesson: await getMyNextLesson(session, now) };
+  }
+
+  if (intent === 'SICK_LEAVE') {
+    // Больничный не зависит от оценок, поэтому гейт верификации тут не
+    // применяется: студент без сверенного билета тоже видит свой статус.
+    const [sickLeaves, sickNow] = await Promise.all([
+      getMySickLeaves(session),
+      isSickNow(session, now),
+    ]);
+    return { ...empty, sickLeaves, sickNow };
   }
 
   if (intent === 'REQUESTS') {
@@ -275,7 +391,9 @@ async function loadFacts(
     return {
       ...empty,
       notifications,
-      unreadCount: notifications.filter((notification) => !notification.read).length,
+      // Побитые записи без заголовка не считаются: иначе счётчик
+      // непрочитанных расходился бы со списком в ответе.
+      unreadCount: notifications.filter((item) => !item.read && isShowableNotification(item)).length,
     };
   }
 
@@ -298,16 +416,17 @@ async function loadFacts(
       return { ...empty, summary };
     }
 
-    const [grades, gapsToday, gapsTomorrow] = await Promise.all([
-      getMyGrades(session),
+    const [gapsToday, gapsTomorrow] = await Promise.all([
       getFreeGaps(session, now),
       getFreeGaps(session, addUtcDays(now, 1)),
     ]);
-    const works = grades.semesters
-      .flatMap((semester) => semester.entries)
-      .filter((entry) => entry.type !== 'CREDIT')
-      .map((entry) => ({ value: entry.value }));
-    const leverage = calculateLeverage(works, empty.targetGpa);
+    // Леверидж — строка про рост среднего балла, поэтому она нужна только
+    // STUDY_PLAN и только когда студент спросил про балл/среднее/gpa.
+    // Для DEBTS (перечень долгов) и запроса оценок не делаем вовсе.
+    const leverage =
+      intent === 'STUDY_PLAN' && wantsLeverage(question)
+        ? calculateLeverage(await leverageWorks(session), empty.targetGpa)
+        : null;
 
     return { ...empty, summary, leverage, gapsToday, gapsTomorrow };
   }
@@ -367,7 +486,13 @@ function renderGradeAnswer(intent: AssistantIntent, facts: AssistantFacts): stri
     return lines.join('\n');
   }
 
-  // DEBTS / STUDY_PLAN: долги + когда закрывать + леверидж до цели.
+  // DEBTS / STUDY_PLAN: долги + когда закрывать (+ леверидж для STUDY_PLAN).
+  //
+  // Контракт (разделён намеренно): DEBTS отвечает ПЕРЕЧНЕМ долгов и
+  // окнами — без строки левериджа (она про «план роста балла», а не про
+  // перечень долгов). STUDY_PLAN добавляет леверидж, и только когда
+  // вопрос про балл/среднее/gpa (wantsLeverage в loadFacts): «как закрыть
+  // долги» — план без левериджа, «как поднять средний балл до 5» — с ним.
   const lines: string[] = [];
   if (summary.debts.length === 0) {
     lines.push('Долгов нет.');
@@ -413,14 +538,19 @@ function trendText(summary: AcademicSummary): string | null {
  * В расписании группы окон много, но короткие (10–15 минут между
  * сменами) для закрытия долга бесполезны, поэтому за день показываем
  * два самых длинных окна — отсортированные по времени для чтения.
+ * Окна короче MIN_GAP_MINUTES_FOR_DEBT отбрасываются ещё до выбора
+ * «двух самых длинных»: иначе короткая перемена занимала бы место
+ * реального окна, а при отсутствии длинных ответ врал бы «когда
+ * закрывать» про 10-минутный промежуток.
  */
 function gapSlots(facts: AssistantFacts): string[] {
   const slots: string[] = [];
   const push = (gaps: readonly FreeGap[] | null, label: string): void => {
-    if (gaps === null || gaps.length === 0) {
+    if (gaps === null) {
       return;
     }
-    const longest = [...gaps]
+    const usable = gaps.filter((gap) => gap.durationMinutes >= MIN_GAP_MINUTES_FOR_DEBT);
+    const longest = [...usable]
       .sort((left, right) => right.durationMinutes - left.durationMinutes)
       .slice(0, 2)
       .sort((left, right) => left.startTime.localeCompare(right.startTime));
@@ -464,9 +594,9 @@ function leverageText(leverage: LeverageResult | null): string | null {
 function renderScheduleToday(facts: AssistantFacts): string {
   const lessons = facts.todayLessons;
   if (lessons === null || lessons.length === 0) {
-    return 'Сегодня пар нет.';
+    return dayEmptyLessons(facts.dayOffset);
   }
-  const lines = ['Сегодня:'];
+  const lines = [dayHeading(facts.dayOffset)];
   for (const lesson of lessons.slice(0, MAX_LIST_ITEMS)) {
     const status = lesson.status === 'SCHEDULED' ? '' : ` · ${lesson.statusLabel.toLowerCase()}`;
     lines.push(
@@ -477,6 +607,26 @@ function renderScheduleToday(facts: AssistantFacts): string {
     lines.push(`и ещё ${lessons.length - MAX_LIST_ITEMS}`);
   }
   return lines.join('\n');
+}
+
+/**
+ * Статус «болею»: период активной отметки или подсказка, где отметить.
+ *
+ * Активность считает сервис (isSickNow): период, у которого dateTo уже
+ * в прошлом, активным не считается. Даты — UTC, как их хранит сервис.
+ */
+function renderSickLeave(facts: AssistantFacts, now: Date): string {
+  const today = startOfUtcDay(now).getTime();
+  const active = (facts.sickLeaves ?? []).find(
+    (leave) => leave.dateFrom.getTime() <= today && leave.dateTo.getTime() >= today,
+  );
+  if (facts.sickNow && active !== undefined) {
+    return `Вы на больничном: ${formatDayMonthYear(active.dateFrom)} — ${formatDayMonthYear(active.dateTo)}.`;
+  }
+  return [
+    'Активных больничных нет.',
+    'Отметить болезнь — в разделе «Я заболел»: до 14 дней, деканат и преподаватели увидят.',
+  ].join('\n');
 }
 
 function renderScheduleNext(facts: AssistantFacts, now: Date): string {
@@ -510,19 +660,28 @@ function renderNotifications(facts: AssistantFacts): string {
   if (notifications === null || notifications.length === 0) {
     return 'Уведомлений нет.';
   }
-  const unread = facts.unreadCount ?? 0;
-  if (unread === 0) {
+  // Побитые записи без заголовка пропускаем: иначе вместо строки
+  // уведомления в ответе появляется пустая строка.
+  const unread = notifications.filter((item) => !item.read && isShowableNotification(item));
+  if (unread.length === 0) {
     return 'Непрочитанных нет.';
   }
-  const lines = [`Непрочитанных: ${unread}`];
-  for (const notification of notifications.filter((item) => !item.read).slice(0, MAX_LIST_ITEMS)) {
+  const lines = [`Непрочитанных: ${unread.length}`];
+  for (const notification of unread.slice(0, MAX_LIST_ITEMS)) {
     lines.push(notification.title);
+  }
+  if (unread.length > MAX_LIST_ITEMS) {
+    lines.push(`и ещё ${unread.length - MAX_LIST_ITEMS}`);
   }
   return lines.join('\n');
 }
 
 const HELP_TEXT =
   'Отвечаю по вашим данным: долги, план закрытия, средний балл, что подтянуть, расписание, заявки, уведомления.';
+
+/** Приветствие: не «не понял вопрос», а понятный вход в диалог. */
+const GREETING_TEXT =
+  'Здравствуйте! Спросите про долги, средний балл, расписание, заявки или уведомления.';
 
 function renderUnknown(): string {
   return 'Не понял вопрос.\nСпросите про долги, средний балл, расписание, заявки или уведомления.';
@@ -546,11 +705,14 @@ function suggestionsFor(intent: AssistantIntent, verificationRequired: boolean):
       return ['Какая следующая пара?', 'Какие у меня заявки?', 'Есть новые уведомления?'];
     case 'SCHEDULE_NEXT':
       return ['Расписание на сегодня', 'Какие у меня долги?', 'Что подтянуть?'];
+    case 'SICK_LEAVE':
+      return ['Что ты умеешь?', 'Расписание на сегодня', 'Какие у меня долги?'];
     case 'REQUESTS':
       return ['Есть новые уведомления?', 'Расписание на сегодня', 'Какой средний балл?'];
     case 'NOTIFICATIONS':
       return ['Какие у меня заявки?', 'Расписание на сегодня', 'Какой средний балл?'];
     case 'HELP':
+    case 'GREETING':
       return ['Какие у меня долги?', 'Расписание на сегодня', 'Какой средний балл?'];
     case 'UNKNOWN':
       return ['Что ты умеешь?', 'Расписание на сегодня', 'Какой средний балл?'];
@@ -577,6 +739,9 @@ function renderAnswer(intent: AssistantIntent, facts: AssistantFacts, now: Date)
     case 'SCHEDULE_NEXT':
       answer = renderScheduleNext(facts, now);
       break;
+    case 'SICK_LEAVE':
+      answer = renderSickLeave(facts, now);
+      break;
     case 'REQUESTS':
       answer = renderRequests(facts);
       break;
@@ -585,6 +750,9 @@ function renderAnswer(intent: AssistantIntent, facts: AssistantFacts, now: Date)
       break;
     case 'HELP':
       answer = HELP_TEXT;
+      break;
+    case 'GREETING':
+      answer = GREETING_TEXT;
       break;
     case 'UNKNOWN':
       answer = renderUnknown();
@@ -654,12 +822,27 @@ function buildLlmContext(intent: AssistantIntent, facts: AssistantFacts, now: Da
   }
 
   if (facts.todayLessons !== null) {
+    const day = dayWord(facts.dayOffset);
     lines.push(
       facts.todayLessons.length === 0
-        ? 'Пары сегодня: нет'
-        : `Пары сегодня: ${facts.todayLessons
+        ? `Пары ${day}: нет`
+        : `Пары ${day}: ${facts.todayLessons
             .map((lesson) => `${lesson.startTime}–${lesson.endTime} ${lesson.subjectName} (${lesson.room})`)
             .join('; ')}`,
+    );
+  }
+
+  if (facts.sickLeaves !== null) {
+    lines.push(
+      facts.sickLeaves.length === 0
+        ? 'Больничные: нет'
+        : `Больничные: ${facts.sickLeaves
+            .map(
+              (leave) =>
+                `${formatDayMonthYear(leave.dateFrom)}—${formatDayMonthYear(leave.dateTo)}`,
+            )
+            .join('; ')}`,
+      `Болеет сейчас: ${facts.sickNow ? 'да' : 'нет'}`,
     );
   }
 
