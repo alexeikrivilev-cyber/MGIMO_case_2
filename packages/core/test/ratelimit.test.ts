@@ -1,6 +1,9 @@
 /**
  * Тесты rate-limit входа: 5 неуспешных попыток / 15 минут на пару
  * (логин, IP). Часы инжектируются — без sleep.
+ *
+ * Вторая половина файла — лимитер действий кабинета: 30 действий /
+ * минуту на ключ «bucket:userId» (та же механика скользящего окна).
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -11,6 +14,11 @@ import {
   loginAttemptsLeft,
   MAX_LOGIN_ATTEMPTS,
   LOGIN_WINDOW_MS,
+  checkSessionRateLimit,
+  recordSessionAction,
+  resetSessionRateLimit,
+  MAX_SESSION_ACTIONS,
+  SESSION_WINDOW_MS,
 } from '../src/index.js';
 
 const LOGIN = 'student1';
@@ -138,3 +146,110 @@ test('resetLoginRateLimit полностью обнуляет состояние
 function recordLoginRateLimitAttempt(index: number): void {
   recordLoginAttempt(LOGIN, IP, false, T0 + index);
 }
+
+// ---------------------------------------------------------------------------
+// Лимитер действий кабинета: 30 действий / минуту на (bucket, userId)
+// ---------------------------------------------------------------------------
+
+const BUCKET_KEY = 'assistant:user-1';
+
+test.before(() => {
+  resetSessionRateLimit();
+});
+
+test('тридцать быстрых действий разрешены, тридцать первое заблокировано', () => {
+  for (let action = 0; action < MAX_SESSION_ACTIONS; action += 1) {
+    assert.equal(
+      checkSessionRateLimit(BUCKET_KEY, T0).allowed,
+      true,
+      `действие ${action + 1} должно быть разрешено`,
+    );
+    recordSessionAction(BUCKET_KEY, T0 + action);
+  }
+
+  const blocked = checkSessionRateLimit(BUCKET_KEY, T0 + MAX_SESSION_ACTIONS);
+  assert.equal(blocked.allowed, false);
+  assert.ok(blocked.retryAfterSeconds > 0, 'возвращается время ожидания');
+});
+
+test('retryAfterSeconds отсчитывается от самого старого действия в окне', () => {
+  resetSessionRateLimit();
+  for (let action = 0; action < MAX_SESSION_ACTIONS; action += 1) {
+    recordSessionAction(BUCKET_KEY, T0 + action * 100);
+  }
+
+  // Первое действие в T0, окно минута → разблокировка в T0+60с.
+  const atHalfMinute = checkSessionRateLimit(BUCKET_KEY, T0 + 30 * 1000);
+  assert.equal(atHalfMinute.allowed, false);
+  assert.equal(atHalfMinute.retryAfterSeconds, 30);
+
+  const afterWindow = checkSessionRateLimit(BUCKET_KEY, T0 + SESSION_WINDOW_MS + 1);
+  assert.equal(afterWindow.allowed, true);
+  assert.equal(afterWindow.retryAfterSeconds, 0);
+});
+
+test('окно скользящее: действие старше минуты не блокирует', () => {
+  resetSessionRateLimit();
+  for (let action = 0; action < MAX_SESSION_ACTIONS; action += 1) {
+    // Тридцать действий, растянутых на минуту.
+    recordSessionAction(BUCKET_KEY, T0 + action * 2000);
+  }
+
+  // Самое старое действие (T0) выпало из окна: T0+61с - 60с = T0+1с,
+  // в окне остаются 29 действий из 30.
+  const afterSlide = checkSessionRateLimit(BUCKET_KEY, T0 + SESSION_WINDOW_MS + 1000);
+  assert.equal(afterSlide.allowed, true);
+  assert.equal(afterSlide.retryAfterSeconds, 0);
+});
+
+test('счётчики раздельны по ключу: разделы-bucket и пользователи независимы', () => {
+  resetSessionRateLimit();
+  for (let action = 0; action < MAX_SESSION_ACTIONS; action += 1) {
+    recordSessionAction(BUCKET_KEY, T0 + action);
+  }
+  assert.equal(checkSessionRateLimit(BUCKET_KEY, T0).allowed, false);
+
+  // Другой раздел того же пользователя — не заблокирован.
+  assert.equal(checkSessionRateLimit('requests:user-1', T0).allowed, true);
+  // Тот же раздел другого пользователя — не заблокирован.
+  assert.equal(checkSessionRateLimit('assistant:user-2', T0).allowed, true);
+});
+
+test('resetSessionRateLimit полностью обнуляет состояние', () => {
+  for (let action = 0; action < MAX_SESSION_ACTIONS; action += 1) {
+    recordSessionAction(BUCKET_KEY, T0 + action);
+  }
+  assert.equal(checkSessionRateLimit(BUCKET_KEY, T0).allowed, false);
+
+  resetSessionRateLimit();
+  assert.equal(checkSessionRateLimit(BUCKET_KEY, T0).allowed, true);
+});
+
+test('устаревшие записи действий очищаются (память не течёт)', () => {
+  resetSessionRateLimit();
+  for (let ghost = 0; ghost < 10; ghost += 1) {
+    recordSessionAction(`ghost-${ghost}:user`, T0);
+  }
+  assert.equal(checkSessionRateLimit('ghost-0:user', T0).allowed, true);
+
+  // Любой вызов после окна запускает очистку устаревших ключей.
+  checkSessionRateLimit('other:user', T0 + SESSION_WINDOW_MS + 1);
+  checkSessionRateLimit('other:user', T0 + SESSION_WINDOW_MS + 2);
+  checkSessionRateLimit('other:user', T0 + SESSION_WINDOW_MS + 3);
+
+  // Все записи ghost-* вычищены: счётчики снова полные.
+  for (let ghost = 0; ghost < 10; ghost += 1) {
+    for (let action = 0; action < MAX_SESSION_ACTIONS; action += 1) {
+      assert.equal(
+        checkSessionRateLimit(`ghost-${ghost}:user`, T0 + SESSION_WINDOW_MS + 3).allowed,
+        true,
+      );
+      recordSessionAction(`ghost-${ghost}:user`, T0 + SESSION_WINDOW_MS + 3);
+    }
+    assert.equal(
+      checkSessionRateLimit(`ghost-${ghost}:user`, T0 + SESSION_WINDOW_MS + 3).allowed,
+      false,
+      'после заполнения окна ключ снова блокируется',
+    );
+  }
+});

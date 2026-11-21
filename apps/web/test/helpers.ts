@@ -21,7 +21,7 @@ import path from 'node:path';
 import os from 'node:os';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { getPrisma } from '@udgu/db';
-import { hashPassword } from '@udgu/core';
+import { hashPassword, resetSessionRateLimit } from '@udgu/core';
 import { DEMO_PASSWORD } from '@udgu/ui';
 import { ensureTestDatabase } from '@udgu/db';
 
@@ -48,6 +48,11 @@ process.env.DATABASE_URL =
  * проходит на чистом клоне без ручных шагов — критерий приёмки PO.
  * Хук корневого уровня: node:test выполняет его один раз перед всеми
  * тестами процесса, поэтому отдельным файлам ничего добавлять не нужно.
+ *
+ * Здесь же обнуляется in-memory лимитер действий кабинета
+ * (resetSessionRateLimit): счётчики живут в процессе, и без сброса
+ * лимит одного файла тестов утекал бы в следующие (файлы выполняются
+ * последовательно, но в одном процессе — по файлу на процесс).
  */
 let testDatabaseUrl: string | null = null;
 
@@ -68,6 +73,7 @@ async function ensureTestDatabaseOnce(): Promise<void> {
 }
 
 before(async () => {
+  resetSessionRateLimit();
   await ensureTestDatabaseOnce();
 });
 
@@ -83,6 +89,10 @@ export const TEST_PASSWORD = DEMO_PASSWORD;
 
 /** Очищает все таблицы в порядке, безопасном для FK. */
 export async function resetWebTestData(): Promise<void> {
+  // Лимитер действий кабинета живёт в памяти процесса: сбрасываем там же,
+  // где сбрасываются данные, — иначе счётчик предыдущего файла тестов
+  // утекал бы в следующий.
+  resetSessionRateLimit();
   await ensureTestDatabaseOnce();
   const prisma = getPrisma();
   await prisma.auditEvent.deleteMany();

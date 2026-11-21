@@ -93,6 +93,8 @@ let otherTeacherToken: string;
 let studentToken: string;
 let staffToken: string;
 let ownPlanId: string;
+/** Идентификатор преподавателя фикстуры (часы приёма и расписание). */
+let teacherId: string;
 
 function teacherCookies(): { udgu_session: string } {
   return { udgu_session: teacherToken };
@@ -120,6 +122,7 @@ test.before(async () => {
   const otherTeacher = await createTeacher('teacher2');
   const student = await createStudent('student1', group.id);
   const staff = await createUser('staff1', 'STAFF');
+  teacherId = teacher.teacherId;
   // Сотрудник деканата своего факультета — без профиля преподавателя.
   await getPrisma().user.update({ where: { id: staff.id }, data: { faculty: FACULTY_A } });
 
@@ -370,6 +373,76 @@ test('POST /api/teacher/assistant: пустой вопрос → 400, чужой
     apiRequest('/api/teacher/assistant', { method: 'POST', body: { question: 'Что по лабораторным?' } }),
   );
   assert.equal(anon.status(), 401);
+});
+
+// ---------------------------------------------------------------------------
+// Ассистент преподавателя: кабинетные ответы по смыслу (волна 6, «Improve»)
+// ---------------------------------------------------------------------------
+
+test('POST /api/teacher/assistant: «моё расписание на сегодня» → строки пар, citations пусты', async () => {
+  const response = await callRoute(
+    teacherAssistantRoute,
+    apiRequest('/api/teacher/assistant', {
+      method: 'POST',
+      body: { question: 'моё расписание на сегодня' },
+      cookies: teacherCookies(),
+    }),
+  );
+  assert.equal(response.status(), 200);
+
+  const body = await response.json<{
+    answer: string;
+    citations: unknown[];
+    plan: { id: string; title: string } | null;
+  }>();
+  // Притяжательный вопрос про своё расписание приоритетнее плана.
+  assert.match(body.answer, /Сегодня:/);
+  assert.match(body.answer, /10:00–11:20 Информатика · У-101 · ПИ-37/);
+  assert.deepEqual(body.citations, [], 'ответ не по плану: цитировать нечего');
+});
+
+test('POST /api/teacher/assistant: «когда у меня часы приёма» → часы приёма, citations пусты', async () => {
+  await getPrisma().officeHour.create({
+    data: {
+      teacherId,
+      weekday: 2,
+      startTime: '14:00',
+      endTime: '15:30',
+      room: 'У-204',
+      type: 'RECEPTION',
+    },
+  });
+
+  const response = await callRoute(
+    teacherAssistantRoute,
+    apiRequest('/api/teacher/assistant', {
+      method: 'POST',
+      body: { question: 'когда у меня часы приёма' },
+      cookies: teacherCookies(),
+    }),
+  );
+  assert.equal(response.status(), 200);
+
+  const body = await response.json<{ answer: string; citations: unknown[] }>();
+  assert.match(body.answer, /Часов приёма: 1/);
+  assert.match(body.answer, /Вт 14:00–15:30 · У-204 · Час приёма/);
+  assert.deepEqual(body.citations, [], 'ответ не по плану: цитировать нечего');
+});
+
+test('POST /api/teacher/assistant: «кто не сдал зачёт» → долги студентов групп', async () => {
+  const response = await callRoute(
+    teacherAssistantRoute,
+    apiRequest('/api/teacher/assistant', {
+      method: 'POST',
+      body: { question: 'кто не сдал зачёт' },
+      cookies: teacherCookies(),
+    }),
+  );
+  assert.equal(response.status(), 200);
+
+  const body = await response.json<{ answer: string; citations: unknown[] }>();
+  assert.match(body.answer, /Долги студентов ваших групп:/);
+  assert.match(body.answer, /Долги по «Информатика»: 1 студент \(ПИ-37\)/);
 });
 
 // ---------------------------------------------------------------------------

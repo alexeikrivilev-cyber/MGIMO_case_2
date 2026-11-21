@@ -103,10 +103,15 @@ export {
   recordLoginAttempt,
   resetLoginRateLimit,
   loginAttemptsLeft,
+  checkSessionRateLimit,
+  recordSessionAction,
+  resetSessionRateLimit,
   MAX_LOGIN_ATTEMPTS,
   LOGIN_WINDOW_MS,
+  MAX_SESSION_ACTIONS,
+  SESSION_WINDOW_MS,
 } from './ratelimit';
-export type { LoginRateLimitResult } from './ratelimit';
+export type { LoginRateLimitResult, SessionRateLimitResult } from './ratelimit';
 
 export {
   requireUser,

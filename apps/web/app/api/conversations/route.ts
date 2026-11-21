@@ -19,6 +19,7 @@ import { listMyConversations, startConversationWithTeacher } from '@udgu/core';
 import { conversationStartSchema } from '@/lib/validation';
 import { parseJsonBody } from '@/lib/http';
 import { coreErrorResponse, requireSession } from '@/lib/session';
+import { enforceSessionRateLimit } from '@/lib/rate-limit';
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
   try {
@@ -34,6 +35,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
     const input = await parseJsonBody(request, conversationStartSchema);
     const session = await requireSession(request);
+    // Rate-limit кабинета: 30 начатых диалогов в минуту на сессию.
+    const limited = enforceSessionRateLimit(session, 'messages');
+    if (limited !== null) {
+      return limited;
+    }
     const conversation = await startConversationWithTeacher(session, input);
     return NextResponse.json({ conversation }, { status: 201 });
   } catch (error) {

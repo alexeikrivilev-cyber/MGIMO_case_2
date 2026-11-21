@@ -58,6 +58,9 @@ const ROUTER_CONTEXT = {
 
 let sessionToken: string;
 let unverifiedToken: string;
+/** Группа и предмет фикстуры: нужны тестам расписания на завтра. */
+let fixtureGroupId: string;
+let fixtureSubjectId: string;
 
 test.before(async () => {
   await resetWebTestData();
@@ -65,6 +68,8 @@ test.before(async () => {
   const group = await createGroup('АИ-44');
   const teacher = await createTeacher('teacher-assistant');
   const subject = await createSubject('AI-401', 'Машинное обучение');
+  fixtureGroupId = group.id;
+  fixtureSubjectId = subject;
 
   await createScheduleEntry({
     groupId: group.id,
@@ -190,6 +195,105 @@ test('POST /api/assistant: неверифицированный студент �
   assert.ok(body.suggestions.includes('Верифицировать билет'));
   // Заглушка гейта не построена на данных кабинета — источников нет.
   assert.deepEqual(body.sources, []);
+});
+
+// ---------------------------------------------------------------------------
+// Ответы по смыслу (волна 6, «Improve»): «Я болею», расписание, приветствие
+// ---------------------------------------------------------------------------
+
+test('POST /api/assistant: «Я болею» → 200 со ссылкой на раздел «Я заболел»', async () => {
+  const response = await callRoute(
+    assistantRoute,
+    apiRequest('/api/assistant', {
+      method: 'POST',
+      body: { question: 'Я болею' },
+      cookies: { udgu_session: sessionToken },
+    }),
+  );
+  assert.equal(response.status(), 200);
+  const body = await response.json<{
+    answer: string;
+    intent: string;
+    sources: readonly { label: string; href: string }[];
+  }>();
+  assert.equal(body.intent, 'SICK_LEAVE');
+  // Активных больничных у фикстуры нет — ответ ведёт в раздел отметки.
+  assert.match(body.answer, /Активных больничных нет/);
+  assert.match(body.answer, /Я заболел/);
+  assert.ok(
+    body.sources.some((source) => source.href === '/sick-leave'),
+    'источник ответа — раздел «Я заболел»',
+  );
+});
+
+test('POST /api/assistant: «расписание на завтра» → 200 с парами на завтра', async () => {
+  // Пара на завтра (UTC-даты, как их хранит расписание).
+  await createScheduleEntry({
+    groupId: fixtureGroupId,
+    subjectId: fixtureSubjectId,
+    teacherId: (await createTeacher('teacher-tomorrow')).teacherId,
+    date: dateKey(new Date(Date.now() + 24 * 60 * 60 * 1000)),
+    startTime: '12:10',
+    endTime: '13:30',
+  });
+
+  const response = await callRoute(
+    assistantRoute,
+    apiRequest('/api/assistant', {
+      method: 'POST',
+      body: { question: 'расписание на завтра' },
+      cookies: { udgu_session: sessionToken },
+    }),
+  );
+  assert.equal(response.status(), 200);
+  const body = await response.json<{
+    answer: string;
+    intent: string;
+    sources: readonly { label: string; href: string }[];
+  }>();
+  assert.equal(body.intent, 'SCHEDULE_TODAY');
+  assert.match(body.answer, /12:10–13:30 Машинное обучение/);
+  assert.ok(
+    body.sources.some((source) => source.href === '/schedule'),
+    'источник ответа — раздел «Расписание»',
+  );
+});
+
+test('POST /api/assistant: «привет» → приветствие, источников нет', async () => {
+  const response = await callRoute(
+    assistantRoute,
+    apiRequest('/api/assistant', {
+      method: 'POST',
+      body: { question: 'привет' },
+      cookies: { udgu_session: sessionToken },
+    }),
+  );
+  assert.equal(response.status(), 200);
+  const body = await response.json<{
+    answer: string;
+    intent: string;
+    sources: readonly unknown[];
+  }>();
+  assert.equal(body.intent, 'GREETING');
+  assert.match(body.answer, /Здравствуйте/);
+  assert.deepEqual(body.sources, [], 'приветствие не строится на данных кабинета');
+});
+
+test('POST /api/assistant: XSS-payload в вопросе не отражается в ответе', async () => {
+  const payload = '<img src=x onerror=alert(1)>';
+  const response = await callRoute(
+    assistantRoute,
+    apiRequest('/api/assistant', {
+      method: 'POST',
+      body: { question: payload },
+      cookies: { udgu_session: sessionToken },
+    }),
+  );
+  assert.equal(response.status(), 200);
+  const body = await response.json<{ answer: string; intent: string }>();
+  assert.equal(body.intent, 'UNKNOWN');
+  assert.ok(!body.answer.includes(payload), 'ответ не отражает вопрос');
+  assert.ok(!body.answer.includes('onerror'), 'ответ не отражает вопрос');
 });
 
 test('страница /assistant: рендерится из серверного загрузчика', async () => {

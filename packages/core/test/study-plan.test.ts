@@ -47,6 +47,7 @@ import {
   createGrade,
   createTeacher,
   createUser,
+  createOfficeHour,
   authSessionFor,
   resetTestData,
 } from './helpers.js';
@@ -86,6 +87,8 @@ let student: AuthSession;
 let deanStaff: AuthSession;
 let ownPlanId: string;
 let foreignPlanId: string;
+/** Идентификатор преподавателя фикстуры (сессия его не несёт). */
+let teacher1Id: string;
 
 let storageDir: string;
 let previousStorageDir: string | undefined;
@@ -122,6 +125,7 @@ test.before(async () => {
   const second = await createTeacher('plan-teacher-2');
   const studentFixture = await createStudent('plan-student', group.id);
   const staff = await createUser('plan-staff', 'STAFF');
+  teacher1Id = first.teacherId;
 
   // Преподаватель ведёт пары у группы → её студенты попадают в сопоставление
   // с долгами. У студента есть незачёт по информатике.
@@ -482,6 +486,53 @@ test('ответ: запись плана есть, а файл пропал →
   assert.equal(plans.length, 1);
   assert.equal(plans[0]?.id, plan.id);
   assert.equal('storagePath' in (plans[0] ?? {}), false);
+});
+
+// ---------------------------------------------------------------------------
+// Приоритет кабинета над планом: часы приёма (дефект ревью тимлида)
+// ---------------------------------------------------------------------------
+
+test('вопрос про план со словом «приём» при загруженном плане → ответ по плану, не часы приёма', async () => {
+  // «приём» — широкий маркер часов приёма: без защиты вопрос про план
+  // уходил бы в часы приёма мимо загруженного плана.
+  const answer = await askStudyPlanAssistant(teacher1, { question: 'Что в плане про приём лабораторных?' });
+  assert.equal(answer.mode, 'deterministic');
+  assert.ok(answer.citations.length >= 1, 'ответ построен по разделам плана');
+  assert.match(answer.answer, /Лабораторные работы/);
+  assert.doesNotMatch(answer.answer, /Часов приёма/, 'вопрос про план не отвечается часами приёма');
+});
+
+test('притяжательный вопрос про часы приёма при загруженном плане → часы приёма', async () => {
+  await createOfficeHour(teacher1Id, {
+    weekday: 2,
+    startTime: '14:00',
+    endTime: '15:30',
+    room: 'У-204',
+    type: 'RECEPTION',
+  });
+
+  const answer = await askStudyPlanAssistant(teacher1, { question: 'Когда у меня часы приёма?' });
+  assert.equal(answer.mode, 'deterministic');
+  assert.match(answer.answer, /Вт 14:00–15:30 · У-204 · Час приёма/);
+  assert.deepEqual(answer.citations, [], 'ответ не по плану: цитировать нечего');
+});
+
+test('вопрос про часы приёма без плана → часы приёма', async () => {
+  const fresh = await createTeacher('plan-teacher-office');
+  const session = await authSessionFor(fresh.userId);
+  await createOfficeHour(fresh.teacherId, {
+    weekday: 4,
+    startTime: '10:15',
+    endTime: '11:45',
+    room: 'У-301',
+    type: 'CONSULTATION',
+  });
+
+  const answer = await askStudyPlanAssistant(session, { question: 'Когда у меня часы приёма?' });
+  assert.equal(answer.mode, 'deterministic');
+  assert.equal(answer.plan, null, 'плана нет вовсе');
+  assert.match(answer.answer, /Чт 10:15–11:45 · У-301 · Консультация/);
+  assert.deepEqual(answer.citations, []);
 });
 
 // ---------------------------------------------------------------------------

@@ -22,10 +22,16 @@ import { askStudyPlanAssistant, createLlmClientFromEnv } from '@udgu/core';
 import { teacherAssistantQuestionSchema } from '@/lib/validation';
 import { parseJsonBody } from '@/lib/http';
 import { coreErrorResponse, requireSession } from '@/lib/session';
+import { enforceSessionRateLimit } from '@/lib/rate-limit';
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
     const session = await requireSession(request);
+    // Rate-limit кабинета: 30 вопросов ассистенту в минуту на сессию.
+    const limited = enforceSessionRateLimit(session, 'teacher-assistant');
+    if (limited !== null) {
+      return limited;
+    }
     const { planId, question } = await parseJsonBody(request, teacherAssistantQuestionSchema);
 
     const answer = await askStudyPlanAssistant(

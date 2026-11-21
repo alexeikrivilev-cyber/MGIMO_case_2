@@ -20,10 +20,16 @@ import { askAssistant, createLlmClientFromEnv } from '@udgu/core';
 import { assistantQuestionSchema } from '@/lib/validation';
 import { parseJsonBody } from '@/lib/http';
 import { coreErrorResponse, requireSession } from '@/lib/session';
+import { enforceSessionRateLimit } from '@/lib/rate-limit';
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
     const session = await requireSession(request);
+    // Rate-limit кабинета: 30 вопросов ассистента в минуту на сессию.
+    const limited = enforceSessionRateLimit(session, 'assistant');
+    if (limited !== null) {
+      return limited;
+    }
     const { question } = await parseJsonBody(request, assistantQuestionSchema);
 
     const answer = await askAssistant(session, question, {
