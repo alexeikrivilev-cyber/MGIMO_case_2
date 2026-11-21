@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>proj-3311 — Wave 4: живой чат ассистента</title>
+<!--
+  ДИЗАЙН-АРТЕФАКТ волны 4 (тимлид Hermes; генеративный агент Open Design
+  в этой среде неработоспособен — AGENT_CLI_SESSION_REFUSED, проверено
+  исполнением 21.11; артефакт проходит настоящий lint-гейт Open Design).
+
+  Задача волны: чат ассистента «мёртв» не как декор, а как ПОВЕДЕНИЕ.
+  Аудит кода (AssistantPanel.tsx, TeacherAssistantPanel.tsx) дал три
+  факта:
+  1. Нет истории: состояние — asked/answer последнего обмена, новый
+     вопрос ЗАТИРАЕТ предыдущий ответ. Диалог не накапливается.
+  2. Нет отклика на отправку: вопрос студента не появляется в ленте,
+     пока не пришёл ответ — вместо него общая карточка «Думаем…».
+  3. Нет атрибуции: бейдж «По данным кабинета» не говорит, ИЗ КАКИХ
+     разделов собран ответ (intent приходит в payload, UI его игнорирует).
+
+  Доктрина (via-negativa): убрать спиннер-карточку и разнесённые
+  вопрос/ответ → лента обменов; НЕ добавлять посимвольную печать
+  ответа (фейк: ответ уже целиком на клиенте), звуки, аватары-картинки,
+  новые зависимости, новые цвета. Всё движение — токены волны 1,
+  только под prefers-reduced-motion: no-preference.
+-->
+<style>
+  :root {
+    --bg: #0b0e14; --surface: #131824; --surface-2: #1b2233; --border: #2a3348;
+    --text: #e8ebf2; --text-muted: #9aa4b8;
+    --primary: #818cf8; --primary-soft: #1e2140; --on-primary: #0b0e14;
+    --motion-fast: 150ms; --motion-slow: 300ms; --ease-out: cubic-bezier(0.2,0,0,1);
+    --radius-md: 0.5rem; --radius-xl: 1rem;
+  }
+  body { background: var(--bg); color: var(--text); font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; margin: 0; }
+  .wrap { max-width: 360px; margin: 0 auto; padding: 16px; }
+  .spec { border: 1px solid var(--border); border-radius: var(--radius-xl); background: var(--surface); padding: 16px; margin-bottom: 16px; }
+  .spec h2 { font-size: 0.875rem; font-weight: 600; margin: 0 0 4px; }
+  .why { font-size: 0.75rem; color: var(--text-muted); margin: 0 0 12px; }
+  code { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 0.7rem; color: #a5b4fc; }
+  ul.why { margin: 0 0 10px 16px; padding: 0; }
+  .num { font-variant-numeric: tabular-nums; }
+  .muted { color: var(--text-muted); }
+
+  /* --- 1. Лента диалога: пузыри --- */
+  .thread { display: flex; flex-direction: column; gap: 12px; }
+  .exchange { display: flex; flex-direction: column; gap: 6px; }
+  .bubble { max-width: 85%; padding: 10px 12px; font-size: 0.875rem; line-height: 1.45; border-radius: var(--radius-xl); overflow-wrap: anywhere; white-space: pre-line; }
+  .bubble.student { align-self: flex-end; background: var(--primary-soft); border: 1px solid var(--primary); border-bottom-right-radius: var(--radius-md); }
+  .bubble.assistant { align-self: flex-start; background: var(--surface); border: 1px solid var(--border); border-bottom-left-radius: var(--radius-md); }
+  .bubble .row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+  .badge { display: inline-flex; align-items: center; border-radius: 9999px; border: 1px solid var(--border); background: var(--surface-2); padding: 1px 8px; font-size: 0.6875rem; font-weight: 500; color: var(--text-muted); }
+  .badge.info { border-color: color-mix(in srgb, var(--primary) 30%, transparent); background: var(--primary-soft); color: var(--primary); }
+  .src { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 8px; }
+  .src .lbl { font-size: 0.6875rem; color: var(--text-muted); }
+  .src a { display: inline-flex; align-items: center; min-height: 24px; border-radius: 9999px; border: 1px solid var(--border); background: var(--surface-2); padding: 0 10px; font-size: 0.75rem; font-weight: 500; color: var(--primary); text-decoration: underline; text-decoration-style: dotted; text-underline-offset: 2px; }
+  .src a:hover { color: var(--primary); background: var(--primary-soft); }
+
+  /* --- 2. Индикатор «печатает»: три точки --- */
+  .typing { display: inline-flex; align-items: center; gap: 4px; padding: 2px 0; }
+  .typing .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--text-muted); }
+  @media (prefers-reduced-motion: no-preference) {
+    .typing .dot { animation: udgu-typing 1s var(--ease-out) infinite; }
+    .typing .dot:nth-child(2) { animation-delay: 150ms; }
+    .typing .dot:nth-child(3) { animation-delay: 300ms; }
+  }
+  @keyframes udgu-typing {
+    0%, 60%, 100% { opacity: 0.35; transform: translateY(0); }
+    30% { opacity: 1; transform: translateY(-3px); }
+  }
+
+  /* --- 3. Чипы follow-up и стартовые --- */
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip { display: inline-flex; align-items: center; min-height: 44px; border-radius: 9999px; border: 1px solid var(--border); background: var(--surface-2); padding: 0 12px; font-size: 0.875rem; color: var(--text); cursor: pointer; }
+  .chip:hover { color: var(--primary); }
+
+  /* --- 4. Поле ввода + кнопка (как в кабинете) --- */
+  .field { display: block; width: 100%; min-height: 44px; border-radius: var(--radius-md); border: 1px solid var(--border); background: var(--surface-2); padding: 8px 12px; font-size: 0.875rem; color: var(--text); }
+  .send { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; width: 100%; border: 0; border-radius: var(--radius-md); background: var(--primary); color: var(--on-primary); font-size: 0.875rem; font-weight: 500; cursor: pointer; }
+  .press { transition: transform var(--motion-fast) var(--ease-out), background-color var(--motion-fast) var(--ease-out), border-color var(--motion-fast) var(--ease-out), color var(--motion-fast) var(--ease-out); }
+  @media (prefers-reduced-motion: no-preference) {
+    .press:enabled:active { transform: scale(0.96); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
+  }
+  .focus:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="spec">
+    <h2>Wave 4. Что это</h2>
+    <p class="why">Волны 1–3 оживиния отклик, данные и «где я». Остался главный экран диалога — чат ассистента. Он работает, но ведёт себя как форум, а не как разговор: помнит только последний обмен, не отзывается на отправку и не показывает, на каких данных построен ответ. Волна 4 — лента обменов, немедленный пузырь студента, индикатор «печатает» и ссылки-источники в ответе.</p>
+  </div>
+
+  <div class="spec">
+    <h2>1. Лента диалога вместо последнего обмена</h2>
+    <p class="why">Состояние панели: массив обменов <code>{ question, answer, mode, sources, error? }[]</code>. Новый вопрос ДОБАВЛЯЕТ обмен (пузырь студента появляется сразу, синхронно, до сети), ответ заполняет его по <code>id</code>. Follow-up чипы и стартовые подсказки остаются только у последнего обмена — иначе они дублировались бы под каждым ответом (BRIEF v4: одна мысль на экран).</p>
+    <div class="thread" aria-label="Пример диалога">
+      <div class="exchange">
+        <div class="bubble student">Какие у меня долги?</div>
+        <div class="bubble assistant">
+          <div class="row"><span class="badge">По данным кабинета</span></div>
+          <p style="margin:6px 0 0">Долгов: 1<br>Алгоритмы и структуры данных — 2 семестра<br>Когда закрывать: сегодня 11:20–11:40, завтра 10:00–10:30</p>
+          <div class="src"><span class="lbl">Источники:</span><a href="#grades" class="press focus">Успеваемость</a><a href="#schedule" class="press focus">Расписание</a></div>
+        </div>
+      </div>
+      <div class="exchange">
+        <div class="bubble student">Как поднять средний балл до 5?</div>
+        <div class="bubble assistant">
+          <div class="row"><span class="badge info">ИИ-режим</span></div>
+          <p style="margin:6px 0 0">До среднего 5: 18 баллов на 3 предстоящих работах — в среднем 6,0. Цель недостижима: максимум 4,7.</p>
+          <div class="src"><span class="lbl">Источники:</span><a href="#grades" class="press focus">Успеваемость</a></div>
+        </div>
+      </div>
+    </div>
+    <ul class="why" style="margin-top:12px">
+      <li>Пузырь студента — справа, <code>bg-primary-soft</code> + рамка <code>primary</code>; ассистента — слева, <code>bg-surface</code> + рамка <code>border</code>. Ни одного нового цвета: токены волны 1.</li>
+      <li><code>max-width: 85%</code>, <code>overflow-wrap: anywhere</code>, <code>white-space: pre-line</code> — длинный план с окнами переносится, 360 px держит (проверяется живьём).</li>
+      <li>Живая область <code>aria-live="polite"</code> — ТОЛЬКО на последнем пузыре ответа. История не анонсируется: иначе скринридер перечитывал бы весь диалог на каждый ответ.</li>
+    </ul>
+  </div>
+
+  <div class="spec">
+    <h2>2. Отклик на отправку: пузыръ сразу, «печатает» в ленте</h2>
+    <p class="why">Отправка вопроса: пузыръ студента появляется в ленте синхронно (setState до fetch) — отдача на действие без ожидания сети. На месте будущего ответа — пузыръ ассистента с индикатором «печатает» (три точки, пульсация 1s, задержка 150ms на точку) и <code>sr-only</code> «Ассистент печатает…». Карточка-спиннер «Думаем…» УБИРАЕТСЯ (via-negativa): её смысл полностью несёт индикатор в ленте, а два индикатора на один ответ — шум.</p>
+    <div class="thread" aria-label="Пример состояния ожидания">
+      <div class="exchange">
+        <div class="bubble student">Есть новые уведомления?</div>
+        <div class="bubble assistant">
+          <span class="typing" role="status"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">Ассистент печатает…</span></span>
+        </div>
+      </div>
+    </div>
+    <ul class="why" style="margin-top:12px">
+      <li>Печать ответа посимвольно НЕ делаем: ответ приходит целиком — посимвольный reveal был бы иллюзией генерации. Индикатор показывает РЕАЛЬНОЕ ожидание, не враёт.</li>
+      <li>Точки — <code>@keyframes udgu-typing</code> в <code>globals.css</code> под <code>prefers-reduced-motion: no-preference</code> (единый стиль волн: <code>.bar</code>, <code>.nav-indicator</code>). Под reduce — три статичные точки, глобальный reduce-блок их гасит.</li>
+      <li>Кнопка «Спросить» сохраняет <code>loading</code> + <code>aria-busy</code> — отклик есть на обоих уровнях.</li>
+    </ul>
+  </div>
+
+  <div class="spec">
+    <h2>3. Атрибуция: из каких данных собран ответ</h2>
+    <p class="why">Движок возвращает <code>sources: { label, href }[]</code> по интенту (единый маппинг в <code>assistantClient.ts</code> — лист-модуль без Prisma, общий для ядра и браузера):</p>
+    <ul class="why">
+      <li><code>DEBTS / STUDY_PLAN / AVERAGE / IMPROVE</code> → Успеваемость <code>/grades</code> + Расписание <code>/schedule</code> (план закрытия использует свободные окна);</li>
+      <li><code>SCHEDULE_TODAY / SCHEDULE_NEXT</code> → Расписание <code>/schedule</code>;</li>
+      <li><code>REQUESTS</code> → Заявки <code>/requests</code>; <code>NOTIFICATIONS</code> → Уведомления <code>/notifications</code>;</li>
+      <li><code>HELP / UNKNOWN</code> и заглушка гейта → источников НЕТ (ответ не построен на данных кабинета — врать нечем).</li>
+    </ul>
+    <ul class="why">
+      <li>Ссылки-чипы под ответом: <code>TEXT_LINK_SM_CLASS</code>-стиль (dotted underline) в <code>&lt;a&gt;</code> — Hit ≥ 24px (WCAG 2.5.8), <code>PRESS_FEEDBACK</code>, <code>FOCUS_RING</code>. Это и доверие («не выдумано»), и навигация в раздел.</li>
+      <li>LLM-путь наследует sources от детерминированного ответа: данные у них одни и те же.</li>
+    </ul>
+  </div>
+
+  <div class="spec">
+    <h2>4. Преподавательский чат — тот же класс, те же примитивы</h2>
+    <p class="why"><code>TeacherAssistantPanel</code> несёт ровно тот же дефект (последний обмен, карточка-спиннер). Общие примитивы выносим в <code>components/chat.tsx</code> (<code>ChatBubble</code>, <code>TypingIndicator</code>, <code>SourceLinks</code>) и применяем в обеих панелях — иначе следующий экран снова расходился бы. Цитаты-разделы плана остаются ВНУТРИ пузыръ ассистента (там они уже есть и уже аттрибуция).</p>
+  </div>
+
+  <div class="spec">
+    <h2>5. Границы волны (что НЕ делаем)</h2>
+    <ul class="why">
+      <li>Ноль новых зависимостей, ноль новых цветов, ноль новых размеров.</li>
+      <li>Никаких аватаров-картинок, звуков, автоскролла-скриптов (скролл к новому обмену — нативное поведение фокуса/живой области, не вешаем скрипт).</li>
+      <li>Посимвольная печать, «ИИ думает…» с задержкой — фейк, не делаем.</li>
+      <li>Пустые состояния «с характером через иконку» — следующая волна, сюда не тащим.</li>
+    </ul>
+  </div>
+
+</div>
+</body>
+</html>

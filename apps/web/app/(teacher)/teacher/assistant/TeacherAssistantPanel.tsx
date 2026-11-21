@@ -9,16 +9,33 @@
  * показывается в живой области (aria-live), поэтому скринридер
  * зачитывает его без перемещения фокуса.
  *
- * Состояния: пустое (нет планов — ведёт в «Мои планы»), «думает»,
- * ответ с цитатами, ошибка. Чипы примеров вопросов задают формулировки:
- * «Какие темы проходят в 3 модуле?», «Что по лабораторным?»,
- * «Где контрольные точки?».
+ * Волна 4 «оживления» (docs/design/ui-alive-wave-4.html): та же лента
+ * обменов, что и в кабинете студента (AssistantPanel) — общие примитивы
+ * ChatBubble/TypingIndicator из components/chat.tsx, иначе экраны снова
+ * расходились бы:
+ * - вопрос преподавателя появляется пузырём СИНХРОННО, до сети;
+ * - на месте будущего ответа — индикатор «печатает»; карточка-спиннер
+ *   «Думаем…» убрана (два индикатора на один ответ — шум);
+ * - follow-up чипы последнего ответа — под лентой, как у студента;
+ * - цитаты-разделы плана остаются ВНУТРИ пузыря ассистента: для
+ *   преподавателя это и есть атрибуция, ссылки-источники кабинета
+ *   студента ему не нужны;
+ * - живая область постоянна и содержит ТОЛЬКО последний ответ.
  */
-import { useState, type FormEvent } from 'react';
+import { Fragment, useState, type FormEvent } from 'react';
 import Link from 'next/link';
-import { ApiClientError, api } from '../../../../lib/api-client';
-import { Button, Card, EmptyState, ErrorState, LinkButton, Spinner, StatusBadge, TextInput } from '../../../../components/ui';
+import { ApiClientError, api, type TeacherAssistantCitation } from '../../../../lib/api-client';
+import {
+  Button,
+  Card,
+  EmptyState,
+  ErrorState,
+  LinkButton,
+  StatusBadge,
+  TextInput,
+} from '../../../../components/ui';
 import { PRESS_FEEDBACK, TEXT_LINK_SM_CLASS } from '../../../../lib/ui';
+import { ChatBubble, TypingIndicator } from '../../../../components/chat';
 import type { StudyPlanListItem } from '@udgu/core';
 
 const FOCUS_RING =
@@ -48,6 +65,95 @@ function Chip({
   );
 }
 
+// ---------------------------------------------------------------------------
+// Лента обменов (волна 4)
+// ---------------------------------------------------------------------------
+
+/**
+ * Обмен в ленте: вопрос преподавателя и ответ ассистента по его плану.
+ * answer === null — ответ ещё не пришёл (индикатор «печатает»), error —
+ * запрос упал (ошибка с повтором внутри пузыря ассистента).
+ */
+export interface Exchange {
+  readonly id: string;
+  readonly question: string;
+  readonly answer: string | null;
+  readonly mode: 'deterministic' | 'llm' | null;
+  readonly citations: readonly TeacherAssistantCitation[];
+  readonly error: string | null;
+}
+
+/** Счётчик идентификаторов обменов: уникален внутри жизни ленты. */
+let exchangeSeq = 0;
+
+/**
+ * Добавляет обмен в ленту (чистая функция — проверяется без DOM):
+ * вопрос виден сразу, ответ заполнится по id после сети. Лента
+ * накапливается: новый вопрос добавляет обмен, а не затирает ответ.
+ */
+export function appendExchange(
+  exchanges: readonly Exchange[],
+  question: string,
+): readonly Exchange[] {
+  exchangeSeq += 1;
+  return [
+    ...exchanges,
+    {
+      id: `exchange-${exchangeSeq}`,
+      question,
+      answer: null,
+      mode: null,
+      citations: [],
+      error: null,
+    },
+  ];
+}
+
+/**
+ * Пузырь ассистента одного обмена: бейдж режима (только когда ответ
+ * пришёл), ответ с цитатами-разделами плана, индикатор «печатает» или
+ * ошибка с повтором.
+ */
+export function TeacherAssistantBubble({
+  exchange,
+  onRetry,
+}: {
+  exchange: Exchange;
+  onRetry: () => void;
+}): React.JSX.Element {
+  return (
+    <ChatBubble
+      role="assistant"
+      badge={
+        exchange.mode === null ? undefined : (
+          <StatusBadge tone={exchange.mode === 'llm' ? 'info' : 'neutral'}>
+            {exchange.mode === 'llm' ? 'ИИ-режим' : 'По плану'}
+          </StatusBadge>
+        )
+      }
+    >
+      {exchange.answer !== null ? (
+        <>
+          {exchange.answer}
+          {exchange.citations.length === 0 ? null : (
+            <ul className="mt-3 space-y-1.5" data-testid="assistant-citations">
+              {exchange.citations.map((citation) => (
+                <li key={citation.section} className="text-xs text-text-muted">
+                  Раздел плана: {citation.section}
+                </li>
+              ))}
+            </ul>
+          )}
+        </>
+      ) : exchange.error === null ? (
+        <TypingIndicator />
+      ) : (
+        <ErrorState message={exchange.error} onRetry={onRetry} />
+      )}
+    </ChatBubble>
+  );
+}
+
 export function TeacherAssistantPanel({
   plans,
   suggestions,
@@ -57,37 +163,58 @@ export function TeacherAssistantPanel({
 }): React.JSX.Element {
   const [planId, setPlanId] = useState<string>(plans[0]?.id ?? '');
   const [question, setQuestion] = useState('');
-  const [asked, setAsked] = useState<string | null>(null);
-  const [answer, setAnswer] = useState<string | null>(null);
-  const [citations, setCitations] = useState<readonly { section: string; score: number }[]>([]);
-  const [mode, setMode] = useState<'deterministic' | 'llm' | null>(null);
-  const [pending, setPending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [exchanges, setExchanges] = useState<readonly Exchange[]>([]);
+  // Follow-up чипы последнего ответа (payload.suggestions): диалог
+  // продолжается без набора текста — как в кабинете студента.
+  const [followUps, setFollowUps] = useState<readonly string[]>([]);
+
+  // Запрос идёт, пока в ленте есть обмен без ответа и без ошибки.
+  const pending = exchanges.some((exchange) => exchange.answer === null && exchange.error === null);
+  const lastExchange = exchanges.at(-1) ?? null;
 
   async function ask(text: string): Promise<void> {
     const trimmed = text.trim();
     if (trimmed === '' || pending) {
       return;
     }
-    setPending(true);
-    setError(null);
-    setAsked(trimmed);
+    // Пузырь преподавателя — синхронно, до сети: отклик на отправку.
+    const next = appendExchange(exchanges, trimmed);
+    const created = next.at(-1);
+    if (created === undefined) {
+      return;
+    }
+    setExchanges(next);
+    // Follow-up чипы принадлежали прошлому ответу — новый вопрос их снимает.
+    setFollowUps([]);
     try {
       const payload = await api.askTeacherAssistant(trimmed, planId === '' ? undefined : planId);
-      setAnswer(payload.answer);
-      setCitations(payload.citations);
-      setMode(payload.mode);
-    } catch (askError) {
-      setAnswer(null);
-      setCitations([]);
-      setMode(null);
-      setError(
-        askError instanceof ApiClientError
-          ? askError.message
-          : 'Не удалось получить ответ. Попробуйте снова.',
+      setExchanges((current) =>
+        current.map((exchange) =>
+          exchange.id === created.id
+            ? {
+                ...exchange,
+                answer: payload.answer,
+                mode: payload.mode,
+                citations: payload.citations,
+              }
+            : exchange,
+        ),
       );
-    } finally {
-      setPending(false);
+      setFollowUps(payload.suggestions);
+    } catch (askError) {
+      setExchanges((current) =>
+        current.map((exchange) =>
+          exchange.id === created.id
+            ? {
+                ...exchange,
+                error:
+                  askError instanceof ApiClientError
+                    ? askError.message
+                    : 'Не удалось получить ответ. Попробуйте снова.',
+              }
+            : exchange,
+        ),
+      );
     }
   }
 
@@ -109,8 +236,6 @@ export function TeacherAssistantPanel({
       </div>
     );
   }
-
-  const hasAnswer = answer !== null;
 
   return (
     <div className="space-y-4">
@@ -151,58 +276,55 @@ export function TeacherAssistantPanel({
         </form>
       </Card>
 
-      {/* Пустое состояние: одна строка + готовые вопросы (BRIEF v4). */}
-      {hasAnswer === true || pending === true ? null : (
-        <EmptyState title="Спросите по плану" description="Темы модулей, лабораторные, контрольные точки." />
-      )}
-
-      {pending === true ? (
-        <Card>
-          <div className="flex items-center gap-2 text-sm text-text-muted">
-            <Spinner label="Думаем…" />
-            Думаем…
-          </div>
-        </Card>
-      ) : null}
-
-      {/* Ответ — живая область: меняется без перезагрузки страницы. */}
-      <div aria-live="polite" role="status" className="space-y-4">
-        {answer === null ? null : (
-          <Card>
-            <div className="flex flex-wrap items-center gap-2">
-              <p className="min-w-0 flex-1 text-sm text-text-muted">{asked}</p>
-              <StatusBadge tone={mode === 'llm' ? 'info' : 'neutral'}>
-                {mode === 'llm' ? 'ИИ-режим' : 'По плану'}
-              </StatusBadge>
-            </div>
-            <p className="mt-2 whitespace-pre-line text-sm text-text">{answer}</p>
-            {citations.length === 0 ? null : (
-              <ul className="mt-3 space-y-1.5" data-testid="assistant-citations">
-                {citations.map((citation) => (
-                  <li key={citation.section} className="text-xs text-text-muted">
-                    Раздел плана: {citation.section}
-                  </li>
+      {/* Пустое состояние и стартовые чипы — только пока лента пуста. */}
+      {exchanges.length === 0 ? (
+        <>
+          <EmptyState title="Спросите по плану" description="Темы модулей, лабораторные, контрольные точки." />
+          {suggestions.length === 0 ? null : (
+            <section aria-labelledby="teacher-assistant-starters">
+              <h2 id="teacher-assistant-starters" className="mb-2 text-base font-semibold text-text">
+                Попробуйте спросить
+              </h2>
+              <ul className="flex flex-wrap gap-2">
+                {suggestions.map((item) => (
+                  <Chip key={item} label={item} onPick={(label) => void ask(label)} disabled={pending} />
                 ))}
               </ul>
+            </section>
+          )}
+        </>
+      ) : null}
+
+      {/* Лента обменов: вопрос преподавателя сразу, ответ ассистента под ним. */}
+      <div className="thread space-y-4">
+        {exchanges.map((exchange, index) => (
+          <Fragment key={exchange.id}>
+            <ChatBubble role="student">{exchange.question}</ChatBubble>
+            {/* Ответ последнего обмена живёт в живой области ниже: история вне её. */}
+            {index === exchanges.length - 1 ? null : (
+              <TeacherAssistantBubble exchange={exchange} onRetry={() => void ask(exchange.question)} />
             )}
-          </Card>
-        )}
+          </Fragment>
+        ))}
 
-        {error === null ? null : <ErrorState message={error} onRetry={() => void ask(asked ?? '')} />}
-
-        {suggestions.length === 0 ? null : (
-          <section aria-labelledby="teacher-assistant-starters">
-            <h2 id="teacher-assistant-starters" className="mb-2 text-base font-semibold text-text">
-              Попробуйте спросить
-            </h2>
-            <ul className="flex flex-wrap gap-2">
-              {suggestions.map((item) => (
-                <Chip key={item} label={item} onPick={(label) => void ask(label)} disabled={pending} />
-              ))}
-            </ul>
-          </section>
-        )}
+        {/* Постоянная живая область: только последний ответ. Колонка флекс-
+            контейнера — иначе self-start пузыря не применится и ответ
+            растянется на всю ширину вместо обтекания содержимого. */}
+        <div aria-live="polite" role="status" className="flex flex-col space-y-4">
+          {lastExchange === null ? null : (
+            <TeacherAssistantBubble exchange={lastExchange} onRetry={() => void ask(lastExchange.question)} />
+          )}
+        </div>
       </div>
+
+      {/* Follow-up чипы — только под последним обменом (как у студента). */}
+      {followUps.length === 0 ? null : (
+        <ul className="flex flex-wrap gap-2">
+          {followUps.map((item) => (
+            <Chip key={item} label={item} onPick={(label) => void ask(label)} disabled={pending} />
+          ))}
+        </ul>
+      )}
 
       <p className="text-xs text-text-muted">
         Ответы строятся по вашим планам.{' '}

@@ -145,6 +145,36 @@
 }
 
 /*
+ * Волна 4 «оживления интерфейса» (docs/design/ui-alive-wave-4.html, §1–2):
+ * лента чата ассистента и индикатор «печатает».
+ *
+ * .thread — колонка флекс-контейнера: пузыри выравниваются внутри неё
+ * через self-start/self-end (компоненты ChatBubble в components/chat.tsx),
+ * а расстояния задаёт утилита space-y-4 на том же элементе.
+ *
+ * .typing-dot — точки индикатора (TypingIndicator): пульсация по
+ * очереди, задержка 150ms на точку. Смысл несёт sr-only текст внутри
+ * индикатора, точки — только движение. Анимация — только при
+ * prefers-reduced-motion: no-preference; при reduce три статичные точки
+ * (глобальный reduce-блок ниже гасит длительности), как у .bar и
+ * .nav-indicator выше.
+ */
+.thread { display: flex; flex-direction: column; }
+
+.typing-dot { width: 6px; height: 6px; border-radius: 9999px; background: var(--udgu-color-text-muted); }
+
+@keyframes udgu-typing {
+  0%, 60%, 100% { opacity: .35; transform: translateY(0); }
+  30% { opacity: 1; transform: translateY(-3px); }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .typing-dot { animation: udgu-typing 1s var(--udgu-motion-ease-out) infinite; }
+  .typing-dot:nth-child(2) { animation-delay: 150ms; }
+  .typing-dot:nth-child(3) { animation-delay: 300ms; }
+}
+
+/*
  * prefers-reduced-motion (WCAG 2.3.3, 2.2.2): пользователь просил не
  * двигать интерфейс — гасим ВСЕ анимации и переходы, включая
  * animate-pulse (скелетоны) и animate-spin (спиннеры кнопок).

@@ -422,6 +422,8 @@ export type {
 // Константы ассистента, пригодные для браузерного кода (без ядра и БД):
 // их импортируют подпутем @udgu/core/assistant.
 export { ASSISTANT_VERIFICATION_SUGGESTION } from './assistantClient';
+// Тип источника ответа — для веб-слоя (ссылки-источники в чате, волна 4).
+export type { AssistantSource } from './assistantClient';
 export type {
   AssistantAnswer,
   AssistantIntent,

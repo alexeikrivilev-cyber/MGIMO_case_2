@@ -10,8 +10,9 @@
  * - LLM опционален и включается ТОЛЬКО переменными окружения сервера
  *   (ASSISTANT_LLM_*): без ключа ответ всегда детерминированный, ошибка
  *   LLM не ломает ответ (фолбэк внутри askAssistant);
- * - ответ: { answer, intent, suggestions, mode } — mode сообщает, это
- *   ответ движка или LLM по его же данным.
+ * - ответ: { answer, intent, suggestions, mode, sources } — mode сообщает,
+ *   это ответ движка или LLM по его же данным, sources — из каких разделов
+ *   кабинета собран ответ (атрибуция в интерфейсе, волна 4).
  */
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
@@ -35,6 +36,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       intent: answer.intent,
       suggestions: answer.suggestions,
       mode: answer.mode,
+      sources: answer.sources,
     });
   } catch (error) {
     return coreErrorResponse(error);
