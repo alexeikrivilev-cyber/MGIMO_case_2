@@ -14,6 +14,7 @@ import { createMyRequest, getMyRequests } from '@udgu/core';
 import { requestCreateSchema } from '@/lib/validation';
 import { parseJsonBody } from '@/lib/http';
 import { coreErrorResponse, requireSession } from '@/lib/session';
+import { enforceSessionRateLimit } from '@/lib/rate-limit';
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
   try {
@@ -28,6 +29,11 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
     const session = await requireSession(request);
+    // Rate-limit кабинета: 30 заявок в минуту на сессию.
+    const limited = enforceSessionRateLimit(session, 'requests');
+    if (limited !== null) {
+      return limited;
+    }
     const input = await parseJsonBody(request, requestCreateSchema);
     const request_ = await createMyRequest(session, input);
     return NextResponse.json({ request: request_ }, { status: 201 });

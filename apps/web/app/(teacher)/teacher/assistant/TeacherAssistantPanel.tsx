@@ -128,7 +128,14 @@ export function TeacherAssistantBubble({
       badge={
         exchange.mode === null ? undefined : (
           <StatusBadge tone={exchange.mode === 'llm' ? 'info' : 'neutral'}>
-            {exchange.mode === 'llm' ? 'ИИ-режим' : 'По плану'}
+            {exchange.mode === 'llm'
+              ? 'ИИ-режим'
+              : // Цитаты есть → ответ по плану; cabinet-интенты (расписание,
+                // часы приёма, долги) отвечаются данными кабинета — бейдж
+                // «По плану» врал бы об источнике (волна 6, Improve).
+                exchange.citations.length > 0
+                ? 'По плану'
+                : 'По данным кабинета'}
           </StatusBadge>
         )
       }

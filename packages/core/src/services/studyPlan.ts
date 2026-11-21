@@ -15,7 +15,10 @@
  * Раньше они получали шаблонное «В плане не найдено ответа», хотя
  * расписание и часы приёма в кабинете есть. Поэтому интенты
  * TEACHER_SCHEDULE и OFFICE_HOURS проверяются ДО чтения плана: план
- * может отсутствовать вовсе — и это нормально.
+ * может отсутствовать вовсе — и это нормально. Но при ЗАГРУЖЕННОМ плане
+ * кабинетный интент срабатывает только на притяжательный вопрос
+ * (isScheduleQuestion/isOfficeHoursQuestion, POSSESSIVE_MARKERS): «что в
+ * плане про приём лабораторных» — вопрос про план, а не про часы приёма.
  *
  * Архитектура (решение Hermes, как у ассистента студента):
  * - детерминированный движок — основа: свой парсинг, свой индекс, свой
@@ -228,9 +231,21 @@ function hasAny(text: string, markers: readonly string[]): boolean {
   return markers.some((marker) => text.includes(marker));
 }
 
-/** Вопрос про часы приёма (проверяется ПЕРЕД расписанием). */
-function isOfficeHoursQuestion(text: string): boolean {
-  return hasAny(text, OFFICE_HOURS_MARKERS);
+/**
+ * Вопрос про часы приёма (проверяется ПЕРЕД расписанием).
+ *
+ * Та же защита, что у расписания (isScheduleQuestion): при загруженном
+ * плане вопрос должен быть притяжательным («мои часы», «когда у меня
+ * часы приёма»), иначе широкий маркер «прием» уводил бы в часы приёма
+ * вопрос про план («что в плане про приём лабораторных») — приоритетный
+ * дефект по ревью тимлида. Без плана отвечать нечем, и часы приёма —
+ * честный ответ кабинета.
+ */
+function isOfficeHoursQuestion(text: string, hasPlan: boolean): boolean {
+  if (!hasAny(text, OFFICE_HOURS_MARKERS)) {
+    return false;
+  }
+  return !hasPlan || hasAny(text, POSSESSIVE_MARKERS);
 }
 
 /**
@@ -1159,8 +1174,10 @@ export async function askStudyPlanAssistant(
   const planRef = plan === null ? null : { id: plan.id, title: plan.title };
 
   // 1. Часы приёма — ДО расписания: «когда у меня часы приёма» не должно
-  // уходить в пары.
-  if (isOfficeHoursQuestion(text)) {
+  // уходить в пары. С загруженным планом срабатывает только на
+  // притяжательный вопрос — иначе «что в плане про приём лабораторных»
+  // отвечалось бы часами приёма мимо плана.
+  if (isOfficeHoursQuestion(text, plan !== null)) {
     return {
       answer: renderOfficeHours(await getTeacherOfficeHours(teacherId)),
       mode: 'deterministic',

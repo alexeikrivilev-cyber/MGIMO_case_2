@@ -32,6 +32,7 @@ import {
 } from '@udgu/core';
 import { sickLeaveMultipartSchema } from '@/lib/validation';
 import { coreErrorResponse, requireSession } from '@/lib/session';
+import { enforceSessionRateLimit } from '@/lib/rate-limit';
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
   try {
@@ -46,6 +47,11 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
     const session = await requireSession(request);
+    // Rate-limit кабинета: 30 отметок о болезни в минуту на сессию.
+    const limited = enforceSessionRateLimit(session, 'sick-leave');
+    if (limited !== null) {
+      return limited;
+    }
 
     let form: FormData;
     try {
