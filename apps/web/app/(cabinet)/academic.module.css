@@ -1,8 +1,14 @@
-.board {
-  display: grid;
-  gap: 24px;
-}
-.board > header { margin-bottom: 0; }
+/*
+ * Волна 1 «оживления интерфейса»: дашборд — единственное место stagger'а
+ * в проекте. Сам класс .stagger-in и ключевые кадры udgu-rise живут в
+ * globals.css; сетка листа (grid + gap) — тоже там, рядом с хореографией:
+ * :global() в модуле css-loader не принимает («pure selectors must
+ * contain at least one local class or id»), а класс-то глобальный.
+ * Секции обязаны остаться ПРЯМЫМИ детьми обёртки: каскад задержек
+ * (.stagger-in > *:nth-child(n) в globals.css) доходит только до них —
+ * иначе stagger превращается в одно общее появление вместо раскрытия по
+ * секциям.
+ */
 .hero {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -14,6 +20,10 @@
   color: #ffffff;
 }
 .heroInfo { min-width: 0; }
+/* Приветствие по имени из профиля — первая строка героя (P1.4): экран
+   обращается к студенту, а не к «пользователю». Специфичность выше, чем
+   у `.hero p` ниже, иначе общий правила героя перебьют размер и цвет. */
+.hero .heroGreeting { margin: 0 0 10px; font-size: .9375rem; color: #d9dee7; }
 .heroLabel, .meeting, .sectionHead, .notice {
   display: flex;
   align-items: center;
@@ -22,7 +32,22 @@
 }
 .heroLabel { font-size: .875rem; font-weight: 600; }
 .heroLabel i { width: 8px; height: 8px; border-radius: 50%; background: #1677ff; }
-.heroLabel span { padding: 2px 8px; border: 1px solid #6b7280; border-radius: 4px; }
+/* Метка «когда» у ближайшей пары (волна 5): есть только на дашборде и
+   только у пары, до которой меньше суток, — в primary-тоне, а не серым.
+   Герой всегда тёмный (#111), а токен primary в светлой теме — #4f46e5:
+   на тёмном герое такой текст даёт 3.0:1 и не проходит AA (1.4.3).
+   Поэтому тон светлим к белому от того же токена: в светлой теме выходим
+   на ~6.5:1, в тёмной токен светлее — контраст ещё выше. Селектор
+   .heroLabel .when намеренно специфичнее утилиты text-primary, которую
+   чип несёт в разметке (требование сторожа разметки): класс в разметке
+   отвечает за «primary-тон», читаемость на тёмной поверхности — модуль. */
+.heroLabel .when {
+  padding: 2px 8px;
+  border: 1px solid color-mix(in oklab, var(--udgu-color-primary) 55%, #fff);
+  border-radius: 4px;
+  color: color-mix(in oklab, var(--udgu-color-primary) 55%, #fff);
+  font-weight: 650;
+}
 .hero h2 { font-size: clamp(1.8rem, 4vw, 3.5rem); font-weight: 600; letter-spacing: -.045em; line-height: 1.08; margin: 18px 0 16px; overflow-wrap: anywhere; }
 .meeting { gap: 4px 16px; font-size: 1rem; }
 .meeting strong { font-variant-numeric: tabular-nums; white-space: nowrap; }
@@ -39,6 +64,15 @@
 .sectionHead a, .notice a { font-size: .875rem; min-height: 44px; display: inline-flex; align-items: center; gap: 4px; font-weight: 600; }
 .sectionHead a:hover, .notice a:hover, .lineAction:hover { text-decoration: underline; text-underline-offset: 4px; }
 .empty { padding-block: 12px; font-size: .9375rem; color: var(--udgu-color-text-muted); }
+/* Свободные окна дня (решение Council, «освоенное время»): именованная
+   строка под рельсом — концепт назван словом, сами окна рельс уже несёт в
+   хронологической позиции. Дубля длительностей с рельсом нет: здесь
+   только заголовок и диапазоны. */
+.gaps { margin-top: 14px; border-top: 1px solid var(--udgu-color-border); padding-top: 12px; }
+.gaps h3 { font-size: .6875rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--udgu-color-text-muted); }
+.gaps ul { display: flex; flex-wrap: wrap; gap: 4px 20px; margin-top: 8px; }
+.gaps li { display: flex; align-items: baseline; gap: 6px; font-size: .875rem; font-variant-numeric: tabular-nums; }
+.gaps li span { font-size: .8125rem; color: var(--udgu-color-text-muted); }
 .list > li { padding: 12px 0; border-bottom: 1px solid var(--udgu-color-border); }
 .list > li:last-child { border-bottom: 0; }
 .list p, .notice p { font-size: .9rem; margin-top: 4px; color: var(--udgu-color-text-muted); }
@@ -55,6 +89,9 @@
 .weekStrip i { width: 5px; height: 5px; border-radius: 50%; }
 .weekStrip [data-lessons="true"] { background: currentColor; }
 .dayPanel { padding-top: 24px; }
+/* Невыбранные дни недели скрыты атрибутом hidden: display: none задаём
+   явно — правило модуля не должно зависеть от префлайта Tailwind. */
+.dayPanel[hidden] { display: none; }
 .dayPanel h2 { margin-bottom: 8px; }
 .score { display: inline-flex; align-items: center; gap: 8px; font-variant-numeric: tabular-nums; font-weight: 650; }
 .scoreMarks { display: flex; gap: 2px; align-items: flex-end; }
@@ -65,17 +102,24 @@
 .steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; margin: 16px 0; }
 .steps li { min-width: 0; }
 .steps i { display: block; height: 5px; border-radius: 3px; background: var(--udgu-color-border); }
-.steps [data-complete="true"] i, .steps [aria-current="step"] i { background: var(--udgu-color-primary); }
+.steps [data-complete="true"] i, .steps [data-current="true"] i { background: var(--udgu-color-primary); }
 .steps span { display: block; margin-top: 5px; font-size: .75rem; color: var(--udgu-color-text-muted); }
-.steps [aria-current="step"] span { font-weight: 700; color: var(--udgu-color-text); }
+/* aria-current сидит на подписи шага: подпись — единственный текст шага,
+   поэтому скринридер связывает «текущий шаг» с названием («Готова,
+   текущий шаг»), а не с декоративной точкой. */
+.steps [aria-current="step"] { font-weight: 700; color: var(--udgu-color-text); }
 .requestDetails { margin-top: 12px; }
 .requestList { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit,minmax(min(100%, 320px),1fr)); align-items: start; }
 .move { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 6px; font-size: .875rem; font-weight: 600; }
 .move del { color: var(--udgu-color-text-muted); }
-:where(.board,.sheet,.requestDetails) :focus-visible { outline: 2px solid var(--udgu-color-primary); outline-offset: 3px; }
+/* Кольцо фокуса для экранов на модуле (WCAG 2.4.7): Tailwind-утилита
+   focus-visible: в модуль не тащится, поэтому кольцо живёт здесь же —
+   токен primary, смещение как у базового правила ниже. Класс навешивается
+   на каждый интерактивный элемент модульного экрана явно. */
+.focus-visible:focus-visible { outline: 2px solid var(--udgu-color-primary); outline-offset: 3px; }
+:where(.sheet,.requestDetails) :focus-visible { outline: 2px solid var(--udgu-color-primary); outline-offset: 3px; }
 @media (max-width: 760px) {
   .columns { grid-template-columns: 1fr; gap: 16px; }
-  .board { gap: 16px; }
   .hero { gap: 12px; }
 }
 @media (max-width: 480px) {
@@ -87,7 +131,7 @@
 @keyframes fillStep { from { transform: scaleX(.25); opacity: .45; } }
 @media (prefers-reduced-motion: no-preference) {
   .dayPanel { animation: revealDay .22s ease-out; }
-  .steps [aria-current="step"] i { animation: fillStep .25s ease-out; transform-origin: left; }
+  .steps [data-current="true"] i { animation: fillStep .25s ease-out; transform-origin: left; }
   .list details[open] p, .requestDetails[open] dl { animation: revealDay .18s ease-out; }
 }
 @media (prefers-reduced-motion: reduce) {

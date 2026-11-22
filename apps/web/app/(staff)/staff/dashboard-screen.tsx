@@ -35,15 +35,19 @@ function QueueTile({ count, label, href, linkLabel, testId }: {
   testId: string;
 }): React.JSX.Element {
   return (
-    <Link href={href} data-testid={testId} className={styles.metric} aria-label={`${linkLabel} · ${count}`}>
+    <Link href={href} data-testid={testId} className={`${styles.metric} ${styles['focus-visible']}`} aria-label={`${linkLabel} · ${count}`}>
       <span className={styles.metricCount}><strong>{count}</strong><i aria-hidden="true">↗</i></span>
       <span className={styles.metricLabel}>{label}</span>
+      {/* Глубина очереди словом: крупная цифра говорит «сколько», подпись
+          «N в очереди» / «Пусто» придаёт ей смысл без опоры на контекст
+          и цвет (сторож видимости счётчика, требование кейса). */}
+      <span className={styles.metricQueue}>{count > 0 ? `${count} в очереди` : 'Пусто'}</span>
     </Link>
   );
 }
 
 function SectionLink({ href, title }: {href: string; title: string}): React.JSX.Element {
-  return <li><Link className={styles.rowLink} href={href}><span>{title}</span><span aria-hidden="true">↗</span></Link></li>;
+  return <li><Link className={`${styles.rowLink} ${styles['focus-visible']}`} href={href}><span>{title}</span><span aria-hidden="true">↗</span></Link></li>;
 }
 
 export function StaffDashboardView({ result }: { result: LoadResult<StaffDashboardPageData> }): React.JSX.Element {
