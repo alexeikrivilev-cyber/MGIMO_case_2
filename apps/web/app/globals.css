@@ -85,6 +85,17 @@
   to { opacity: 1; transform: none; filter: blur(0); }
 }
 
+/* Сетка листа дашборда: обёртка .stagger-in — grid с зазором 24px, чтобы
+   секции раскрывались каскадом, а не слипались (дизайн-коммит владельца,
+   бывший .board). Правила живут здесь, а не в academic.module.css: класс
+   глобальный, а css-loader в модуле не принимает :global() как чистый
+   селектор. Шапка не добавляет своего margin — зазор даёт сетка. */
+.stagger-in { display: grid; gap: 24px; }
+.stagger-in > header { margin-bottom: 0; }
+@media (max-width: 760px) {
+  .stagger-in { gap: 16px; }
+}
+
 @media (prefers-reduced-motion: no-preference) {
   .stagger-in > * { animation: udgu-rise var(--udgu-motion-duration-slow) var(--udgu-motion-ease-out) both; }
   .stagger-in > *:nth-child(2) { animation-delay: 80ms; }

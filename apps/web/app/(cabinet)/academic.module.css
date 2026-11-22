@@ -1,14 +1,14 @@
 /*
  * Волна 1 «оживления интерфейса»: дашборд — единственное место stagger'а
  * в проекте. Сам класс .stagger-in и ключевые кадры udgu-rise живут в
- * globals.css; сетка листа добавлена здесь, рядом с остальным оформлением
- * экрана. Секции обязаны остаться ПРЯМЫМИ детьми обёртки: каскад задержек
+ * globals.css; сетка листа (grid + gap) — тоже там, рядом с хореографией:
+ * :global() в модуле css-loader не принимает («pure selectors must
+ * contain at least one local class or id»), а класс-то глобальный.
+ * Секции обязаны остаться ПРЯМЫМИ детьми обёртки: каскад задержек
  * (.stagger-in > *:nth-child(n) в globals.css) доходит только до них —
  * иначе stagger превращается в одно общее появление вместо раскрытия по
  * секциям.
  */
-:global(.stagger-in) { display: grid; gap: 24px; }
-:global(.stagger-in) > header { margin-bottom: 0; }
 .hero {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -120,7 +120,6 @@
 :where(.sheet,.requestDetails) :focus-visible { outline: 2px solid var(--udgu-color-primary); outline-offset: 3px; }
 @media (max-width: 760px) {
   .columns { grid-template-columns: 1fr; gap: 16px; }
-  :global(.stagger-in) { gap: 16px; }
   .hero { gap: 12px; }
 }
 @media (max-width: 480px) {
