@@ -733,6 +733,12 @@ function startOfDay(date: Date): Date {
   return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
 }
 
+/** Понедельник недели, к которой принадлежит дата (0 — понедельник). */
+function startOfWeek(date: Date): Date {
+  const weekday = (date.getUTCDay() + 6) % 7;
+  return addDays(startOfDay(date), -weekday);
+}
+
 function addDays(date: Date, days: number): Date {
   const next = new Date(date);
   next.setUTCDate(next.getUTCDate() + days);
@@ -979,6 +985,11 @@ export async function buildSeedData(options: BuildSeedDataOptions = {}): Promise
   const rng = mulberry32(20261117);
   const now = startOfDay(options.now ?? new Date());
   const scheduleEnd = addDays(now, SCHEDULE_HORIZON_DAYS);
+  const scheduleStart = startOfWeek(now);
+  // Расписание начинается с ПОНЕДЕЛЬНИКА текущей недели: экран «Неделя»
+  // показывает занятия и тогда, когда сидер запущен в выходной день
+  // (red 22.11: сид в воскресенье оставлял текущую неделю пустой — экран
+  // открывался на неделе «16 ноября» без единой пары).
 
   const passwordHash = await argon2Hash(TEST_PASSWORD, {
     type: 2, // argon2id
@@ -1129,8 +1140,9 @@ export async function buildSeedData(options: BuildSeedDataOptions = {}): Promise
 
     // dayOffset 0 — сегодняшний день: экран «Сегодня» показывает реальные
     // пары, а не пустое состояние.
-    for (let dayOffset = 0; dayOffset < SCHEDULE_HORIZON_DAYS; dayOffset += 1) {
-      const date = addDays(now, dayOffset);
+    for (let dayOffset = 0; ; dayOffset += 1) {
+      const date = addDays(scheduleStart, dayOffset);
+      if (date.getTime() > scheduleEnd.getTime()) break;
       if (!isWeekday(date)) continue;
 
       const pairsCount = rng() < 0.5 ? 5 : 6;

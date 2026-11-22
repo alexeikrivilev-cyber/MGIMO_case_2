@@ -40,7 +40,7 @@ const today = startOfDay(new Date());
 const todayKey = today.toISOString().slice(0, 10);
 // Расписание покрывает две недели, НАЧИНАЯ С СЕГОДНЯ: экран «Сегодня»
 // показывает реальные пары, а не пустое состояние.
-const windowStart = today;
+const windowStart = addDays(today, -((today.getUTCDay() + 6) % 7)); // понедельник текущей недели
 const windowEnd = addDays(today, SCHEDULE_HORIZON_DAYS);
 const windowStartKey = windowStart.toISOString().slice(0, 10);
 const windowEndKey = windowEnd.toISOString().slice(0, 10);

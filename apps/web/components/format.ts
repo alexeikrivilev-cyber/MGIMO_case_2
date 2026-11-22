@@ -63,11 +63,17 @@ export function formatDateRange(from: Date, to: Date): string {
   return `${formatDateWithYear(from)} — ${formatDateWithYear(to)}`;
 }
 
-/** «17 ноября, 14:05» — для момента события (локальное время). */
+/**
+ * «17 ноября, 14:05» — для момента события (локальное время).
+ * Значения датной гранулярности (00:00) показываются без времени:
+ «16 ноября, 00:00» выглядело как баг времени.
+ */
 export function formatMoment(date: Date): string {
-  const hours = String(date.getHours()).padStart(2, '0');
-  const minutes = String(date.getMinutes()).padStart(2, '0');
-  return `${date.getDate()} ${MONTHS_GENITIVE[date.getMonth()] ?? ''}, ${hours}:${minutes}`;
+  const day = `${date.getDate()} ${MONTHS_GENITIVE[date.getMonth()] ?? ''}`;
+  const hours = date.getHours();
+  const minutes = date.getMinutes();
+  if (hours === 0 && minutes === 0) return day;
+  return `${day}, ${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
 }
 
 /** Длительность в минутах → «1 ч 20 мин» / «45 мин». */
