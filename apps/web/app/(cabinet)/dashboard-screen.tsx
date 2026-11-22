@@ -75,7 +75,7 @@ export function DashboardView({ result, now = new Date() }: {result: LoadResult<
     // /schedule несёт свои маркеры (волна 2), а дубля метки на нём нет.
     const timing = lesson ? lessonMoment(now, dateKey(lesson.effectiveDate), lesson.startTime, lesson.endTime) : null;
     const requests = [...data.activeRequests].sort((a, b) => Number(requestTurnLabel(b.status) === 'Ваш ход') - Number(requestTurnLabel(a.status) === 'Ваш ход'));
-    return <div className={`${styles.board} stagger-in`}>
+    return <div className="stagger-in">
       <PageHeader title="Сегодня" subtitle={`${profile.groupName} · ${formatDate(new Date(data.date + 'T00:00:00Z'))}`} />
       <section className={styles.hero} aria-label="Ближайшая пара">
         <div className={styles.heroInfo}>

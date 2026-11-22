@@ -1,8 +1,14 @@
-.board {
-  display: grid;
-  gap: 24px;
-}
-.board > header { margin-bottom: 0; }
+/*
+ * Волна 1 «оживления интерфейса»: дашборд — единственное место stagger'а
+ * в проекте. Сам класс .stagger-in и ключевые кадры udgu-rise живут в
+ * globals.css; сетка листа добавлена здесь, рядом с остальным оформлением
+ * экрана. Секции обязаны остаться ПРЯМЫМИ детьми обёртки: каскад задержек
+ * (.stagger-in > *:nth-child(n) в globals.css) доходит только до них —
+ * иначе stagger превращается в одно общее появление вместо раскрытия по
+ * секциям.
+ */
+:global(.stagger-in) { display: grid; gap: 24px; }
+:global(.stagger-in) > header { margin-bottom: 0; }
 .hero {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -27,8 +33,21 @@
 .heroLabel { font-size: .875rem; font-weight: 600; }
 .heroLabel i { width: 8px; height: 8px; border-radius: 50%; background: #1677ff; }
 /* Метка «когда» у ближайшей пары (волна 5): есть только на дашборде и
-   только у пары, до которой меньше суток, — в primary-тоне, а не серым. */
-.when { padding: 2px 8px; border: 1px solid var(--udgu-color-primary); border-radius: 4px; color: var(--udgu-color-primary); font-weight: 650; }
+   только у пары, до которой меньше суток, — в primary-тоне, а не серым.
+   Герой всегда тёмный (#111), а токен primary в светлой теме — #4f46e5:
+   на тёмном герое такой текст даёт 3.0:1 и не проходит AA (1.4.3).
+   Поэтому тон светлим к белому от того же токена: в светлой теме выходим
+   на ~6.5:1, в тёмной токен светлее — контраст ещё выше. Селектор
+   .heroLabel .when намеренно специфичнее утилиты text-primary, которую
+   чип несёт в разметке (требование сторожа разметки): класс в разметке
+   отвечает за «primary-тон», читаемость на тёмной поверхности — модуль. */
+.heroLabel .when {
+  padding: 2px 8px;
+  border: 1px solid color-mix(in oklab, var(--udgu-color-primary) 55%, #fff);
+  border-radius: 4px;
+  color: color-mix(in oklab, var(--udgu-color-primary) 55%, #fff);
+  font-weight: 650;
+}
 .hero h2 { font-size: clamp(1.8rem, 4vw, 3.5rem); font-weight: 600; letter-spacing: -.045em; line-height: 1.08; margin: 18px 0 16px; overflow-wrap: anywhere; }
 .meeting { gap: 4px 16px; font-size: 1rem; }
 .meeting strong { font-variant-numeric: tabular-nums; white-space: nowrap; }
@@ -70,6 +89,9 @@
 .weekStrip i { width: 5px; height: 5px; border-radius: 50%; }
 .weekStrip [data-lessons="true"] { background: currentColor; }
 .dayPanel { padding-top: 24px; }
+/* Невыбранные дни недели скрыты атрибутом hidden: display: none задаём
+   явно — правило модуля не должно зависеть от префлайта Tailwind. */
+.dayPanel[hidden] { display: none; }
 .dayPanel h2 { margin-bottom: 8px; }
 .score { display: inline-flex; align-items: center; gap: 8px; font-variant-numeric: tabular-nums; font-weight: 650; }
 .scoreMarks { display: flex; gap: 2px; align-items: flex-end; }
@@ -95,10 +117,10 @@
    токен primary, смещение как у базового правила ниже. Класс навешивается
    на каждый интерактивный элемент модульного экрана явно. */
 .focus-visible:focus-visible { outline: 2px solid var(--udgu-color-primary); outline-offset: 3px; }
-:where(.board,.sheet,.requestDetails) :focus-visible { outline: 2px solid var(--udgu-color-primary); outline-offset: 3px; }
+:where(.sheet,.requestDetails) :focus-visible { outline: 2px solid var(--udgu-color-primary); outline-offset: 3px; }
 @media (max-width: 760px) {
   .columns { grid-template-columns: 1fr; gap: 16px; }
-  .board { gap: 16px; }
+  :global(.stagger-in) { gap: 16px; }
   .hero { gap: 12px; }
 }
 @media (max-width: 480px) {
