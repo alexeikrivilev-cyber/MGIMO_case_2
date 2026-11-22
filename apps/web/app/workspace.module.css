@@ -25,6 +25,15 @@
   outline: 2px solid var(--udgu-color-primary);
   outline-offset: -3px;
 }
+/* Кольцо фокуса для экранов на этом модуле (WCAG 2.4.7): Tailwind-утилита
+   focus-visible: в модульную вёрстку не тащится, поэтому кольцо живёт в
+   модуле — с тем же внутренним смещением (-3px), что и у плиток выше:
+   рамка workload имеет зазор 1px, и внешнее кольцо срезалось бы. Класс
+   навешивается на каждый интерактивный элемент экрана явно. */
+.focus-visible:focus-visible {
+  outline: 2px solid var(--udgu-color-primary);
+  outline-offset: -3px;
+}
 .metricCount {
   display: flex;
   width: 100%;
@@ -41,6 +50,10 @@
 .metricCount i { color: var(--udgu-color-primary); font-size: 1.25rem; font-style: normal; }
 .metric:first-child strong {color: var(--udgu-color-primary)}
 .metricLabel {font-size: .875rem; font-weight: 600}
+/* Глубина очереди словом под именем раздела: счётчик плитки получает
+   смысл без контекста («1 в очереди» / «Пусто»). Мuted-тон второй
+   строки — иерархия: цифра главная, подпись поясняет. */
+.metricQueue {font-size: .8125rem; color: var(--udgu-color-text-muted)}
 .shortcuts {display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,15rem),1fr));gap:.5rem}
 .rowLink {display:flex;align-items:center;justify-content:space-between;min-height:3rem;gap:1rem;padding:.5rem 1rem;border-bottom:1px solid var(--udgu-color-border);color:var(--udgu-color-text)}
 .rowLink span:last-child {color:var(--udgu-color-primary)}

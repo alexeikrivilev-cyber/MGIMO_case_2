@@ -48,7 +48,7 @@ function ConversationRow({
       <Link
         href={`/messages?conversation=${encodeURIComponent(conversation.id)}`}
         aria-current={active ? 'page' : undefined}
-        className={styles.conversation}
+        className={`${styles.conversation} ${styles['focus-visible']}`}
       >
         <span aria-hidden="true" className={styles.initials}>{conversation.peer.fullName.trim().split(/\s+/).slice(0, 2).map((word) => word[0]).join('')}</span>
         <span className="min-w-0 flex-1">
