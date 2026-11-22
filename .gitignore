@@ -27,3 +27,13 @@ storage/study-plans/*
 !storage/study-plans/.gitkeep
 
 packages/db/src/generated/
+
+# Рабочий мусор агентов и инструментов — организаторам не нужен
+memory/
+.scratch/
+.idea/
+.vscode/
+*.local
+playwright-report/
+test-results/
+docs/process-*.log
