@@ -81,7 +81,7 @@ export function DashboardView({ result, now = new Date() }: {result: LoadResult<
         <div className={styles.heroInfo}>
           <p className={styles.heroGreeting}>{greeting(now)}, {profile.firstName}!</p>
           {lesson ? <>
-            <div className={styles.heroLabel}><i aria-hidden="true"/>Ближайшая пара {timing && timing.kind !== 'FAR' && <span className={styles.when}>{timing.label}</span>}</div>
+            <div className={styles.heroLabel}><i aria-hidden="true"/>Ближайшая пара {timing && timing.kind !== 'FAR' && <span className={`${styles.when} text-primary`}>{timing.label}</span>}</div>
             <h2>{lesson.subjectName}</h2>
             <div className={styles.meeting}><strong>{lesson.startTime}–{lesson.endTime}</strong><span>{formatDayLabel(lesson.effectiveDate)}</span><span>{lesson.effectiveRoom}</span></div>
             <p>{lesson.typeLabel} · {lesson.teacherName}</p>
