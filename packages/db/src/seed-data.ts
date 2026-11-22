@@ -1285,16 +1285,48 @@ export async function buildSeedData(options: BuildSeedDataOptions = {}): Promise
   }
 
   // У student1 — один незачёт (долг) во 2-м семестре, для наглядности.
+  // Долг ОБЯЗАН быть дисциплиной teacher1: учебный план строится из его
+  // расписания, и ассистент сопоставляет долги со разделами плана по
+  // названию предмета. На части стартовых дней (воскресенье 22.11 — red)
+  // «первый зачёт» студента выпадал на предмет вне расписания teacher1,
+  // и инвариант «долг покрыт разделом плана» падал. Поэтому: сначала
+  // ищем зачёт по дисциплине преподавателя, иначе обмениваем предмет
+  // зачёта с оценкой по дисциплине преподавателя — количество оценок,
+  // их типы и уникальность ключей (студент|предмет|семестр|тип) целы.
   const student1 = students[0];
   if (student1) {
-    const debt = grades.find(
-      (grade) =>
-        grade.studentLogin === student1.login &&
-        grade.semester === 2 &&
-        grade.type === 'CREDIT' &&
-        grade.passed === true,
+    const teacherSubjects = new Set(
+      scheduleEntries
+        .filter((entry) => entry.teacherLogin === 'teacher1')
+        .map((entry) => entry.subjectCode),
     );
-    if (debt) {
+    const isCredit = (grade: GradeSeed): boolean =>
+      grade.studentLogin === student1.login &&
+      grade.semester === 2 &&
+      grade.type === 'CREDIT' &&
+      grade.passed === true;
+    let debt = grades.find((grade) => isCredit(grade) && teacherSubjects.has(grade.subjectCode));
+    if (debt === undefined) {
+      debt = grades.find(isCredit);
+      if (debt !== undefined && !teacherSubjects.has(debt.subjectCode)) {
+        const swap = grades.find(
+          (grade) =>
+            grade.studentLogin === student1.login &&
+            grade.semester === 2 &&
+            grade.type !== 'CREDIT' &&
+            teacherSubjects.has(grade.subjectCode),
+        );
+        if (swap !== undefined) {
+          const debtIndex = grades.indexOf(debt);
+          const swapIndex = grades.indexOf(swap);
+          const debtSubject = debt.subjectCode;
+          grades[debtIndex] = { ...debt, subjectCode: swap.subjectCode };
+          grades[swapIndex] = { ...swap, subjectCode: debtSubject };
+          debt = grades[debtIndex];
+        }
+      }
+    }
+    if (debt !== undefined) {
       const index = grades.indexOf(debt);
       grades[index] = { ...debt, passed: false };
     }
