@@ -15,6 +15,7 @@
  * данные снова приходят из packages/core, клиент их не дублирует.
  */
 import { useId, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
+import styles from '../../../workspace.module.css';
 import { useRouter } from 'next/navigation';
 import { ApiClientError, api, validateStudyPlanFile } from '../../../../lib/api-client';
 import { Button, Card, EmptyState, TextInput } from '../../../../components/ui';
@@ -74,7 +75,7 @@ function StudyPlanForm({
       <form className="mt-4 space-y-4" onSubmit={handleSubmit} noValidate>
         <TextInput
           label="Название плана"
-          hint="Например: Основы программирования, осенний семестр."
+          placeholder="Основы программирования"
           value={title}
           maxLength={120}
           disabled={pending}
@@ -86,7 +87,7 @@ function StudyPlanForm({
             Файл плана
           </label>
           <p className="text-xs text-text-muted">
-            Markdown или текст, до 1 МБ. Ассистент отвечает по разделам этого файла.
+            Markdown или текст · до 1 МБ
           </p>
           <input
             id={fileInputId}
@@ -129,13 +130,15 @@ function StudyPlanRow({
   const [confirming, setConfirming] = useState(false);
 
   return (
-    <li>
-      <Card>
-        <div className="flex flex-wrap items-center gap-2">
-          <p className="min-w-0 flex-1 text-sm font-medium text-text">{plan.title}</p>
-          <p className="text-xs text-text-muted">
-            {formatMoment(new Date(plan.uploadedAt))} · {formatFileSize(plan.sizeBytes)}
-          </p>
+    <li className={styles.fileRow}>
+        <div className={styles.person}>
+          <span className={styles.initials} aria-hidden="true"><IconRequests /></span>
+          <div className={styles.fileInfo}>
+            <p className="text-sm font-semibold text-text">{plan.title}</p>
+            <p className={styles.recordMeta}>
+              {formatMoment(new Date(plan.uploadedAt))} · {formatFileSize(plan.sizeBytes)}
+            </p>
+          </div>
         </div>
         <div className="mt-2 flex items-center gap-2">
           {confirming ? (
@@ -153,7 +156,6 @@ function StudyPlanRow({
             </Button>
           )}
         </div>
-      </Card>
     </li>
   );
 }
@@ -164,11 +166,17 @@ export function StudyPlanManager({ plans }: { plans: readonly StudyPlanListItem[
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  const [notice, setNotice] = useState('');
+  const [formVersion, setFormVersion] = useState(0);
+
   async function upload(title: string, file: File): Promise<void> {
     setPending(true);
     setError(null);
+    setNotice('');
     try {
       await api.uploadTeacherStudyPlan(title, file);
+      setNotice('План загружен.');
+      setFormVersion((version) => version + 1);
       router.refresh();
     } catch (uploadError) {
       setError(
@@ -176,6 +184,7 @@ export function StudyPlanManager({ plans }: { plans: readonly StudyPlanListItem[
           ? uploadError.message
           : 'Не удалось загрузить план. Попробуйте снова.',
       );
+    } finally {
       setPending(false);
     }
   }
@@ -183,8 +192,10 @@ export function StudyPlanManager({ plans }: { plans: readonly StudyPlanListItem[
   async function remove(id: string): Promise<void> {
     setDeletingId(id);
     setError(null);
+    setNotice('');
     try {
       await api.deleteTeacherStudyPlan(id);
+      setNotice('План удалён.');
       router.refresh();
     } catch (deleteError) {
       setError(
@@ -192,13 +203,14 @@ export function StudyPlanManager({ plans }: { plans: readonly StudyPlanListItem[
           ? deleteError.message
           : 'Не удалось удалить план. Попробуйте снова.',
       );
+    } finally {
       setDeletingId(null);
     }
   }
 
   return (
     <div className="space-y-4">
-      <StudyPlanForm pending={pending} onUpload={(title, file) => void upload(title, file)} />
+      {notice ? <p role="status" className="rounded-md bg-success-soft p-3 text-sm text-success">{notice}</p> : null}
 
       {/* Ошибка действия — role=alert: живая область зачитывается скринридером. */}
       <div role="alert">
@@ -207,9 +219,10 @@ export function StudyPlanManager({ plans }: { plans: readonly StudyPlanListItem[
         )}
       </div>
 
-      <section aria-labelledby="plans-list">
+      <div className={styles.library}>
+      <section aria-labelledby="plans-list" className="rounded-lg border border-border bg-surface p-4">
         <h2 id="plans-list" className="mb-2 text-base font-semibold text-text">
-          Загруженные планы
+          Загруженные планы <span className="text-text-muted">· {plans.length}</span>
         </h2>
         {plans.length === 0 ? (
           <EmptyState
@@ -230,6 +243,8 @@ export function StudyPlanManager({ plans }: { plans: readonly StudyPlanListItem[
           </ul>
         )}
       </section>
+      <StudyPlanForm key={formVersion} pending={pending} onUpload={(title, file) => void upload(title, file)} />
+      </div>
     </div>
   );
 }

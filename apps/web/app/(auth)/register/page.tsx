@@ -19,6 +19,7 @@
  * сообщение и «Начать заново»; 409 (логин занят) — ошибка у поля
  * логина, форма остаётся редактируемой.
  */
+import styles from '../access.module.css';
 import { Suspense, useState, type FormEvent } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { ApiClientError, api, type OAuthProviderPath } from '../../../lib/api-client';
@@ -90,7 +91,7 @@ function RegisterForm(): React.JSX.Element {
 
   if (linkBroken !== null) {
     return (
-      <Card>
+      <Card className={styles.formPanel}>
         <h1 className="text-2xl font-semibold tracking-tight text-text">Регистрация</h1>
         <div className="mt-4">
           <ErrorState message={linkBroken} onRetry={() => window.location.assign('/login')} retryLabel="Начать заново" />
@@ -100,10 +101,10 @@ function RegisterForm(): React.JSX.Element {
   }
 
   return (
-    <Card>
+    <Card className={styles.formPanel}>
       <h1 className="text-2xl font-semibold tracking-tight text-text">Регистрация</h1>
       <p className="mt-1 text-sm text-text-muted">
-        {`Вход через ${OAUTH_PROVIDER_LABELS[provider]} (эмуляция согласия)`}
+        {`Демо-вход через ${OAUTH_PROVIDER_LABELS[provider]}`}
       </p>
 
       <form className="mt-6 space-y-4" onSubmit={handleSubmit} noValidate>
@@ -135,12 +136,12 @@ function RegisterForm(): React.JSX.Element {
         />
 
         <TextInput
-          label="Логин учётной записи университета"
+          label="Логин (по желанию)"
           name="login"
           type="text"
           autoComplete="username"
           disabled={pending}
-          hint="Если оставить пустым, логин создастся автоматически."
+          hint="Можно оставить пустым."
           error={loginError}
           value={login}
           onChange={(event) => setLogin(event.target.value)}
@@ -177,8 +178,7 @@ function RegisterForm(): React.JSX.Element {
       </div>
 
       <p className="mt-4 text-xs text-text-muted">
-        Прототип: согласие провайдера эмулируется. Оценки и переписка откроются после верификации
-        студбилета.
+        Для доступа к оценкам и переписке потребуется подтвердить студбилет.
       </p>
     </Card>
   );
@@ -189,7 +189,7 @@ export default function RegisterPage(): React.JSX.Element {
   return (
     <Suspense
       fallback={
-        <Card>
+        <Card className={styles.formPanel}>
           <Skeleton className="h-8 w-40" label="Загрузка формы регистрации…" />
           <Skeleton className="mt-4 h-11 w-full" />
           <Skeleton className="mt-3 h-11 w-full" />
@@ -201,3 +201,4 @@ export default function RegisterPage(): React.JSX.Element {
     </Suspense>
   );
 }
+

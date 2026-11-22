@@ -21,7 +21,7 @@ import { PageHeader } from '../../../components/PageHeader';
 import { PageResult } from '../../../components/PageStates';
 import { formatMoment } from '../../../components/format';
 import { IconChat } from '../../../components/icons';
-import { FOCUS_RING, PRESS_FEEDBACK } from '../../../lib/ui';
+import styles from '../../workspace.module.css';
 import {
   loadMessagesPageData,
   type LoadResult,
@@ -48,10 +48,9 @@ function ConversationRow({
       <Link
         href={`/messages?conversation=${encodeURIComponent(conversation.id)}`}
         aria-current={active ? 'page' : undefined}
-        className={`flex min-h-11 items-center gap-3 rounded-xl border bg-surface px-4 py-3 shadow-sm ${PRESS_FEEDBACK} hover:bg-surface-2 ${FOCUS_RING} ${
-          active ? 'border-primary/50' : 'border-border'
-        }`}
+        className={styles.conversation}
       >
+        <span aria-hidden="true" className={styles.initials}>{conversation.peer.fullName.trim().split(/\s+/).slice(0, 2).map((word) => word[0]).join('')}</span>
         <span className="min-w-0 flex-1">
           <span className="flex flex-wrap items-center gap-2">
             <span className="text-sm font-medium text-text">{conversation.peer.fullName}</span>
@@ -82,7 +81,7 @@ function ConversationPanel({
   mode: 'student' | 'teacher';
 }): React.JSX.Element {
   return (
-    <Card className="mt-4" data-testid="conversation-panel">
+    <Card data-testid="conversation-panel">
       <div className="flex flex-wrap items-center gap-2">
         <h2 className="min-w-0 flex-1 text-sm font-semibold text-text">{detail.peer.fullName}</h2>
         {detail.peer.groupName === null ? null : (
@@ -105,13 +104,12 @@ function ConversationPanel({
       {detail.messages.length === 0 ? (
         <p className="mt-3 text-sm text-text-muted">Сообщений пока нет. Напишите первое.</p>
       ) : (
-        <ul className="mt-3 space-y-2" data-testid="conversation-messages">
+        <ul className={styles.bubbles} data-testid="conversation-messages">
           {detail.messages.map((message) => (
             <li
               key={message.id}
-              className={`rounded-md px-3 py-2 text-sm ${
-                message.mine ? 'ml-8 bg-primary-soft text-text' : 'mr-8 bg-surface-2 text-text'
-              }`}
+              className="text-sm"
+              data-mine={message.mine}
             >
               <span className="block text-xs text-text-muted">
                 {message.mine ? 'Вы' : detail.peer.fullName} · {formatMoment(new Date(message.createdAt))}
@@ -123,7 +121,7 @@ function ConversationPanel({
         </ul>
       )}
 
-      <MessageComposer conversationId={detail.id} peerName={detail.peer.fullName} />
+      <MessageComposer key={detail.id} conversationId={detail.id} peerName={detail.peer.fullName} />
     </Card>
   );
 }
@@ -165,16 +163,15 @@ export function MessagesView({ result }: { result: LoadResult<MessagesPageData> 
               subtitle={isStudent ? 'Диалоги с преподавателями' : 'Диалоги со студентами'}
             />
 
+            <div className={styles.inbox}>
+            <div>
             {isStudent ? (
-              <Card className="mb-4">
-                <h2 className="text-sm font-semibold text-text">Написать преподавателю</h2>
-                <p className="mt-1 text-xs text-text-muted">
-                  Выберите преподавателя — откроется диалог с историей переписки.
-                </p>
+              <details className={styles.disclosure}>
+                <summary>Написать преподавателю</summary>
                 <div className="mt-3">
                   <NewConversationForm teachers={data.teachers} />
                 </div>
-              </Card>
+              </details>
             ) : null}
 
             <section aria-labelledby="messages-list">
@@ -196,7 +193,8 @@ export function MessagesView({ result }: { result: LoadResult<MessagesPageData> 
                 </ul>
               )}
             </section>
-
+            </div>
+            <div>
             {activeError === null ? null : (
               <Card className="mt-4" data-testid="conversation-error">
                 <h2 className="text-base font-semibold text-text">Диалог недоступен</h2>
@@ -206,7 +204,9 @@ export function MessagesView({ result }: { result: LoadResult<MessagesPageData> 
               </Card>
             )}
 
-            {active === null ? null : <ConversationPanel detail={active} mode={data.mode} />}
+            {active !== null ? <ConversationPanel detail={active} mode={data.mode} /> : activeError === null && data.conversations.length > 0 ? <EmptyState title="Выберите диалог" icon={<IconChat />} /> : null}
+            </div>
+            </div>
           </>
         );
       }}

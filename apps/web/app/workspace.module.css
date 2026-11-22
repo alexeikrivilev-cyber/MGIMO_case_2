@@ -1,0 +1,82 @@
+/* The deanery queue, plan library and conversations share the same document rows. */
+.workload {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 11rem), 1fr));
+  gap: 1px;
+  overflow: hidden;
+  border: 1px solid var(--udgu-color-border);
+  border-radius: 8px;
+  background: var(--udgu-color-border);
+}
+.metric {
+  display: flex;
+  min-width: 0;
+  min-height: 8rem;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: clamp(1rem, 2vw, 1.5rem);
+  color: var(--udgu-color-text);
+  background: var(--udgu-color-surface);
+  text-decoration: none;
+}
+.metric:focus-visible, .rowLink:focus-visible, .disclosure > summary:focus-visible {
+  outline: 2px solid var(--udgu-color-primary);
+  outline-offset: -3px;
+}
+.metricCount {
+  display: flex;
+  width: 100%;
+  align-items: baseline;
+  justify-content: space-between;
+}
+.metricCount strong {
+  font-size: clamp(2.6rem, 5vw, 4.25rem);
+  line-height: 1;
+  letter-spacing: -.07em;
+  font-variant-numeric: tabular-nums;
+  font-weight: 560;
+}
+.metricCount i { color: var(--udgu-color-primary); font-size: 1.25rem; font-style: normal; }
+.metric:first-child strong {color: var(--udgu-color-primary)}
+.metricLabel {font-size: .875rem; font-weight: 600}
+.shortcuts {display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,15rem),1fr));gap:.5rem}
+.rowLink {display:flex;align-items:center;justify-content:space-between;min-height:3rem;gap:1rem;padding:.5rem 1rem;border-bottom:1px solid var(--udgu-color-border);color:var(--udgu-color-text)}
+.rowLink span:last-child {color:var(--udgu-color-primary)}
+.recordHeader {display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;flex-wrap:wrap}
+.person {display:flex;gap:.75rem;align-items:center;min-width:0}
+.initials {display:grid;flex:none;place-items:center;width:2.5rem;height:2.5rem;border-radius:50%;background:var(--udgu-color-surface-2);color:var(--udgu-color-text);font-size:.8125rem;font-weight:650}
+.recordMeta {font-size:.8125rem;color:var(--udgu-color-text-muted)}
+.disclosure {margin-top:1rem;border-top:1px solid var(--udgu-color-border)}
+.disclosure > summary {display:flex;align-items:center;justify-content:space-between;gap:.5rem;min-height:2.75rem;cursor:pointer;color:var(--udgu-color-text);font-size:.875rem;font-weight:600;list-style:none}
+.disclosure > summary::-webkit-details-marker {display:none}
+.disclosure > summary::after {content:'+';font-size:1.25rem;color:var(--udgu-color-primary)}
+.disclosure[open] > summary::after {content:'−'}
+.fieldList {display:grid;gap:.5rem;padding:.75rem 0}
+.fieldList > div {display:grid;grid-template-columns:minmax(5rem,1fr) minmax(0,2fr);gap:1rem;font-size:.875rem;overflow-wrap:anywhere}
+.fieldList dt {color:var(--udgu-color-text-muted)}
+.library, .inbox {display:grid;gap:1rem;align-items:start}
+.library > *, .inbox > * {min-width:0}
+.fileRow {display:flex;align-items:center;gap:.875rem;flex-wrap:wrap;padding:.875rem 0;border-bottom:1px solid var(--udgu-color-border)}
+.fileRow > div:first-child {flex:1 1 12rem;min-width:0}
+.fileRow .initials {border-radius:6px;color:var(--udgu-color-primary)}
+.fileInfo {min-width:0;overflow-wrap:anywhere}
+.conversation {display:flex;gap:.75rem;align-items:center;min-height:4.5rem;padding:.75rem;border-bottom:1px solid var(--udgu-color-border);color:var(--udgu-color-text)}
+.conversation[aria-current] {background:var(--udgu-color-primary-soft);border-radius:8px;font-weight:600}
+.bubbles {display:grid;gap:.75rem;margin:1.25rem 0}
+.bubbles > li {width:fit-content;max-width:90%;padding:.625rem .875rem;border-radius:8px;background:var(--udgu-color-surface-2);overflow-wrap:anywhere}
+.bubbles > li[data-mine="true"] {justify-self:end;background:var(--udgu-color-primary-soft)}
+@media(min-width:900px) {
+  .library {grid-template-columns:minmax(0,1.3fr) minmax(17rem,.8fr)}
+  .inbox {grid-template-columns:minmax(13rem,.72fr) minmax(18rem,1.4fr)}
+}
+@media(hover:hover) {
+  .rowLink:hover, .metric:hover, .conversation:hover {background:var(--udgu-color-surface-2)}
+}
+@media(prefers-reduced-motion:no-preference) {
+  .metric i {transition:transform .18s ease-out}
+  .metric:hover i, .metric:focus-visible i {transform:translate(2px,-2px)}
+  .disclosure[open] > :not(summary), .bubbles > li:last-child {animation:appear .2s ease-out}
+  @keyframes appear {from {opacity:.3;transform:translateY(3px)}to{opacity:1;transform:translateY(0)}}
+}

@@ -8,6 +8,7 @@
  * областью. Данные карточки приходят с сервера пропсами — владение
  * проверено в packages/core (сотрудник видит только свой институт).
  */
+import styles from '../../../workspace.module.css';
 import { useRouter } from 'next/navigation';
 import { Card, StatusBadge } from '../../../../components/ui';
 import { formatMoment } from '../../../../components/format';
@@ -21,27 +22,29 @@ export function StaffRequestCard({ request }: { request: StaffRequestItem }): Re
 
   return (
     <Card>
-      <div className="flex flex-wrap items-center gap-2">
-        <h2 className="min-w-0 flex-1 text-sm font-semibold text-text">{request.typeLabel}</h2>
+      <div className={styles.recordHeader}>
+        <div className={styles.person}>
+          <span className={styles.initials} aria-hidden="true">
+            {request.student.fullName.trim().split(/\s+/).slice(0, 2).map((word) => word[0]).join('')}
+          </span>
+          <div>
+            <h2 className="font-semibold text-text">{request.typeLabel}</h2>
+            <p className={styles.recordMeta}>{request.student.fullName} · {request.student.groupName}</p>
+          </div>
+        </div>
         <StatusBadge tone={requestStatusTone(request.status)}>{request.statusLabel}</StatusBadge>
       </div>
 
-      <dl className="mt-3 space-y-1.5">
-        <div className="flex gap-2 text-sm">
-          <dt className="w-32 shrink-0 text-text-muted">Студент:</dt>
-          <dd className="min-w-0 text-text">{request.student.fullName}</dd>
-        </div>
-        <div className="flex gap-2 text-sm">
-          <dt className="w-32 shrink-0 text-text-muted">Группа:</dt>
-          <dd className="min-w-0 text-text">{request.student.groupName}</dd>
-        </div>
-        {formDataEntries.map(([key, value]) => (
-          <div key={key} className="flex gap-2 text-sm">
-            <dt className="w-32 shrink-0 text-text-muted">{requestFieldLabel(key)}:</dt>
-            <dd className="min-w-0 text-text">{value}</dd>
-          </div>
-        ))}
-      </dl>
+      {formDataEntries.length > 0 ? (
+        <details className={styles.disclosure}>
+          <summary>Данные заявки</summary>
+          <dl className={styles.fieldList}>
+            {formDataEntries.map(([key, value]) => (
+              <div key={key}><dt>{requestFieldLabel(key)}</dt><dd>{value}</dd></div>
+            ))}
+          </dl>
+        </details>
+      ) : null}
 
       {request.staffComment === null ? null : (
         <p className="mt-3 rounded-md bg-surface-2 px-3 py-2 text-sm text-text">
@@ -59,11 +62,11 @@ export function StaffRequestCard({ request }: { request: StaffRequestItem }): Re
 
       {request.status === 'READY' || request.status === 'REJECTED' ? (
         <p className="mt-2 text-xs text-text-muted">
-          Заявка закрыта: «{request.statusLabel}». Студент уже получил решение.
+          Решение отправлено студенту.
         </p>
       ) : (
-        <details className="mt-3 rounded-md border border-border bg-surface-2/40 px-3 py-2">
-          <summary className="min-h-11 cursor-pointer py-2 text-sm font-medium text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
+        <details className={styles.disclosure}>
+          <summary>
             Принять решение
           </summary>
           <RequestDecisionForm

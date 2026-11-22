@@ -12,6 +12,8 @@ import { Card, EmptyState, SegmentedLinks } from '../../../components/ui';
 import { PageHeader } from '../../../components/PageHeader';
 import { PageResult, SectionTitle } from '../../../components/PageStates';
 import { LessonRow } from '../../../components/LessonRow';
+import styles from '../academic.module.css';
+import { WeekDays } from './WeekDays';
 import { DayTimeline } from '../../../components/DayTimeline';
 import { formatDateRange, formatDateWithYear, weekdayShort } from '../../../components/format';
 import { IconCalendar, IconChevronLeft, IconChevronRight } from '../../../components/icons';
@@ -79,7 +81,7 @@ export function ScheduleView({
                   />
                   {data.offset === 0 ? null : (
                     <Link
-                      href={weekHref}
+                      href="/schedule?view=week&offset=0"
                       className="inline-flex min-h-11 items-center rounded-md px-2 text-sm font-medium text-primary underline decoration-dotted"
                     >
                       Текущая неделя
@@ -110,28 +112,16 @@ export function ScheduleView({
                   {data.offset === 0 ? 'Текущая неделя' : data.offset > 0 ? 'Следующая неделя' : 'Прошедшая неделя'}:{' '}
                   {formatDateRange(data.week.weekStart, data.week.weekEnd)}
                 </p>
-                <div className="space-y-4">
-                  {data.week.days.map((day) => (
-                    <section key={day.date.toISOString()} aria-labelledby={`day-${day.date.toISOString()}`}>
-                      <SectionTitle>
-                        <span id={`day-${day.date.toISOString()}`}>
-                          {weekdayShort(day.weekday)}, {formatDateWithYear(day.date)}
-                        </span>
-                      </SectionTitle>
-                      <Card>
-                        {day.lessons.length === 0 ? (
-                          <p className="py-1 text-sm text-text-muted">Занятий нет</p>
-                        ) : (
-                          <ul>
-                            {day.lessons.map((lesson) => (
-                              <LessonRow key={lesson.id} lesson={lesson} />
-                            ))}
-                          </ul>
-                        )}
-                      </Card>
-                    </section>
-                  ))}
-                </div>
+                <WeekDays key={data.offset} initialDate={data.date} days={data.week.days.map(day => ({
+                  date: day.date.toISOString().slice(0, 10),
+                  weekday: weekdayShort(day.weekday),
+                  number: String(day.date.getUTCDate()),
+                  title: formatDateWithYear(day.date),
+                  count: day.lessons.length,
+                  content: day.lessons.length === 0
+                    ? <p className={styles.empty}>Занятий нет</p>
+                    : <ul>{day.lessons.map(lesson => <LessonRow key={lesson.id} lesson={lesson}/>)}</ul>,
+                }))}/>
               </>
             ) : null}
 

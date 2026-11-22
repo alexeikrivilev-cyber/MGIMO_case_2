@@ -22,10 +22,10 @@
  * подсказке, случайный (16 символов) — не помечается браузером как
  * «утёкший». Данные всех аккаунтов синтетические.
  */
-import { useState, type FormEvent } from 'react';
+import { useRef, useState, type FormEvent } from 'react';
 import { ApiClientError, api, type OAuthProviderPath } from '../../../lib/api-client';
-import { Button, Card, TextInput } from '../../../components/ui';
-import { ConceptMark } from '../../../components/ConceptMark';
+import { Button, TextInput } from '../../../components/ui';
+import styles from '../access.module.css';
 import { DEMO_ACCOUNTS, DEMO_PASSWORD, type DemoAccount } from '@udgu/ui';
 
 /** Провайдеры OAuth-эмуляции: сегмент пути роута → подпись кнопки. */
@@ -71,6 +71,8 @@ export default function LoginPage(): React.JSX.Element {
   const [pending, setPending] = useState(false);
   const [oauthPending, setOauthPending] = useState<OAuthProviderPath | null>(null);
 
+  const demoList = useRef<HTMLDetailsElement>(null);
+  const submitButton = useRef<HTMLDivElement>(null);
   const busy = pending || oauthPending !== null;
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
@@ -103,18 +105,15 @@ export default function LoginPage(): React.JSX.Element {
   function fillDemo(account: DemoAccount): void {
     setLogin(account.login);
     setPassword(DEMO_PASSWORD);
+    if (demoList.current) demoList.current.open = false;
+    requestAnimationFrame(() => submitButton.current?.querySelector('button')?.focus());
     setError(null);
   }
 
   return (
-    <Card>
-      <div className="flex items-center gap-3">
-        <ConceptMark className="h-10 w-10 text-primary" />
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-text">Вход в кабинет</h1>
-          <p className="mt-0.5 text-sm text-text-muted">УдГУ — цифровой деканат</p>
-        </div>
-      </div>
+    <section className={styles.formPanel}>
+      <h1>Вход в кабинет</h1>
+      <p className={styles.subtitle}>С университетской учётной записью</p>
 
       <form className="mt-6 space-y-4" onSubmit={handleSubmit} noValidate>
         <TextInput
@@ -157,61 +156,52 @@ export default function LoginPage(): React.JSX.Element {
           )}
         </div>
 
-        <Button
+        <div ref={submitButton} className={styles.primary}><Button
           type="submit"
           fullWidth
           loading={pending}
           loadingLabel="Входим…"
           disabled={busy || login.trim() === '' || password === ''}
         >
-          Войти
-        </Button>
+          Войти <span aria-hidden="true">→</span>
+        </Button></div>
       </form>
 
-      <div className="mt-6 space-y-2">
-        <p className="text-xs font-medium text-text-muted">Или войдите через</p>
+      <p className={styles.divider}>Другие способы входа</p>
+      <div className={styles.providers}>
         {OAUTH_PROVIDERS.map((provider) => (
           <Button
             key={provider.path}
             variant="secondary"
-            fullWidth
+            aria-label={`Войти через ${provider.label}`}
             loading={oauthPending === provider.path}
             loadingLabel="Открываем согласие…"
             disabled={busy}
             onClick={() => handleOAuth(provider.path)}
           >
-            {`Войти через ${provider.label}`}
+            {provider.label}
           </Button>
         ))}
       </div>
 
-      <div className="mt-6 rounded-md bg-surface-2 p-3">
-        <p className="text-xs font-medium text-text">Демо-доступ</p>
-        <div
-          className="mt-2 grid gap-2"
-          role="group"
-          aria-label="Демо-доступ: подставить логин и пароль в форму"
-        >
+      <details ref={demoList} className={styles.demo}>
+        <summary>Демо-доступ<span aria-hidden="true">⌄</span></summary>
+        <div className={styles.accounts} role="group" aria-label="Выберите демо-аккаунт">
           {DEMO_ACCOUNTS.map((account) => (
-            <Button
+            <button
               key={account.login}
-              variant="secondary"
-              fullWidth
+              type="button"
               disabled={busy}
               data-testid={`demo-login-${account.login}`}
               onClick={() => fillDemo(account)}
             >
-              {`${account.login} — ${account.label}`}
-            </Button>
+              <span>{account.label}</span><code>{account.login}</code>
+            </button>
           ))}
         </div>
-        <p className="mt-2 text-xs text-text-muted">
-          Пароль для всех:{' '}
-          <span className="font-mono text-text" data-testid="demo-password">
-            {DEMO_PASSWORD}
-          </span>
-        </p>
-      </div>
-    </Card>
+        <p className={styles.password}>Общий пароль <code data-testid="demo-password">{DEMO_PASSWORD}</code></p>
+      </details>
+    </section>
   );
 }
+

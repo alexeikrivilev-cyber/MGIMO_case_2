@@ -22,67 +22,28 @@ import Link from 'next/link';
 import { Card, EmptyState, LinkButton, StatusBadge } from '../../../components/ui';
 import { PageHeader } from '../../../components/PageHeader';
 import { StaffPageResult } from '../../../components/StaffPageResult';
-import { FOCUS_RING, PRESS_FEEDBACK } from '../../../lib/ui';
+import styles from '../../workspace.module.css';
 import { IconMove, IconRequests } from '../../../components/icons';
 import { loadStaffDashboardPageData, type LoadResult, type StaffDashboardPageData } from '../../../lib/page-data';
 
 /** Плитка очереди: счётчик + подпись + куда ведёт. */
-function QueueTile({
-  count,
-  label,
-  hint,
-  href,
-  linkLabel,
-  tone = 'info',
-  testId,
-}: {
+function QueueTile({ count, label, href, linkLabel, testId }: {
   count: number;
   label: string;
-  hint: string;
   href: string;
   linkLabel: string;
-  tone?: 'info' | 'warning' | 'success';
   testId: string;
 }): React.JSX.Element {
   return (
-    <Card data-testid={testId}>
-      <div className="flex flex-wrap items-center gap-2">
-        <h2 className="min-w-0 flex-1 text-sm font-semibold text-text">{label}</h2>
-        <StatusBadge tone={count > 0 ? tone : 'neutral'}>{count > 0 ? `${count} в очереди` : 'Пусто'}</StatusBadge>
-      </div>
-      <p className="mt-1.5 text-sm text-text-muted">{hint}</p>
-      <div className="mt-3">
-        <LinkButton href={href} variant="secondary" className="min-h-11">
-          {linkLabel}
-        </LinkButton>
-      </div>
-    </Card>
+    <Link href={href} data-testid={testId} className={styles.metric} aria-label={`${linkLabel} · ${count}`}>
+      <span className={styles.metricCount}><strong>{count}</strong><i aria-hidden="true">↗</i></span>
+      <span className={styles.metricLabel}>{label}</span>
+    </Link>
   );
 }
 
-/** Ссылка на раздел с пояснением — быстрый путь ко всем частям кабинета. */
-function SectionLink({
-  href,
-  title,
-  description,
-}: {
-  href: string;
-  title: string;
-  description: string;
-}): React.JSX.Element {
-  return (
-    <li>
-      <Link
-        href={href}
-        className={`flex min-h-11 items-center gap-3 rounded-xl border border-border bg-surface px-4 py-3 shadow-sm ${PRESS_FEEDBACK} hover:bg-surface-2 ${FOCUS_RING}`}
-      >
-        <span className="min-w-0 flex-1">
-          <span className="block text-sm font-medium text-text">{title}</span>
-          <span className="mt-0.5 block text-xs text-text-muted">{description}</span>
-        </span>
-      </Link>
-    </li>
-  );
+function SectionLink({ href, title }: {href: string; title: string}): React.JSX.Element {
+  return <li><Link className={styles.rowLink} href={href}><span>{title}</span><span aria-hidden="true">↗</span></Link></li>;
 }
 
 export function StaffDashboardView({ result }: { result: LoadResult<StaffDashboardPageData> }): React.JSX.Element {
@@ -95,14 +56,14 @@ export function StaffDashboardView({ result }: { result: LoadResult<StaffDashboa
 
         return (
           <>
-            <PageHeader title="Кабинет деканата" subtitle={`Очереди и задачи: ${scope}`} />
+            <PageHeader title="Кабинет деканата" subtitle={scope} />
 
-            <div className="space-y-3">
+            <div className={styles.workload}>
               <QueueTile
                 testId="queue-requests"
                 count={dashboard.newRequests}
                 label="Заявки и справки"
-                hint="Ждут вашего решения."
+
                 href="/staff/requests"
                 linkLabel="Открыть очередь заявок"
               />
@@ -110,19 +71,19 @@ export function StaffDashboardView({ result }: { result: LoadResult<StaffDashboa
                 testId="queue-verifications"
                 count={dashboard.pendingVerifications}
                 label="Верификация студбилетов"
-                hint="Проверка фото против учётной записи."
+
                 href="/staff/verifications"
                 linkLabel="Открыть очередь верификаций"
-                tone="warning"
+
               />
               <QueueTile
                 testId="queue-sick"
                 count={dashboard.sickNow}
                 label="Статусы «болею»"
-                hint="Кто отмечен болеющим сейчас."
+
                 href="/staff/sick-leaves"
                 linkLabel="Смотреть, кто болеет"
-                tone="warning"
+
               />
             </div>
 
@@ -173,40 +134,25 @@ export function StaffDashboardView({ result }: { result: LoadResult<StaffDashboa
 
             <section aria-labelledby="staff-sections" className="mt-6">
               <h2 id="staff-sections" className="mb-2 text-base font-semibold text-text">
-                Разделы кабинета
+                Быстрый переход
               </h2>
-              <ul className="space-y-2">
+              <ul className={styles.shortcuts}>
                 {data.isTeacher ? (
                   <SectionLink
                     href="/teacher/plans"
                     title="Кабинет преподавателя"
-                    description="Учебные планы и ассистент"
+
                   />
                 ) : null}
                 <SectionLink
-                  href="/staff/requests"
-                  title="Заявки и справки"
-                  description="Очередь заявок института"
-                />
-                <SectionLink
-                  href="/staff/verifications"
-                  title="Верификация студбилетов"
-                  description="Очередь проверки фото"
-                />
-                <SectionLink
-                  href="/staff/sick-leaves"
-                  title="Статусы «болею»"
-                  description="Период, причина, справка"
-                />
-                <SectionLink
                   href="/staff/announcements"
                   title="Объявления"
-                  description="Публикация для института или группы"
+
                 />
                 <SectionLink
                   href="/staff/schedule"
                   title="Расписание групп"
-                  description="Перенос и отмена пар"
+
                 />
               </ul>
             </section>

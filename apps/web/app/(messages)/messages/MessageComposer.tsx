@@ -48,6 +48,7 @@ export function MessageComposer({
           ? submitError.message
           : 'Не удалось отправить. Попробуйте снова.',
       );
+    } finally {
       setPending(false);
     }
   }
@@ -60,7 +61,7 @@ export function MessageComposer({
         value={body}
         maxLength={MAX_MESSAGE_LENGTH}
         disabled={pending}
-        onChange={(event) => setBody(event.target.value)}
+        onChange={(event) => { setBody(event.target.value); setDone(null); }}
       />
 
       <div role="status" aria-live="polite">
@@ -74,7 +75,7 @@ export function MessageComposer({
         )}
       </div>
 
-      <Button type="submit" loading={pending} loadingLabel="Отправляем…">
+      <Button type="submit" loading={pending} disabled={body.trim() === ''} loadingLabel="Отправляем…">
         Отправить
       </Button>
     </form>

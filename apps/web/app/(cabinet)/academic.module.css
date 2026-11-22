@@ -1,0 +1,95 @@
+.board {
+  display: grid;
+  gap: 24px;
+}
+.board > header { margin-bottom: 0; }
+.hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 32px;
+  border-radius: var(--udgu-radius-md, 8px);
+  padding: clamp(24px, 4vw, 48px);
+  background: #111111;
+  color: #ffffff;
+}
+.heroInfo { min-width: 0; }
+.heroLabel, .meeting, .sectionHead, .notice {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+}
+.heroLabel { font-size: .875rem; font-weight: 600; }
+.heroLabel i { width: 8px; height: 8px; border-radius: 50%; background: #1677ff; }
+.heroLabel span { padding: 2px 8px; border: 1px solid #6b7280; border-radius: 4px; }
+.hero h2 { font-size: clamp(1.8rem, 4vw, 3.5rem); font-weight: 600; letter-spacing: -.045em; line-height: 1.08; margin: 18px 0 16px; overflow-wrap: anywhere; }
+.meeting { gap: 4px 16px; font-size: 1rem; }
+.meeting strong { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.hero p { color: #d9dee7; margin-top: 8px; font-size: .875rem; }
+.heroLink, .lineAction { display: inline-flex; align-items: center; gap: 12px; min-height: 44px; font-weight: 600; font-size: .9rem; }
+.heroLink { margin-top: 16px; }
+.heroLink span { transition: transform .2s ease-out; }
+.heroLink:hover span { transform: translateX(4px); }
+.dial { width: clamp(104px, 14vw, 176px); height: auto; color: #d9dee7; }
+.columns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; align-items: start; }
+.sheet { min-width: 0; padding: clamp(16px, 2.4vw, 28px); background: var(--udgu-color-surface); border: 1px solid var(--udgu-color-border); border-radius: var(--udgu-radius-md, 8px); }
+.sectionHead { justify-content: space-between; margin-bottom: 8px; }
+.sectionHead h2, .dayPanel h2 { font-size: 1.15rem; line-height: 1.2; letter-spacing: -.025em; font-weight: 650; }
+.sectionHead a, .notice a { font-size: .875rem; min-height: 44px; display: inline-flex; align-items: center; gap: 4px; font-weight: 600; }
+.sectionHead a:hover, .notice a:hover, .lineAction:hover { text-decoration: underline; text-underline-offset: 4px; }
+.empty { padding-block: 12px; font-size: .9375rem; color: var(--udgu-color-text-muted); }
+.list > li { padding: 12px 0; border-bottom: 1px solid var(--udgu-color-border); }
+.list > li:last-child { border-bottom: 0; }
+.list p, .notice p { font-size: .9rem; margin-top: 4px; color: var(--udgu-color-text-muted); }
+.list small { display: block; margin-top: 4px; color: var(--udgu-color-text-muted); font-size: .8rem; }
+.list summary, .requestDetails summary { cursor: pointer; font-weight: 560; line-height: 1.45; padding: 4px 0; }
+.list summary::marker, .requestDetails summary::marker { color: var(--udgu-color-primary); }
+.notice { background: var(--udgu-color-surface-2); justify-content: space-between; padding: 12px 20px; border-radius: var(--udgu-radius-md,8px); }
+.weekStrip { display: flex; gap: 4px; border-bottom: 1px solid var(--udgu-color-border); padding-bottom: 16px; }
+.weekStrip button { flex: 1; min-width: 0; min-height: 64px; padding: 8px 0; border-radius: 8px; display: grid; justify-items: center; gap: 2px; font-variant-numeric: tabular-nums; cursor: pointer; transition: background-color .18s; }
+.weekStrip button[aria-pressed="true"] { background: var(--udgu-color-text); color: var(--udgu-color-bg); }
+.weekStrip button[aria-pressed="false"]:hover { background: var(--udgu-color-surface-2); }
+.weekStrip small { font-size: .75rem; }
+.weekStrip strong { font-size: clamp(1rem, 3vw, 1.5rem); }
+.weekStrip i { width: 5px; height: 5px; border-radius: 50%; }
+.weekStrip [data-lessons="true"] { background: currentColor; }
+.dayPanel { padding-top: 24px; }
+.dayPanel h2 { margin-bottom: 8px; }
+.score { display: inline-flex; align-items: center; gap: 8px; font-variant-numeric: tabular-nums; font-weight: 650; }
+.scoreMarks { display: flex; gap: 2px; align-items: flex-end; }
+.scoreMarks i { display: block; width: 5px; height: 12px; background: var(--udgu-color-border); }
+.scoreMarks i[data-filled="true"] { background: var(--udgu-color-primary); }
+.gradesMetrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 195px),1fr)); padding: 20px 0 12px; gap: 20px; border-bottom: 1px solid var(--udgu-color-border); }
+.gradesMetrics [data-testid="average-score"] { font-size: clamp(2.25rem,5vw,3.6rem); line-height: 1.1; letter-spacing: -.055em; }
+.steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; margin: 16px 0; }
+.steps li { min-width: 0; }
+.steps i { display: block; height: 5px; border-radius: 3px; background: var(--udgu-color-border); }
+.steps [data-complete="true"] i, .steps [aria-current="step"] i { background: var(--udgu-color-primary); }
+.steps span { display: block; margin-top: 5px; font-size: .75rem; color: var(--udgu-color-text-muted); }
+.steps [aria-current="step"] span { font-weight: 700; color: var(--udgu-color-text); }
+.requestDetails { margin-top: 12px; }
+.requestList { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit,minmax(min(100%, 320px),1fr)); align-items: start; }
+.move { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 6px; font-size: .875rem; font-weight: 600; }
+.move del { color: var(--udgu-color-text-muted); }
+:where(.board,.sheet,.requestDetails) :focus-visible { outline: 2px solid var(--udgu-color-primary); outline-offset: 3px; }
+@media (max-width: 760px) {
+  .columns { grid-template-columns: 1fr; gap: 16px; }
+  .board { gap: 16px; }
+  .hero { gap: 12px; }
+}
+@media (max-width: 480px) {
+  .hero { grid-template-columns: minmax(0, 1fr); }
+  .dial { display: none; }
+  .weekStrip { gap: 0; }
+}
+@keyframes revealDay { from { opacity: .35; transform: translateY(5px); } }
+@keyframes fillStep { from { transform: scaleX(.25); opacity: .45; } }
+@media (prefers-reduced-motion: no-preference) {
+  .dayPanel { animation: revealDay .22s ease-out; }
+  .steps [aria-current="step"] i { animation: fillStep .25s ease-out; transform-origin: left; }
+  .list details[open] p, .requestDetails[open] dl { animation: revealDay .18s ease-out; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .heroLink span, .weekStrip button { transition: none; }
+}
